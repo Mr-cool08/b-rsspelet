@@ -35,16 +35,16 @@ class Scenario:
 @dataclass(frozen=True, slots=True)
 class GameMode:
     key: str
-    starting_cash: Decimal = Decimal("1000")
+    starting_cash: Decimal = Decimal("500")
     starting_hp: int = 100
     allowed_actions: frozenset[str] = frozenset({"buy", "short", "sell", "confirm_sell"})
     buy_percentages: tuple[int, ...] = (25, 50, 75, 100)
-    attack_multiplier: Decimal = Decimal("2")
+    attack_multiplier: Decimal = Decimal("4")
     base_attack_cap: int = 35
     attack_cap: int = 50
-    attack_power_credits_per_point: int = 5
+    attack_power_credits_per_point: Decimal = Decimal("2.5")
     attack_power_limit: int = 25
-    grow_multiplier: Decimal = Decimal("2.5")
+    grow_multiplier: Decimal = Decimal("5")
     grow_bonus_cap: int = 25
     loss_damage_cap: int = 20
     market_storm_at: int = 75
@@ -52,6 +52,7 @@ class GameMode:
     market_storm_damage: int = 2
     final_storm_damage: int = 4
     rating_k: int = K_FACTOR
+    loss_multiplier: Decimal = Decimal("2")
 
     @property
     def scenario_seconds(self) -> int:
@@ -288,7 +289,7 @@ class Match:
         return min(self.mode.grow_bonus_cap - player.grow_bonus, floor(profit * self.mode.grow_multiplier))
 
     def _loss_damage(self, player: PlayerState, profit: Decimal) -> int:
-        return min(player.hp, self.mode.loss_damage_cap, floor(-profit))
+        return min(player.hp, self.mode.loss_damage_cap, floor(-profit * self.mode.loss_multiplier))
 
     def _close_preview(
         self, position: Position, player: PlayerState, opponent: PlayerState, profit: Decimal

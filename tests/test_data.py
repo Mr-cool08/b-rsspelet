@@ -436,6 +436,25 @@ def test_prediction_provider_prefers_moving_short_window_to_flat_long_window(dat
     assert tuple(bar.close for bar in scenario.bars) == tuple(map(Decimal, active_closes))
 
 
+def test_prediction_provider_prefers_larger_moves_within_a_stock(database, tmp_path, monkeypatch):
+    preview = 12
+    required = preview + MAX_ROUNDS
+    modest_closes = (100, 101) * (required // 2)
+    strong_closes = (100, 106) * (required // 2)
+    rows = []
+    for start, closes in ((0, modest_closes), (100, strong_closes)):
+        for offset, close in enumerate(closes):
+            row = _csv_row(start + offset)
+            rows.append((*row[:3], close, close, close, close, *row[7:]))
+    import_csv(_write_csv(tmp_path / "volatile.csv", rows), source="volatility fixture")
+    monkeypatch.setattr("stockfight.market_data.randrange", lambda count: count - 1)
+
+    scenario = DatabaseMarketProvider().choose_prediction(required_bars=required, preview_count=preview)
+
+    assert scenario.bars[0].timestamp == FIRST_BAR + timedelta(minutes=100)
+    assert tuple(bar.close for bar in scenario.bars) == strong_closes
+
+
 def test_demo_is_idempotent_and_all_bars_are_synthetic(database):
     seeded = seed_demo()
     assert seeded == _count(MarketData) > 0
@@ -453,8 +472,8 @@ def test_demo_prediction_has_meaningful_changes_and_keeps_original_closes(databa
     seed_demo()
     preview = 12
     scenario = DatabaseMarketProvider().choose_prediction(required_bars=preview + MAX_ROUNDS, preview_count=preview)
-    assert scenario.interval == "3m"
-    assert all(after.timestamp - before.timestamp == timedelta(minutes=3) for before, after in pairwise(scenario.bars))
+    assert scenario.interval == "5m"
+    assert all(after.timestamp - before.timestamp == timedelta(minutes=5) for before, after in pairwise(scenario.bars))
 
     original = dict(db.session.execute(select(MarketData.timestamp, MarketData.close).where(
         MarketData.symbol == scenario.symbol, MarketData.source == scenario.source,
@@ -464,6 +483,7 @@ def test_demo_prediction_has_meaningful_changes_and_keeps_original_closes(databa
 
     moves = [price_move_bps(before.close, after.close) for before, after in pairwise(scenario.bars)]
     actual_moves = moves[preview - 1:]
+    assert median(map(abs, actual_moves)) >= 150
     assert min(actual_moves[:4]) <= -75 and max(actual_moves[:4]) >= 75
     assert sum(abs(move) >= 75 for move in actual_moves) >= 6
     assert sum(

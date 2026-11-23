@@ -10,7 +10,7 @@ from .ranking import K_FACTOR
 
 
 MAX_ROUNDS = 8
-PREDICTION_STEP = 3
+PREDICTION_STEPS = (5, 3, 1)
 SIGNIFICANT_MOVE_BPS = 75
 PREDICT_SECONDS = 20
 REVEAL_SECONDS = 4
@@ -29,12 +29,12 @@ def price_move_bps(previous_price: Decimal, price: Decimal) -> int:
     return int(actual_move.to_integral_value(rounding=ROUND_HALF_UP))
 
 
-def prediction_window_quality(moves: tuple[int, ...], preview_moves: int) -> int:
-    """Prefer active windows where visible price momentum is useful."""
+def prediction_window_quality(moves: tuple[int, ...], preview_moves: int) -> tuple[int, int]:
+    """Rate the activity and typical size of the moves that players will predict."""
     actual_moves = moves[preview_moves:]
     opening = actual_moves[:4]
     if not opening:
-        return 0
+        return 0, 0
     increases = sum(move >= SIGNIFICANT_MOVE_BPS for move in actual_moves)
     decreases = sum(move <= -SIGNIFICANT_MOVE_BPS for move in actual_moves)
 
@@ -46,12 +46,16 @@ def prediction_window_quality(moves: tuple[int, ...], preview_moves: int) -> int
         actual = moves[index]
         trend_wins.append(abs(guess - actual) < abs(actual))
 
-    return sum((
+    quality = sum((
         increases >= 2 and decreases >= 2,
         (increases + decreases) * 4 >= len(actual_moves) * 3,
         min(opening) <= -SIGNIFICANT_MOVE_BPS and max(opening) >= SIGNIFICANT_MOVE_BPS,
         sum(trend_wins) * 2 > len(trend_wins) and sum(trend_wins[:4]) * 2 >= len(opening),
     ))
+    typical_move = median(map(abs, actual_moves))
+    # Coarse tiers leave room to vary starts and a single spike cannot drive the score.
+    move_tier = sum(typical_move >= threshold for threshold in (150, 300, 450))
+    return quality, move_tier
 
 
 def revealed_prediction_bars(scenario: Scenario, revealed_count: int) -> list[dict]:

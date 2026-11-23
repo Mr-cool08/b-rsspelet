@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
 from threading import Barrier
 
 import pytest
@@ -68,6 +69,7 @@ def test_only_one_guest_can_use_an_invitation_concurrently(game):
     host_state, guest_state = host.state(), admitted.state()
     assert host_state["id"] == guest_state["id"]
     assert host_state["mode"] == guest_state["mode"] == "private"
+    assert Decimal(host_state["self"]["cash"]) == Decimal(guest_state["self"]["cash"]) == 500
     assert host_state["opponent"]["id"] == admitted.id
     assert rejected.events("match_state") == []
     assert not rejected.emit("private_join", {"code": code})["ok"]

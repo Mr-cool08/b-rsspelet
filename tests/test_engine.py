@@ -67,10 +67,10 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(initial["self"]["id"], 1)
         self.assertEqual(initial["opponent"]["id"], 2)
         self.assertEqual(initial["self"]["hp"], 100)
-        self.assertEqual(initial["self"]["cash"], "1000")
-        self.assertEqual(initial["self"]["capital"], "1000")
+        self.assertEqual(initial["self"]["cash"], "500")
+        self.assertEqual(initial["self"]["capital"], "500")
         self.assertEqual(initial["self"]["attackPower"], 100)
-        self.assertEqual(initial["opponent"]["capital"], "1000")
+        self.assertEqual(initial["opponent"]["capital"], "500")
         self.assertEqual([bar["close"] for bar in initial["bars"]], ["90", "100"])
         for public_bar, source_bar in zip(initial["bars"], scenario.bars, strict=False):
             self.assertEqual(set(public_bar), {"time", "open", "high", "low", "close"})
@@ -110,12 +110,12 @@ class MatchTests(unittest.TestCase):
         for percent in (25, 50, 75, 100):
             with self.subTest(percent=percent):
                 match = make_match("128", "160")
-                invested = Decimal(10 * percent)
+                invested = Decimal(5 * percent)
                 act(match, "buy", 0, {"percent": percent})
                 match.advance(START + 1)
                 state = match.public(1, START + 1)["self"]
 
-                self.assertEqual(Decimal(state["cash"]), 1000 - invested)
+                self.assertEqual(Decimal(state["cash"]), 500 - invested)
                 self.assertEqual(Decimal(state["position"]["entryPrice"]), 128)
                 self.assertEqual(Decimal(state["position"]["invested"]), invested)
                 self.assertEqual(Decimal(state["position"]["pnl"]), invested / 4)
@@ -160,8 +160,8 @@ class MatchTests(unittest.TestCase):
         short = match.public(1, START + 1)["self"]["position"]
         long = match.public(2, START + 1)["self"]["position"]
         self.assertEqual((short["side"], long["side"]), ("short", "long"))
-        self.assertEqual(Decimal(short["pnl"]), 5)
-        self.assertEqual(Decimal(long["pnl"]), -5)
+        self.assertEqual(Decimal(short["pnl"]), Decimal("2.5"))
+        self.assertEqual(Decimal(long["pnl"]), Decimal("-2.5"))
 
         sale = request_sale(match, 1)
         self.assertTrue(sale["requiresChoice"])
@@ -169,7 +169,7 @@ class MatchTests(unittest.TestCase):
 
         state = match.public(1, START + 2)["self"]
         self.assertIsNone(state["position"])
-        self.assertEqual(Decimal(state["cash"]), Decimal("1012.5"))
+        self.assertEqual(Decimal(state["cash"]), Decimal("506.25"))
         self.assertEqual(state["growBonus"], 25)
         self.assertEqual(state["hp"], 100)
 
@@ -177,7 +177,7 @@ class MatchTests(unittest.TestCase):
         for percent in (25, 100):
             with self.subTest(percent=percent):
                 match = make_match("100", "98", "250")
-                invested = Decimal(10 * percent)
+                invested = Decimal(5 * percent)
                 act(match, "short", 0, {"percent": percent})
                 sale = request_sale(match, 1)
                 self.assertTrue(sale["requiresChoice"])
@@ -189,7 +189,7 @@ class MatchTests(unittest.TestCase):
 
                 state = match.public(1, START + 2)
                 self.assertIsNone(state["self"]["position"])
-                self.assertEqual(Decimal(state["self"]["cash"]), 1000 - invested)
+                self.assertEqual(Decimal(state["self"]["cash"]), 500 - invested)
                 self.assertEqual(state["self"]["hp"], 80)
                 self.assertEqual(state["opponent"]["hp"], 100)
                 self.assertEqual(state["event"]["type"], "loss")
@@ -207,7 +207,7 @@ class MatchTests(unittest.TestCase):
 
         confirm_sale(match, 1.5, "attack", sale["positionId"])
         state = match.public(1, START + 1.5)
-        self.assertEqual(Decimal(state["self"]["cash"]), 1000)
+        self.assertEqual(Decimal(state["self"]["cash"]), 500)
         self.assertEqual(state["self"]["attackDamage"], 5)
         self.assertEqual(state["opponent"]["hp"], 95)
         self.assertIsNone(state["self"]["position"])
@@ -223,8 +223,8 @@ class MatchTests(unittest.TestCase):
                 "sold_at": 1.5,
                 "buy_price": Decimal("100"),
                 "sell_price": Decimal("101.1"),
-                "invested": Decimal("250"),
-                "profit": Decimal("2.75"),
+                "invested": Decimal("125"),
+                "profit": Decimal("1.375"),
                 "choice": "attack",
                 "damage": 5,
             }
@@ -232,7 +232,7 @@ class MatchTests(unittest.TestCase):
 
     def test_growth_accumulates_bonus_then_capped_attack_spends_it(self):
         match = make_match("100", "100.8", "101.304", "101.81052", "111.991572")
-        expected = ((25, "1002", 5), (100, "1007.01", 17), (100, "1012.04505", 25))
+        expected = ((25, "501", 5), (100, "503.505", 17), (100, "506.022525", 25))
         for elapsed, (percent, cash, bonus) in enumerate(expected, start=1):
             act(match, "buy", elapsed - 1, {"percent": percent})
             sale = request_sale(match, elapsed)
@@ -247,7 +247,7 @@ class MatchTests(unittest.TestCase):
         confirm_sale(match, 4, "attack", sale["positionId"])
         state = match.public(1, START + 4)
         self.assertEqual(state["self"]["growBonus"], 0)
-        self.assertEqual(Decimal(state["self"]["cash"]), Decimal("1012.04505"))
+        self.assertEqual(Decimal(state["self"]["cash"]), Decimal("506.022525"))
         self.assertEqual(state["self"]["attackDamage"], 51)
         self.assertEqual(state["opponent"]["hp"], 49)
         stats = match.summary(1)
@@ -258,7 +258,7 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(stats["winningTrades"], 4)
         self.assertEqual(stats["losingTrades"], 0)
         self.assertIsInstance(stats["capital"], str)
-        self.assertEqual(Decimal(stats["capital"]), Decimal("1012.04505"))
+        self.assertEqual(Decimal(stats["capital"]), Decimal("506.022525"))
         self.assertGreaterEqual(Decimal(stats["peakCapital"]), Decimal(stats["capital"]))
 
     def test_realized_capital_scales_attack_preview_and_damage_with_all_cash_invested(self):
@@ -271,7 +271,7 @@ class MatchTests(unittest.TestCase):
         act(match, "buy", 1, {"percent": 100})
         act(match, "buy", 1, {"percent": 100}, user_id=2)
 
-        for user_id, capital, attack_power, preview_damage in ((1, 1050, 110, 55), (2, 950, 90, 31)):
+        for user_id, capital, attack_power, preview_damage in ((1, 525, 110, 55), (2, 475, 90, 31)):
             with self.subTest(user_id=user_id):
                 sale = request_sale(match, 2, user_id=user_id)
                 state = match.public(user_id, START + 2)
@@ -309,7 +309,7 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(preview["positionId"], sale["positionId"])
         self.assertEqual(preview["kind"], "profit")
         self.assertEqual(preview["attackDamage"], 12)
-        self.assertEqual(Decimal(preview["growCredits"]), 6)
+        self.assertEqual(Decimal(preview["growCredits"]), 3)
         self.assertEqual(preview["growBonus"], 4)
         opponent_view = match.public(2, START + 1)
         self.assertNotIn("closePreview", opponent_view["opponent"])
@@ -317,7 +317,7 @@ class MatchTests(unittest.TestCase):
 
         match.advance(START + 2)
         preview = match.public(1, START + 2)["self"]["position"]["closePreview"]
-        self.assertEqual(Decimal(preview["growCredits"]), 15)
+        self.assertEqual(Decimal(preview["growCredits"]), Decimal("7.5"))
         self.assertEqual(preview["positionId"], sale["positionId"])
         match.advance(START + 3)
         preview = match.public(1, START + 3)["self"]["position"]["closePreview"]
@@ -329,13 +329,13 @@ class MatchTests(unittest.TestCase):
         match.advance(START + 5)
         preview = match.public(1, START + 5)["self"]["position"]["closePreview"]
         self.assertEqual(preview["kind"], "loss")
-        self.assertEqual(Decimal(preview["lossCredits"]), Decimal("12.5"))
+        self.assertEqual(Decimal(preview["lossCredits"]), Decimal("6.25"))
         self.assertEqual(preview["lossDamage"], 12)
         self.assertEqual(preview["attackDamage"], 0)
         confirm_sale(match, 5, "close", preview["positionId"])
         player = match.public(1, START + 5)["self"]
         self.assertEqual(player["hp"], 88)
-        self.assertEqual(Decimal(player["cash"]), Decimal("987.5"))
+        self.assertEqual(Decimal(player["cash"]), Decimal("493.75"))
         self.assertIsNone(player["position"])
 
     def test_attack_without_bonus_caps_base_damage_and_knocks_out_immediately(self):
@@ -377,7 +377,7 @@ class MatchTests(unittest.TestCase):
         self.assertIsNone(breakeven["position"])
         self.assertEqual(breakeven["growBonus"], 25)
         self.assertEqual(breakeven["hp"], 100)
-        self.assertEqual(Decimal(breakeven["cash"]), Decimal("1010"))
+        self.assertEqual(Decimal(breakeven["cash"]), Decimal("505"))
         self.assertEqual(match.trades[-1]["choice"], "flat")
 
         act(match, "buy", 2, {"percent": 100})
@@ -387,8 +387,8 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(state["self"]["growBonus"], 0)
         self.assertEqual(state["self"]["hp"], 80)
         self.assertEqual(state["event"]["type"], "loss")
-        self.assertEqual(Decimal(state["self"]["cash"]), Decimal("989.8"))
-        self.assertEqual(match.trades[-1]["profit"], Decimal("-20.2"))
+        self.assertEqual(Decimal(state["self"]["cash"]), Decimal("494.9"))
+        self.assertEqual(match.trades[-1]["profit"], Decimal("-10.1"))
         self.assertEqual(match.trades[-1]["choice"], "loss")
         self.assertEqual(match.trades[-1]["damage"], 20)
         self.assertEqual(match.summary(1)["losingTrades"], 1)
@@ -420,8 +420,8 @@ class MatchTests(unittest.TestCase):
             confirm_sale(match, 1, "grow", "wrong-position")
         confirm_sale(match, 2, "grow", first_sale["positionId"])
         self.assertEqual(match.trades[-1]["sell_price"], 108)
-        self.assertEqual(match.trades[-1]["profit"], 80)
-        self.assertEqual(Decimal(match.public(1, START + 2)["self"]["cash"]), 1080)
+        self.assertEqual(match.trades[-1]["profit"], 40)
+        self.assertEqual(Decimal(match.public(1, START + 2)["self"]["cash"]), 540)
 
         act(match, "buy", 2, {"percent": 25})
         second_sale = request_sale(match, 3)
@@ -439,9 +439,9 @@ class MatchTests(unittest.TestCase):
         confirm_sale(match, 2, "attack", sale["positionId"])
         state = match.public(1, START + 2)
         self.assertEqual(match.trades[-1]["sell_price"], 95)
-        self.assertEqual(match.trades[-1]["profit"], -50)
+        self.assertEqual(match.trades[-1]["profit"], -25)
         self.assertEqual(match.trades[-1]["choice"], "loss")
-        self.assertEqual(Decimal(state["self"]["cash"]), 950)
+        self.assertEqual(Decimal(state["self"]["cash"]), 475)
         self.assertEqual(state["self"]["hp"], 80)
         self.assertEqual(state["self"]["attackDamage"], 0)
         self.assertEqual(state["opponent"]["hp"], 100)
@@ -463,7 +463,7 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(state["self"]["growBonus"], 25)
         self.assertEqual(state["self"]["hp"], 100)
         self.assertEqual(state["opponent"]["hp"], 100)
-        self.assertEqual(Decimal(state["self"]["cash"]), 1010)
+        self.assertEqual(Decimal(state["self"]["cash"]), 505)
         self.assertIsNone(state["self"]["position"])
 
     def test_storm_uses_whole_seconds_and_hits_both_players(self):
@@ -534,7 +534,7 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(match.status, "finished")
         self.assertEqual(match.duration, 113.0)
         self.assertEqual(match.winner_id, 2)
-        for user_id, capital, opponent_capital in ((1, 996, 1000), (2, 1000, 996)):
+        for user_id, capital, opponent_capital in ((1, 498, 500), (2, 500, 498)):
             summary = match.summary(user_id)
             self.assertEqual(Decimal(summary["capital"]), capital)
             self.assertEqual(Decimal(summary["opponentCapital"]), opponent_capital)
@@ -554,7 +554,7 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(summary["tiebreak"], "attack_damage")
 
     def test_simultaneous_storm_knockout_rounds_capital_to_cents_without_open_pnl(self):
-        for price, winner, tiebreak in (("100.0004", None, None), ("100.0005", 1, "capital")):
+        for price, winner, tiebreak in (("100.0008", None, None), ("100.001", 1, "capital")):
             with self.subTest(price=price):
                 match = make_match("100", price, "110")
                 act(match, "buy", 0, {"percent": 100})

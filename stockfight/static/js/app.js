@@ -15,18 +15,19 @@
     const outcomeLabels = { win: "VANN", lose: "FÖRLORADE", loss: "FÖRLORADE", draw: "OAVGJORT" };
     const spectateModeLabels = { ranked: "Handelsduell", prediction: "Ritduell", bot: "Botduell", private: "Vänduell" };
     const acknowledgements = 5000;
+    const queueBotWaitSeconds = 20;
     const chartRightPadding = 24;
     const chartZoomFactor = 1.5;
     const activityActions = ["play", "play-bot", "play-prediction", "practice-prediction", "guide-start", "tutorial-replay",
         "guide-begin", "guide-bypass", "friend-create", "main-menu", "spectate"];
     const tutorialSteps = 4;
     const tutorialDirectionFeedback = {
-        up: "Kursen stiger från 100 till 104. Din position visar +10 krediter.",
-        down: "Kursen faller från 100 till 96. Din position visar +10 krediter.",
+        up: "100 ↗ 104 · +5 krediter",
+        down: "100 ↘ 96 · +5 krediter",
     };
     const tutorialProfitFeedback = {
-        attack: "Attack gör 20 HP skada. Motståndaren har 80 HP kvar och du har kvar 1 000 krediter.",
-        grow: "Grow sparar vinsten. Du har 1 010 krediter, 102 % attackkraft och 25 bonus-HP till nästa attack.",
+        attack: "Motståndare −20 HP · 500 krediter kvar",
+        grow: "505 krediter · 102 % attackkraft · +25 bonus-HP",
     };
     const localizedValues = new Map();
 
@@ -75,6 +76,7 @@
     let nextSeq;
     let tradeCommand;
     let sellChoice;
+    let keptPositionId;
     let tradeFocus;
     let percent = 100;
     let lastEventId;
@@ -371,6 +373,8 @@
         }
         putLocalized("tutorial-direction-feedback", tutorialDirectionFeedback[direction] ?? "");
         putLocalized("tutorial-profit-feedback", tutorialProfitFeedback[profit] ?? "");
+        show("tutorial-direction-feedback", Boolean(direction));
+        show("tutorial-profit-feedback", Boolean(profit));
         disable("tutorial-close-position", closed);
         show("tutorial-profit-options", closed);
         show("tutorial-exit", !session.duelTutorialPending);
@@ -606,6 +610,7 @@
             if (queueLeavePending && !match) sendQueueCommand(false);
             else if (queueWanted && screen === "queue" && !match) sendQueueCommand(true);
             queueReconnect = false;
+            renderQueueActions();
             if (screen === "spectate") subscribeSpectateList();
             if (screen === "spectate-live" && !spectateFinished) subscribeSpectateMatch();
         });
@@ -613,7 +618,6 @@
             queueReconnect = queueWanted;
             queueCommand = undefined;
             setActivityCommand(undefined);
-            disable("leave-queue", false);
             if (tradeCommand) {
                 message("match-feedback", "Anslutningen bröts under handeln. Kontrollera din position när du är tillbaka.");
             }
@@ -910,10 +914,7 @@
         queueData = undefined;
         queueLeavePending = false;
         queueReconnect = !socket.connected;
-        put("queue-wait", clock(0));
-        put("queue-radius", "—");
-        putLocalized("queue-title", mode === "prediction" ? "Söker en ritduell" : "Söker motståndare");
-        disable("leave-queue", false);
+        renderQueue({ waited: 0 });
         activate("queue");
         if (socket.connected) sendQueueCommand(true);
     }
@@ -922,6 +923,7 @@
         activityCommand = command;
         for (const action of activityActions) disable(action, Boolean(command));
         putLocalized("bot-start-label", command?.event === "bot_start" ? "Startar …" : "Spela mot bot");
+        renderQueueActions();
         renderPrivate();
         renderPrediction();
         renderPlayAgain();
@@ -946,9 +948,14 @@
         else sender.emit(event, payload, acknowledge);
     }
 
-    function startBotMatch(forceGuide = false) {
-        if (!session.user || queueWanted || activityCommand) return;
-        guideRequested = forceGuide;
+    function startBotMatch({ guide = false, fromQueue = false } = {}) {
+        if (!session.user || activityCommand) return;
+        if (fromQueue) {
+            if (screen !== "queue" || !queueBotOffered() || queueCommand?.join) return;
+        } else if (queueWanted) {
+            return;
+        }
+        guideRequested = guide;
         message("guide-start-error", "");
         sendActivity("bot_start", undefined, (error) => {
             guideRequested = false;
@@ -1085,10 +1092,12 @@
     }
 
     function leaveQueue() {
+        if (activityCommand) return;
         queueWanted = false;
         queueLeavePending = true;
         queueReconnect = false;
         if (!socket?.connected) {
+            renderQueueActions();
             activate("menu");
             return;
         }
@@ -1099,12 +1108,11 @@
         if (!socket?.connected || (queueCommand && queueCommand.join === join)) return;
         const command = { join };
         queueCommand = command;
-        disable("leave-queue", !join);
+        renderQueueActions();
         const payload = join && queueMode === "prediction" ? { mode: queueMode } : {};
         socket.timeout(acknowledgements).emit(join ? "queue_join" : "queue_leave", payload, (error, ack) => {
             if (queueCommand !== command) return;
             queueCommand = undefined;
-            disable("leave-queue", false);
             if (error && !socket?.connected) return;
             if (error || ack?.ok === false) {
                 if (join && queueWanted && screen === "queue") {
@@ -1115,6 +1123,7 @@
                     queueLeavePending = false;
                     queueWanted = true;
                 }
+                renderQueueActions();
                 toast(ack?.error || "Kön svarade inte. Försök igen.", "error");
                 return;
             }
@@ -1122,6 +1131,7 @@
                 queueLeavePending = false;
                 if (screen === "queue") activate("menu");
             }
+            renderQueueActions();
         });
     }
 
@@ -1144,7 +1154,8 @@
         queueWanted = false;
         queueLeavePending = false;
         queueReconnect = false;
-        disable("leave-queue", false);
+        queueData = undefined;
+        renderQueueActions();
         if (screen === "queue") activate("menu");
         if (data.error) toast(data.error, "error");
     }
@@ -1153,6 +1164,22 @@
         put("queue-wait", clock(data.waited));
         put("queue-radius", numeric(data.radius) == null ? "—" : `±${formatNumber(data.radius)}`);
         putLocalized("queue-title", queueMode === "prediction" ? "Söker en ritduell" : "Söker motståndare");
+        renderQueueActions();
+    }
+
+    function queueBotOffered() {
+        return queueWanted && queueData?.waited >= queueBotWaitSeconds;
+    }
+
+    function renderQueueActions() {
+        const botOffered = queueBotOffered();
+        show("queue-bot", botOffered);
+        disable("queue-bot", !botOffered || !socket?.connected || Boolean(queueCommand?.join || activityCommand));
+        disable("leave-queue", queueCommand?.join === false || Boolean(activityCommand));
+        if (botOffered) {
+            const label = queueMode === "prediction" ? "Spela handelsduell mot bot" : "Spela mot bot";
+            putLocalized("queue-bot-label", activityCommand?.event === "bot_start" ? "Startar …" : label);
+        }
     }
 
     function preference(name, fallback) {
@@ -1194,11 +1221,8 @@
                 button.setAttribute("aria-pressed", String(action === choice));
             }
         }
-        const outcomes = {
-            attack: "Attack gör upp till 20 HP skada och förbrukar vinsten.",
-            grow: "Grow ger 10 krediter, höjer attackkraften till 102 % och laddar nästa attack med 25 bonus-HP.",
-        };
-        putLocalized("guide-example-result", outcomes[choice] ?? "");
+        putLocalized("guide-example-result", tutorialProfitFeedback[choice] ?? "");
+        show("guide-example-result", Boolean(choice));
     }
 
     function openBotGuide() {
@@ -1219,13 +1243,10 @@
     function renderGuide() {
         show("bot-guide", guideActive);
         if (!guideActive) return;
-        const position = match?.self?.position;
-        let step = "Välj en insats och tryck UPP eller NER beroende på vart du tror kursen går.";
-        if (position) step = "Följ affärens resultat och tryck Stäng position när du vill avsluta.";
-        if (sellChoice?.kind === "profit") step = "Attack använder vinsten till skada. Grow sparar vinsten, bygger attackkraft och laddar nästa attack.";
-        if (sellChoice?.kind === "flat" || sellChoice?.kind === "loss") {
-            step = "Kursen har ändrats. Stäng positionen vid den nya kursen.";
-        }
+        const preview = visibleSellChoice();
+        let step = "Välj insats och tryck UPP eller NER.";
+        if (match?.self?.position) step = "Följ affären och stäng när du vill.";
+        if (preview) step = preview.kind === "profit" ? "Attack gör skada. Grow sparar vinsten." : "Stäng till aktuell kurs eller fortsätt hålla.";
         putLocalized("bot-guide-step", step);
     }
 
@@ -1282,6 +1303,7 @@
         nextSeq = undefined;
         tradeCommand = undefined;
         sellChoice = undefined;
+        keptPositionId = undefined;
         tradeFocus = undefined;
         guideActive = false;
         lastEventId = undefined;
@@ -1706,10 +1728,13 @@
         queueLeavePending = false;
         queueReconnect = false;
         queueCommand = undefined;
+        queueData = undefined;
+        renderQueueActions();
         match = data;
         matchSynchronized = true;
         if (numeric(data.nextSeq) != null) nextSeq = Math.max(nextSeq ?? 0, Number(data.nextSeq));
         sellChoice = data.self?.position?.closePreview ?? undefined;
+        if (!sellChoice || sellChoice.positionId !== keptPositionId) keptPositionId = undefined;
         if (data.mode === "private") forgetInviteCode();
         activate("match");
         renderMatch(data, true);
@@ -1780,7 +1805,9 @@
         put("match-invested", formatNumber(position?.invested ?? 0, amountFormat));
         put("match-grow", formatNumber(data.self?.growBonus));
         stateAttribute("grow-stat", "charged", String(data.self?.growBonus > 0));
-        put("match-direction", position ? positionDirection(position) : null);
+        const directionArrow = position?.side === "short" ? "↘" : "↗";
+        put("match-direction", position ? `${directionArrow} ${positionDirection(position)}` : null);
+        stateAttribute("match-direction", "side", position?.side ?? "");
         put("match-entry", formatNumber(position?.entryPrice, amountFormat));
         put("match-pnl", signed(position?.pnl, amountFormat));
         stateAttribute("match-pnl", "sign", sign(numeric(position?.pnl)));
@@ -1802,12 +1829,13 @@
         for (const button of document.querySelectorAll("[data-percent]")) {
             button.setAttribute("aria-pressed", String(Number(button.dataset.percent) === value));
         }
-        renderStake();
     }
 
     function renderStake() {
         const cash = numeric(match?.self?.cash);
-        put("stake-amount", cash == null ? "—" : formatNumber(cash * percent / 100, amountFormat));
+        for (const stake of [25, 50, 75, 100]) {
+            put(`stake-${stake}`, cash == null ? "—" : formatNumber(cash * stake / 100, amountFormat));
+        }
     }
 
     function tradeReady() {
@@ -1815,40 +1843,65 @@
             && !result && nextSeq != null && (sellChoice || Number(match.nextSeq) >= nextSeq));
     }
 
+    function visibleSellChoice() {
+        return sellChoice?.positionId === keptPositionId ? undefined : sellChoice;
+    }
+
+    function keepHolding() {
+        if (!tradeReady() || !visibleSellChoice()) return;
+        keptPositionId = sellChoice.positionId;
+        tradeFocus = "sell";
+        message("match-feedback", "");
+        renderGuide();
+        renderTradeControls();
+    }
+
     function renderTradeControls() {
         const ready = tradeReady();
         const position = match?.self?.position;
-        const choosing = ready && Boolean(sellChoice);
-        const profitable = sellChoice?.kind === "profit";
+        const preview = visibleSellChoice();
+        const choosing = ready && Boolean(preview);
+        const profitable = preview?.kind === "profit";
         const canOpen = ready && !position && numeric(match?.self?.cash) > 0;
+        const step = preview ? "exit" : position ? "hold" : "entry";
+        for (const item of byId("trade-steps").children) {
+            const current = item.dataset.tradeStep === step;
+            if (current !== item.hasAttribute("aria-current")) {
+                if (current) item.setAttribute("aria-current", "step");
+                else item.removeAttribute("aria-current");
+            }
+        }
         const focusedAction = tradeFocus ?? document.activeElement?.dataset.action;
         if (choosing && profitable && focusedAction === "confirm-close") tradeFocus = "attack";
         if (choosing && !profitable && ["attack", "grow"].includes(focusedAction)) tradeFocus = "confirm-close";
         disable("buy", !canOpen);
         disable("short", !canOpen);
-        disable("sell", !ready || !position || Boolean(sellChoice));
+        disable("sell", !ready || !position || Boolean(preview));
         disable("attack", !choosing || !profitable);
         disable("grow", !choosing || !profitable);
         disable("confirm-close", !choosing || profitable);
+        disable("keep-holding", !choosing);
         show("open-order", !position);
-        show("close-order", Boolean(position) && !sellChoice);
-        show("sell-choice", Boolean(sellChoice));
+        show("position-summary", Boolean(position));
+        show("close-order", Boolean(position) && !preview);
+        show("sell-choice", Boolean(preview));
         show("profit-actions", profitable);
-        show("pending-close", Boolean(sellChoice) && !profitable);
+        show("pending-close", Boolean(preview) && !profitable);
         renderStake();
-        if (sellChoice) {
-            let hint = t("Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.");
+        if (preview) {
+            putLocalized("sell-choice-title", profitable ? "Använd vinsten" : "Avsluta affären");
+            let hint = t("Vid aktuell kurs");
             if (profitable) {
-                put("attack-preview", t("{damage} HP skada", { damage: formatNumber(sellChoice.attackDamage) }));
+                put("attack-preview", t("{damage} HP skada", { damage: formatNumber(preview.attackDamage) }));
                 put("grow-preview", t("{credits} krediter · {bonus} bonus-HP", {
-                    credits: signed(sellChoice.growCredits, amountFormat), bonus: formatNumber(sellChoice.growBonus),
+                    credits: signed(preview.growCredits, amountFormat), bonus: formatNumber(preview.growBonus),
                 }));
-            } else if (sellChoice.kind === "loss") {
-                hint = t("Vid aktuell kurs förlorar du {credits} krediter och {damage} HP.", {
-                    credits: formatNumber(sellChoice.lossCredits, amountFormat), damage: formatNumber(sellChoice.lossDamage),
+            } else if (preview.kind === "loss") {
+                hint = t("{credits} krediter · {damage} HP", {
+                    credits: signed(-Number(preview.lossCredits), amountFormat), damage: signed(-preview.lossDamage),
                 });
             } else {
-                hint = t("Vid aktuell kurs stänger du positionen utan vinst eller förlust.");
+                hint = t("±0 krediter");
             }
             put("sell-choice-hint", hint);
         }
@@ -1866,7 +1919,14 @@
 
     function trade(action, choice) {
         if (!tradeReady()) return;
-        if (action === "confirm_sell" && !sellChoice) return;
+        if (action === "sell" && sellChoice && !visibleSellChoice()) {
+            keptPositionId = undefined;
+            tradeFocus = sellChoice.kind === "profit" ? "attack" : "confirm-close";
+            renderGuide();
+            renderTradeControls();
+            return;
+        }
+        if (action === "confirm_sell" && !visibleSellChoice()) return;
         const buttonAction = action === "confirm_sell" && sellChoice?.kind !== "profit" ? "confirm-close" : choice ?? action;
         const opensPosition = action === "buy" || action === "short";
         const reopenAction = match.self?.position?.side === "short" ? "short" : "buy";
@@ -2154,10 +2214,11 @@
                 if (guideSeen) startBotMatch();
                 else openBotGuide();
                 break;
+            case "queue-bot": startBotMatch({ fromQueue: true }); break;
             case "guide-start": openBotGuide(); break;
             case "guide-example-attack": chooseGuideExample("attack"); break;
             case "guide-example-grow": chooseGuideExample("grow"); break;
-            case "guide-begin": startBotMatch(true); break;
+            case "guide-begin": startBotMatch({ guide: true }); break;
             case "guide-bypass": markGuideSeen(); startBotMatch(); break;
             case "guide-skip": finishGuide(); break;
             case "play-prediction": newQueue("prediction"); break;
@@ -2207,6 +2268,7 @@
             case "attack": trade("confirm_sell", "attack"); break;
             case "grow": trade("confirm_sell", "grow"); break;
             case "confirm-close": trade("confirm_sell", "close"); break;
+            case "keep-holding": keepHolding(); break;
         }
     }
 

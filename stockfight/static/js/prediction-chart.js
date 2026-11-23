@@ -2,7 +2,9 @@
     "use strict";
 
     const { getLocale, t } = window.StockFightI18n;
-    const minimumRadiusBps = 500;
+    const minimumPredictionRadiusBps = 100;
+    const minimumRevealPaddingBps = 25;
+    const recentMoveCount = 6;
 
     function axisFormats() {
         const style = { style: "percent", signDisplay: "exceptZero" };
@@ -22,12 +24,28 @@
         return format.format(bps / 10_000);
     }
 
-    function chartRadius(history, forecast) {
-        const historyExtent = Math.max(...history.map((point) => Math.abs(point.bps)));
-        const extent = Math.max(minimumRadiusBps, historyExtent * 1.15, ...forecast.map((move) => Math.abs(move ?? 0)));
-        const unit = 10 ** Math.floor(Math.log10(extent));
-        const step = [1, 2, 2.5, 5, 10].find((value) => value * unit >= extent) ?? 10;
-        return step * unit;
+    function chartScale(bars, actual) {
+        let min;
+        let max;
+        if (actual != null) {
+            const padding = Math.max(minimumRevealPaddingBps, Math.abs(actual) / 4);
+            min = Math.min(0, actual) - padding;
+            max = Math.max(0, actual) + padding;
+        } else {
+            const closes = bars.slice(-recentMoveCount - 1).map(({ close }) => Number(close));
+            const moves = closes.slice(1).map((close, index) => Math.abs(close / closes[index] - 1) * 10_000);
+            const radius = Math.ceil(Math.max(minimumPredictionRadiusBps, Math.max(0, ...moves) * 2));
+            min = Math.max(-10_000, -radius);
+            max = Math.min(Number.MAX_SAFE_INTEGER, radius);
+        }
+
+        const targetStep = (max - min) / 5;
+        const unit = 10 ** Math.floor(Math.log10(targetStep));
+        const step = ([1, 2, 2.5, 5, 10].find((value) => value * unit >= targetStep) ?? 10) * unit;
+        const firstTick = Math.ceil(min / step);
+        const lastTick = Math.floor(max / step);
+        const ticks = Array.from({ length: lastTick - firstTick + 1 }, (_, index) => (firstTick + index) * step);
+        return { min, max, ticks };
     }
 
     window.createPredictionChart = (canvas, drawTarget, onDraw) => {
@@ -80,11 +98,10 @@
             const own = view.outcome ? view.outcome.selfMoveBps : view.guess;
             const opponent = view.outcome?.opponentMoveBps;
             const actual = view.outcome?.actualMoveBps;
-            const radius = drag?.radius ?? chartRadius(history, [own, opponent, actual]);
+            const scale = drag?.scale ?? chartScale(bars, actual);
 
             context.font = "11px system-ui, sans-serif";
-            const ticks = [radius, radius / 2, 0, -radius / 2, -radius]
-                .map((bps) => ({ bps, label: axisLabel(bps) }));
+            const ticks = scale.ticks.map((bps) => ({ bps, label: axisLabel(bps) }));
             const top = 16;
             const bottom = height - 29;
             const left = Math.ceil(Math.max(...ticks.map(({ label }) => context.measureText(label).width))) + 13;
@@ -92,10 +109,10 @@
             const plotWidth = right - left;
             const anchor = left + plotWidth * 0.59;
             const end = right - plotWidth * 0.12;
-            const y = (bps) => top + (bottom - top) * (1 - bps / radius) / 2;
+            const y = (bps) => top + (bottom - top) * (scale.max - bps) / (scale.max - scale.min);
             const firstTime = Math.min(-1, history[0].time);
             const x = (time) => left + (anchor - left) * (time - firstTime) / -firstTime;
-            plot = { top, bottom, radius };
+            plot = { top, bottom, scale };
             const editable = drawTarget && view.editable && end > anchor && bottom > top;
             if (editable) {
                 Object.assign(drawTarget.style, {
@@ -123,6 +140,10 @@
             context.fillText(t("Historik"), (left + anchor) / 2, height - 11);
             context.fillText(editable ? t("Rita prognos") : t("Nästa punkt"), (anchor + end) / 2, height - 11);
 
+            context.save();
+            context.beginPath();
+            context.rect(left, top, plotWidth, bottom - top);
+            context.clip();
             context.beginPath();
             context.strokeStyle = colors.history;
             context.lineWidth = 2;
@@ -131,12 +152,18 @@
                 else context.lineTo(x(point.time), y(point.bps));
             });
             context.stroke();
+            context.restore();
             mark(anchor, y(0), colors.history, 3);
 
             function forecast(move, color, dash, thickness) {
                 if (move == null) return;
-                segment(anchor, y(0), end, y(move), color, dash, thickness);
-                mark(end, y(move), color, thickness + 1);
+                const visibleMove = Math.max(scale.min, Math.min(scale.max, move));
+                const inRange = visibleMove === move;
+                const endX = inRange ? end : anchor + (end - anchor) * (visibleMove / move);
+                const endY = y(visibleMove);
+                segment(anchor, y(0), endX, endY, color, dash, thickness);
+                if (inRange) mark(endX, endY, color, thickness + 1);
+                else arrow(endX, endY, Math.sign(move), color);
             }
 
             forecast(own, colors.self, [5, 4], 2);
@@ -162,16 +189,26 @@
             context.fill();
         }
 
+        function arrow(x, y, direction, color) {
+            context.beginPath();
+            context.fillStyle = color;
+            context.moveTo(x, y);
+            context.lineTo(x - 4, y + direction * 6);
+            context.lineTo(x + 4, y + direction * 6);
+            context.fill();
+        }
+
         function updatePointer(event, bounds) {
             const y = event.clientY - bounds.top;
             const position = Math.min(1, Math.max(0, (y - plot.top) / (plot.bottom - plot.top)));
-            const bps = Math.round(plot.radius * (1 - 2 * position));
+            const { min, max } = plot.scale;
+            const bps = Math.round(max * (1 - position) + min * position);
             onDraw(Math.max(-10_000, Math.min(Number.MAX_SAFE_INTEGER, bps)));
         }
 
         drawTarget?.addEventListener("pointerdown", (event) => {
             if (!view?.editable || !plot || drag || event.button !== 0) return;
-            drag = { pointer: event.pointerId, radius: plot.radius };
+            drag = { pointer: event.pointerId, scale: plot.scale };
             drawTarget.setPointerCapture(event.pointerId);
             updatePointer(event, canvas.getBoundingClientRect());
         });

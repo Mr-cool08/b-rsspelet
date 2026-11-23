@@ -33,3 +33,21 @@ def test_elo_changes_the_bot_opening_decision():
 
 def test_unrevealed_prices_do_not_change_the_bot_opening_decision():
     assert opening_trade(1100, [103, 104]) == opening_trade(1100, [99, 98])
+
+
+def test_bot_holds_a_position_when_closing_would_knock_it_out():
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    bars = tuple(
+        Bar(start + timedelta(minutes=index), price, price, price, price, 100)
+        for index, price in enumerate(map(Decimal, ("100", "98.7")))
+    )
+    scenario = Scenario("TEST", "SE", "1m", "test", True, bars, preview_count=1)
+    match = Match("bot", {1: "Player", -1: "Bot"}, scenario, 0.0, countdown=0, mode=BOT)
+    bot = TradingBot(100, Random(5))
+    match.act(-1, "buy", {"percent": 100}, 0.0)
+    match.players[-1].hp = 12
+
+    match.advance(3.0)
+    assert not bot.act(match, -1, 3.0)
+    assert match.players[-1].position is not None
+    assert match.players[-1].hp == 12

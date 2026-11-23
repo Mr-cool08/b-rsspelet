@@ -206,7 +206,7 @@ class DatabaseMarketProvider:
 
     def choose_prediction(self, *, required_bars: int, preview_count: int) -> Scenario:
         """Prefer active prediction windows with more time between each close."""
-        from .prediction import PREDICTION_STEP, prediction_window_quality, price_move_bps
+        from .prediction import PREDICTION_STEPS, prediction_window_quality, price_move_bps
 
         preview_moves = min(3, preview_count - 1)
         start = preview_count - 1 - preview_moves
@@ -216,15 +216,15 @@ class DatabaseMarketProvider:
         def move(before: MarketData, after: MarketData) -> int:
             return price_move_bps(before.close, after.close)
 
-        def score_window(rows: tuple[MarketData, ...]) -> int:
+        def score_window(rows: tuple[MarketData, ...]) -> tuple[int, int]:
             moves = tuple(move(before, after) for before, after in pairwise(rows[start:]))
             return prediction_window_quality(moves, preview_moves)
 
-        return self._choose(required_bars, preview_count, strides=(PREDICTION_STEP, 1), score_window=score_window)
+        return self._choose(required_bars, preview_count, strides=PREDICTION_STEPS, score_window=score_window)
 
     def _choose(
         self, required_bars: int, preview_count: int, *, strides: tuple[int, ...],
-        score_window: Callable[[tuple[MarketData, ...]], int] | None = None,
+        score_window: Callable[[tuple[MarketData, ...]], tuple[int, int]] | None = None,
     ) -> Scenario:
         from .data import db
         from .engine import Bar, Scenario
@@ -276,7 +276,7 @@ class DatabaseMarketProvider:
     def _choose_window(
         cls, required_bars: int, synthetic: bool, recent: set[tuple[tuple[str, str], datetime]],
         previous_stock: tuple[str, str] | None, strides: tuple[int, ...],
-        score_window: Callable[[tuple[MarketData, ...]], int] | None,
+        score_window: Callable[[tuple[MarketData, ...]], tuple[int, int]] | None,
     ) -> tuple[tuple[MarketData, ...], int] | None:
         from .data import MarketData, db
 
@@ -316,11 +316,11 @@ class DatabaseMarketProvider:
     @staticmethod
     def _choose_stock_window(
         rows: Iterator[MarketData], window_sizes: tuple[tuple[int, int], ...], recent: set[datetime],
-        synthetic: bool, score_window: Callable[[tuple[MarketData, ...]], int] | None,
-    ) -> tuple[tuple[tuple[MarketData, ...], int], tuple[int, int, int]] | None:
+        synthetic: bool, score_window: Callable[[tuple[MarketData, ...]], tuple[int, int]] | None,
+    ) -> tuple[tuple[tuple[MarketData, ...], int], tuple[int, int, int, int]] | None:
         selected = None
         eligible_windows = 0
-        best_priority = (-1, 0, 0)
+        best_priority = (-1, 0, 0, 0)
         max_size = max(size for _, size in window_sizes)
         for (interval, _), series in groupby(rows, key=attrgetter("interval", "source")):
             step = _interval_delta(interval)
@@ -335,13 +335,16 @@ class DatabaseMarketProvider:
                     if start < 0:
                         continue
                     sampled = None
-                    quality = 0
+                    quality, move_tier = 0, 0
                     if score_window is not None:
                         sampled = tuple(islice(window, start, None, stride))
-                        quality = score_window(sampled)
+                        quality, move_tier = score_window(sampled)
                     fresh = window[start].timestamp not in recent
-                    # Active real windows remain eligible even when another date scores higher.
-                    priority = (quality, stride, fresh) if synthetic else (min(1, quality), fresh, stride)
+                    # Prefer stronger moves among the eligible windows for each stock.
+                    priority = (
+                        (quality, move_tier, stride, fresh) if synthetic
+                        else (min(1, quality), move_tier, fresh, stride)
+                    )
                     if priority > best_priority:
                         best_priority = priority
                         eligible_windows = 0

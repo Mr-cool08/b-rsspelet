@@ -50,17 +50,20 @@ class TradingBot:
         if hold_seconds < 2.5 - 2.0 * self._skill:
             return False
 
+        mode = match.mode
         profit = position.pnl(match.price)
-        if profit < 0 and min(match.mode.loss_damage_cap, int(-profit)) >= player.hp:
+        attack_value = profit * mode.attack_multiplier
+        loss_hp = -profit * mode.loss_multiplier
+        if min(mode.loss_damage_cap, int(loss_hp)) >= player.hp:
             return False
 
-        in_storm = match.duration >= match.mode.market_storm_at
-        profit_target = round(16 - 9 * self._skill)
+        in_storm = match.duration >= mode.market_storm_at
+        attack_target = 2 * round(16 - 9 * self._skill)
         loss_limit = max(2, round(player.hp * (0.18 - 0.12 * self._skill)))
         max_hold = 22.0 - 10.0 * self._skill
         if not (
-            profit >= profit_target
-            or profit <= -loss_limit
+            attack_value >= attack_target
+            or loss_hp >= loss_limit
             or hold_seconds >= max_hold
             or (in_storm and profit > 0)
         ):
@@ -69,12 +72,11 @@ class TradingBot:
         quote = match.act(user_id, "sell", {}, now)
         if quote.get("requiresChoice"):
             # Build a bonus early when the profit would not yet cap an attack.
-            mode = match.mode
             can_grow = (
                 not in_storm
                 and player.grow_bonus < mode.grow_bonus_cap * self._skill
                 and profit * mode.grow_multiplier >= 2
-                and profit * mode.attack_multiplier < mode.base_attack_cap
+                and attack_value < mode.base_attack_cap
             )
             match.act(user_id, "confirm_sell", {
                 "positionId": quote["positionId"],

@@ -1,6 +1,6 @@
 # Stock Fight
 
-Stock Fight är ett mobilanpassat spel med två rankade lägen. I Handelsduell handlar båda samma aktie med 1 000 virtuella krediter och börjar med 100 HP. En vinstaffär kan användas till **Attack** för att skada motståndaren eller **Grow** för att öka kapitalet och ladda nästa attack. I Ritduell tävlar spelarna om att komma närmast nästa kursrörelse. Handelsduell går även att spela privat med en vän eller mot en bot. Ritduell har en övning för en spelare. Elo och avslutade rankade matcher sparas i SQLite lokalt eller i PostgreSQL på Render.
+Stock Fight är ett mobilanpassat spel med två rankade lägen. I Handelsduell handlar båda samma aktie med 500 virtuella krediter och börjar med 100 HP. En vinstaffär kan användas till **Attack** för att skada motståndaren eller **Grow** för att öka kapitalet och ladda nästa attack. I Ritduell tävlar spelarna om att komma närmast nästa kursrörelse. Handelsduell går även att spela privat med en vän eller mot en bot. Ritduell har en övning för en spelare. Elo och avslutade rankade matcher sparas i SQLite lokalt eller i PostgreSQL på Render.
 
 ## Spela lokalt
 
@@ -28,6 +28,7 @@ python3 -m venv .venv
 - **Spela med en vän** skapar en länk till en orankad Handelsduell. Länken fungerar en gång inom 15 minuter. Värden behöver vara ansluten när gästen bekräftar. Efter matchen kan båda tacka ja till revansch inom 15 minuter. Spela från samma lokalnätsadress eller publika adress om ni använder olika enheter.
 - **Spela ritduell** öppnar en separat rankad kö med egen Elo. Dra uppåt eller nedåt i det skuggade prognosfältet eller skriv din gissning i procent. Lås prognosen för att tävla om vem som kommer närmast facit.
 - **Öva ritduell** går igenom tre rundor på en kurva med syntetiska priser. Lås prognosen för att se facit och din avvikelse. Gå vidare när du är redo.
+- **Börskarriär** öppnar fondkontoret. Börja med 5 000 virtuella krediter och fördela dem mellan aktier och kassa med snabbval eller plus- och minusknappar. När du låser upp automatiska säljordrar kan du sätta en stoppkurs eller ett vinstmål. Spela vanliga mandat i egen takt och klara realtidskrisen i slutet av varje karriärsteg för att bli befordrad. Spelläget har simulerade kurser och sparar karriären på kontot. Om du lämnar mitt i en krisfas fortsätter fasen till nästa paus.
 
 För att spela från två mobiler på samma nätverk, sätt `STOCK_FIGHT_DEV_HOST=0.0.0.0` i `.env` före start. Öppna datorns lokala IP-adress med port 8080 från båda mobilerna.
 
@@ -103,7 +104,7 @@ Använd till exempel `SE` eller `US` för marknad och ISO 8601 för tidsstämpel
 
 En handelsduell behöver som standard **51 observationer** i en och samma serie. Det motsvarar förhandsvisningen plus tillräckligt med observationer för 115 sekunders uppspelning. Om du ändrar uppspelningshastigheten behöver varje handelsduell `MATCH_PREVIEW_BARS + ceil(115 / MARKET_TICK_SECONDS)` observationer. En rankad Ritduell behöver minst `MATCH_PREVIEW_BARS + 8` observationer. Intradagsfönster bryts vid luckor. Dagliga och veckovisa serier kan passera stängda handelsdagar, upp till det nominella intervallet plus sex kalenderdagar mellan två observationer.
 
-Ritduellen föredrar perioder med tydliga kursrörelser och lottar bland lämpliga startpunkter. När underlaget räcker kan grafen visa var tredje stängningskurs. Grafen visar då det längre intervallet, till exempel `3d` för dagskurser.
+Ritduellen föredrar perioder med större kursrörelser och lottar bland lämpliga startpunkter. Den kan använda var femte, var tredje eller varje stängningskurs, beroende på vilka fönster som finns. Grafen visar intervallet för de valda kurspunkterna, exempelvis `5d` för var femte dagskurs.
 
 Importera med projektets virtuella miljö aktiv.
 
@@ -125,7 +126,7 @@ Om en rad är ogiltig avbryts hela importen och kommandot anger felet. En andra 
 - Båda spelarna får samma förhandsvisning och tre sekunders nedräkning. Spelservern skickar bara redan visade staplar och använder relativa tider tills resultatet har fastställts.
 - En spelare kan öppna en position med 25, 50, 75 eller 100 procent av sitt tillgängliga kapital. **Upp** ger vinst när kursen stiger och **Ner** ger vinst när den faller. Spelaren kan ha en öppen position åt gången och förlora högst insatsen per affär. Handel och priser räknas med decimaler på servern. Servern behandlar varje kommando under ett lås och uppdaterar först alla kurstick som har förfallit vid behandlingstidpunkten. Varje spelare har ett eget stigande kommandonummer per match.
 - När spelaren stänger en position som ligger på vinst gäller kursen vid bekräftelse av **Attack** eller **Grow**. Om utfallet då har blivit en förlust eller noll används de vanliga reglerna för det utfallet. Attack förbrukar vinsten och Grow-bonusen. Grow behåller vinsten och sparar upp till 25 bonus-HP. En förlust dras från kapitalet, skadar spelaren med högst 20 HP och nollställer bonusen.
-- Attackkraften börjar på 100 % och ändras med 1 procentenhet per hela 5 krediter som kapitalet ligger över eller under startkapitalet på 1 000. Den begränsas till 75–125 % och skalar hela attacken, inklusive Grow-bonusen. Kapitalet räknas som kassan plus den ursprungliga insatsen i en eventuell öppen position.
+- Attackkraften börjar på 100 % och ändras med 1 procentenhet per hela 2,5 krediter som kapitalet ligger över eller under startkapitalet på 500. Den begränsas till 75–125 % och skalar hela attacken, inklusive Grow-bonusen. Kapitalet räknas som kassan plus den ursprungliga insatsen i en eventuell öppen position.
 - Förhandsvisningen av Attack och Grow visar effekten vid den senast visade kursen. Servern uppdaterar effekten när en ny stapel visas. Ett väntande val återställs när spelaren ansluter igen med samma konto.
 - **Market Storm** drar 2 HP per sekund från sekund 75. **Final Storm** drar 4 HP per sekund från sekund 105. En match där båda behåller full hälsa före stormen når dubbel KO vid cirka 114 sekunder. Vid samtidig KO vinner den med mest kapital, avrundat till två decimaler. Vid lika kapital avgör mest attackskada. Om även den är lika blir matchen oavgjord.
 - Matchen fortsätter vid nätavbrott och kan återupptas genom att ansluta med samma konto. Ett kort avbrott ändrar varken HP eller Elo på egen hand. En öppen position vid KO räknas med till sitt investerade belopp i slutkapitalet. Högsta kapital avser det högsta realiserade handelskapitalet.

@@ -119,67 +119,67 @@
                 </header>
 
                 <section id="tutorial-page-1" class="tutorial-page" aria-labelledby="tutorial-step-1">
-                    <h2 id="tutorial-step-1" class="card-title" tabindex="-1" data-i18n="Så vinner du en handelsduell">Så vinner du en handelsduell</h2>
-                    <p data-i18n="Ni handlar på samma aktiekurs. Du vinner genom att få ner motståndaren till 0 HP.">Ni handlar på samma aktiekurs. Du vinner genom att få ner motståndaren till 0 HP.</p>
+                    <h2 id="tutorial-step-1" class="card-title" tabindex="-1" data-i18n="Sänk motståndaren till 0 HP">Sänk motståndaren till 0 HP</h2>
                     <div class="tutorial-duel">
                         <div class="tutorial-player">
                             <h3 data-i18n="Du">Du</h3>
                             <p class="mono">100 HP</p>
                             <progress class="meter" max="100" value="100" aria-hidden="true"></progress>
-                            <p data-i18n="1 000 krediter">1 000 krediter</p>
+                            <p data-i18n="500 krediter">500 krediter</p>
                         </div>
                         <div class="tutorial-player">
                             <h3 data-i18n="Motståndare">Motståndare</h3>
                             <p class="mono">100 HP</p>
                             <progress class="meter" max="100" value="100" aria-hidden="true"></progress>
-                            <p data-i18n="1 000 krediter">1 000 krediter</p>
+                            <p data-i18n="500 krediter">500 krediter</p>
                         </div>
                     </div>
                 </section>
 
                 <section id="tutorial-page-2" class="tutorial-page" aria-labelledby="tutorial-step-2" hidden>
-                    <h2 id="tutorial-step-2" class="card-title" tabindex="-1" data-i18n="Öppna en position">Öppna en position</h2>
-                    <p data-i18n="I en duell kan du satsa 25, 50, 75 eller 100 % av dina tillgängliga krediter. I övningen satsar du 25 % och väljer en riktning.">I en duell kan du satsa 25, 50, 75 eller 100 % av dina tillgängliga krediter. I övningen satsar du 25 % och väljer en riktning.</p>
+                    <h2 id="tutorial-step-2" class="card-title" tabindex="-1" data-i18n="Välj riktning">Välj riktning</h2>
                     <dl class="tutorial-stake">
                         <dt data-i18n="Vald insats">Vald insats</dt>
-                        <dd class="mono" data-i18n="25 % · 250 krediter">25 % · 250 krediter</dd>
+                        <dd class="mono" data-i18n="25 % · 125 krediter">25 % · 125 krediter</dd>
                     </dl>
                     <div class="panel-actions" role="group" aria-label="Välj riktning för din position" data-i18n-aria-label="Välj riktning för din position">
                         <button class="button button-buy direction-button" type="button" data-action="tutorial-up" aria-pressed="false">
-                            <span data-i18n="UPP">UPP</span>
+                            <span><span aria-hidden="true">↗</span> <span data-i18n="UPP">UPP</span></span>
                             <small data-i18n="Vinst vid uppgång">Vinst vid uppgång</small>
                         </button>
                         <button class="button button-short direction-button" type="button" data-action="tutorial-down" aria-pressed="false">
-                            <span data-i18n="NER">NER</span>
+                            <span><span aria-hidden="true">↘</span> <span data-i18n="NER">NER</span></span>
                             <small data-i18n="Vinst vid nedgång">Vinst vid nedgång</small>
                         </button>
                     </div>
-                    <p id="tutorial-direction-feedback" class="tutorial-feedback" role="status"></p>
+                    <p id="tutorial-direction-feedback" class="tutorial-feedback tutorial-outcome" role="status" hidden></p>
                 </section>
 
                 <section id="tutorial-page-3" class="tutorial-page" aria-labelledby="tutorial-step-3" hidden>
                     <h2 id="tutorial-step-3" class="card-title" tabindex="-1" data-i18n="Använd vinsten">Använd vinsten</h2>
-                    <p data-i18n="Din exempelposition ligger 10 krediter plus. Stäng den och välj vad du vill göra med vinsten.">Din exempelposition ligger 10 krediter plus. Stäng den och välj vad du vill göra med vinsten.</p>
+                    <strong class="tutorial-outcome mono" data-i18n="+5 krediter">+5 krediter</strong>
                     <button class="button button-secondary tutorial-close-position" type="button" data-action="tutorial-close-position" aria-controls="tutorial-profit-options" data-i18n="STÄNG POSITION">STÄNG POSITION</button>
                     <div id="tutorial-profit-options" class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till" hidden>
                         <button class="button button-attack direction-button" type="button" data-action="tutorial-attack" aria-pressed="false">
-                            <span>Attack</span>
+                            <span><span aria-hidden="true">⚡︎</span> Attack</span>
                             <small data-i18n="Gör skada">Gör skada</small>
                         </button>
                         <button class="button button-buy direction-button" type="button" data-action="tutorial-grow" aria-pressed="false">
-                            <span>Grow</span>
+                            <span><span aria-hidden="true">↗</span> Grow</span>
                             <small data-i18n="Bygg kapital och bonus">Bygg kapital och bonus</small>
                         </button>
                     </div>
-                    <p id="tutorial-profit-feedback" class="tutorial-feedback" role="status"></p>
-                    <p data-i18n="Stänger du en position med förlust kostar det krediter och kan kosta HP.">Stänger du en position med förlust kostar det krediter och kan kosta HP.</p>
+                    <p id="tutorial-profit-feedback" class="tutorial-feedback tutorial-outcome" role="status" hidden></p>
+                    <p data-i18n="En förlust kostar krediter och kan kosta HP.">En förlust kostar krediter och kan kosta HP.</p>
                 </section>
 
                 <section id="tutorial-page-4" class="tutorial-page" aria-labelledby="tutorial-step-4" hidden>
                     <h2 id="tutorial-step-4" class="card-title" tabindex="-1" data-i18n="När duellen avgörs">När duellen avgörs</h2>
-                    <p data-i18n="Efter 75 sekunder börjar marknadsstormen dra HP från båda. Om ni slås ut samtidigt avgör först kapitalet och sedan vem som gjort mest attackskada. Om även attackskadan är lika blir det oavgjort.">Efter 75 sekunder börjar marknadsstormen dra HP från båda. Om ni slås ut samtidigt avgör först kapitalet och sedan vem som gjort mest attackskada. Om även attackskadan är lika blir det oavgjort.</p>
-                    <p data-i18n="I en rankad handelsduell möter du spelare med liknande Elo. Ditt resultat påverkar ditt Elo. Välj Botduell om du vill öva utan att påverka det.">I en rankad handelsduell möter du spelare med liknande Elo. Ditt resultat påverkar ditt Elo. Välj Botduell om du vill öva utan att påverka det.</p>
-                    <p data-i18n="I Ritduell förutspår ni nästa kursrörelse. Den som kommer närmast gör skada.">I Ritduell förutspår ni nästa kursrörelse. Den som kommer närmast gör skada.</p>
+                    <ul class="tutorial-rules" role="list">
+                        <li><span aria-hidden="true">◷</span><span data-i18n="Efter 75 sekunder drar stormen HP från båda.">Efter 75 sekunder drar stormen HP från båda.</span></li>
+                        <li><span aria-hidden="true">≡</span><span data-i18n="Vid dubbel KO avgör kapital, sedan attackskada.">Vid dubbel KO avgör kapital, sedan attackskada.</span></li>
+                        <li><span aria-hidden="true">↗</span><span data-i18n="Öva i Botduell. Tävla om Elo i rankat läge.">Öva i Botduell. Tävla om Elo i rankat läge.</span></li>
+                    </ul>
                 </section>
 
                 <footer class="tutorial-footer">
@@ -210,6 +210,16 @@
                         </button>
                     </div>
                     {{ market_preview() }}
+                </section>
+                <section class="career-panel mode-panel panel" aria-labelledby="career-title">
+                    <div>
+                        <p class="eyebrow" data-i18n="Solo · Strategi">Solo · Strategi</p>
+                        <h2 id="career-title" data-i18n="Börskarriär">Börskarriär</h2>
+                        <p data-i18n="Bygg en portfölj, klara kundmandat och jobba dig upp till fondchef.">Bygg en portfölj, klara kundmandat och jobba dig upp till fondchef.</p>
+                    </div>
+                    <div class="panel-actions">
+                        <a class="button button-secondary" href="{{ url_for('campaign_page') }}" data-i18n="Öppna fondkontoret">Öppna fondkontoret</a>
+                    </div>
                 </section>
                 <section class="menu-modes" aria-labelledby="modes-title">
                     <h2 id="modes-title" data-i18n="Fler spellägen">Fler spellägen</h2>
@@ -386,6 +396,9 @@
                     <div><dt data-i18n="Väntetid">Väntetid</dt><dd id="queue-wait" class="mono">00:00</dd></div>
                     <div><dt data-i18n="Elo-intervall">Elo-intervall</dt><dd id="queue-radius" class="mono">—</dd></div>
                 </dl>
+                <button id="queue-bot" class="button button-primary" type="button" data-action="queue-bot" hidden>
+                    <span id="queue-bot-label" data-i18n="Spela mot bot">Spela mot bot</span>
+                </button>
                 <button class="button button-secondary" type="button" data-action="leave-queue" data-i18n="Lämna kön">Lämna kön</button>
             </div>
         </section>
@@ -471,48 +484,62 @@
                     </div>
                 </section>
                 <section id="trade-panel" class="trade-panel panel" aria-label="Position och handel" data-i18n-aria-label="Position och handel">
+                    <ol id="trade-steps" class="trade-steps" role="list" aria-label="Handelns steg" data-i18n-aria-label="Handelns steg">
+                        <li data-trade-step="entry" aria-current="step"><span aria-hidden="true">↗</span><span data-i18n="Öppna">Öppna</span></li>
+                        <li data-trade-step="hold"><span aria-hidden="true">◷</span><span data-i18n="Följ kursen">Följ kursen</span></li>
+                        <li data-trade-step="exit"><span aria-hidden="true">✓</span><span data-i18n="Avsluta">Avsluta</span></li>
+                    </ol>
                     <div id="open-order" class="trade-order">
+                        <h2 class="trade-label" data-i18n="Välj insats i krediter">Välj insats i krediter</h2>
                         <div class="percent-buttons" role="group" aria-label="Andel av tillgängliga krediter att satsa" data-i18n-aria-label="Andel av tillgängliga krediter att satsa">
-                            <button type="button" data-percent="25" aria-pressed="false">25 %</button>
-                            <button type="button" data-percent="50" aria-pressed="false">50 %</button>
-                            <button type="button" data-percent="75" aria-pressed="false">75 %</button>
-                            <button type="button" data-percent="100" aria-pressed="true">100 %</button>
+                            <button type="button" data-percent="25" aria-pressed="false" disabled>25 %<small id="stake-25">—</small></button>
+                            <button type="button" data-percent="50" aria-pressed="false" disabled>50 %<small id="stake-50">—</small></button>
+                            <button type="button" data-percent="75" aria-pressed="false" disabled>75 %<small id="stake-75">—</small></button>
+                            <button type="button" data-percent="100" aria-pressed="true" disabled>100 %<small id="stake-100">—</small></button>
                         </div>
-                        <p id="stake-preview" class="trade-detail"><span data-i18n="Vald insats">Vald insats</span> <strong id="stake-amount" class="mono">—</strong> <span data-i18n="krediter">krediter</span></p>
+                        <h2 class="trade-label" data-i18n="Välj riktning">Välj riktning</h2>
                         <div class="order-buttons" role="group" aria-label="Välj riktning för din position" data-i18n-aria-label="Välj riktning för din position">
                             <button class="button button-buy direction-button" type="button" data-action="buy" disabled>
-                                <span><span data-i18n="UPP">UPP</span> <span aria-hidden="true">↗</span></span>
+                                <span><span aria-hidden="true">↗</span> <span data-i18n="UPP">UPP</span></span>
                                 <small data-i18n="Vinst vid uppgång">Vinst vid uppgång</small>
                             </button>
                             <button class="button button-short direction-button" type="button" data-action="short" disabled>
-                                <span><span data-i18n="NER">NER</span> <span aria-hidden="true">↘</span></span>
+                                <span><span aria-hidden="true">↘</span> <span data-i18n="NER">NER</span></span>
                                 <small data-i18n="Vinst vid nedgång">Vinst vid nedgång</small>
                             </button>
                         </div>
                     </div>
+                    <div id="position-summary" class="position-summary" hidden>
+                        <div class="position-result">
+                            <div><span data-i18n="Affären just nu">Affären just nu</span><strong id="match-pnl" class="mono">—</strong> <small data-i18n="krediter">krediter</small></div>
+                            <span id="match-direction" class="position-direction mono">—</span>
+                        </div>
+                        <dl class="position-meta">
+                            <div><dt data-i18n="Investerat">Investerat</dt><dd id="match-invested" class="mono">—</dd></div>
+                            <div><dt data-i18n="Ingångskurs">Ingångskurs</dt><dd id="match-entry" class="mono">—</dd></div>
+                        </dl>
+                    </div>
                     <div id="close-order" class="order-buttons" hidden>
-                        <button class="button button-secondary" type="button" data-action="sell" disabled data-i18n="STÄNG POSITION">STÄNG POSITION</button>
+                        <button class="button button-primary" type="button" data-action="sell" disabled><span aria-hidden="true">✓</span><span data-i18n="Stäng affären">Stäng affären</span></button>
                     </div>
                     <div id="sell-choice" class="sell-choice" hidden>
-                        <p id="sell-choice-hint" data-i18n="Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.">Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.</p>
-                        <div id="profit-actions" class="order-buttons">
+                        <h2 id="sell-choice-title" class="trade-label" data-i18n="Använd vinsten">Använd vinsten</h2>
+                        <div id="profit-actions" class="order-buttons" role="group" aria-labelledby="sell-choice-title" aria-describedby="sell-choice-hint">
                             <button class="button button-attack direction-button" type="button" data-action="attack">
-                                <span>ATTACK</span><small id="attack-preview" data-i18n="Gör skada">Gör skada</small>
+                                <span><span aria-hidden="true">⚡︎</span> ATTACK</span><small id="attack-preview" data-i18n="Gör skada">Gör skada</small>
                             </button>
                             <button class="button button-buy direction-button" type="button" data-action="grow">
-                                <span>GROW</span><small id="grow-preview" data-i18n="Bygg kapital och bonus">Bygg kapital och bonus</small>
+                                <span><span aria-hidden="true">↗</span> GROW</span><small id="grow-preview" data-i18n="Bygg kapital och bonus">Bygg kapital och bonus</small>
                             </button>
                         </div>
-                        <button id="pending-close" class="button button-secondary" type="button" data-action="confirm-close" hidden data-i18n="STÄNG POSITION">STÄNG POSITION</button>
+                        <p id="sell-choice-hint" class="trade-detail"></p>
+                        <button id="pending-close" class="button button-primary" type="button" data-action="confirm-close" aria-describedby="sell-choice-hint" hidden data-i18n="Stäng affären">Stäng affären</button>
+                        <button class="button button-secondary keep-holding" type="button" data-action="keep-holding" data-i18n="Fortsätt hålla">Fortsätt hålla</button>
                     </div>
                     <p id="match-feedback" class="match-feedback" role="status" hidden></p>
                     <dl class="trade-stats">
                         <div><dt data-i18n="Tillgängligt">Tillgängligt</dt><dd id="match-cash" class="mono">—</dd></div>
-                        <div><dt data-i18n="Investerat">Investerat</dt><dd id="match-invested" class="mono">—</dd></div>
                         <div id="grow-stat" class="grow-stat"><dt data-i18n="Grow-bonus">Grow-bonus</dt><dd id="match-grow" class="mono">—</dd></div>
-                        <div><dt>Position</dt><dd id="match-direction" class="mono">—</dd></div>
-                        <div><dt data-i18n="Ingångskurs">Ingångskurs</dt><dd id="match-entry" class="mono">—</dd></div>
-                        <div><dt data-i18n="Orealiserat resultat">Orealiserat resultat</dt><dd id="match-pnl" class="mono">—</dd></div>
                     </dl>
                 </section>
                 <section id="prediction-panel" class="prediction-panel panel" aria-label="Ritduellens prognos" data-i18n-aria-label="Ritduellens prognos" hidden>
@@ -625,10 +652,17 @@
         </div>
         <div class="help-content">
             <h3 data-i18n="Handelsduell">Handelsduell</h3>
-            <p data-i18n="Välj en insats. Tryck UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen för att avsluta affären.">Välj en insats. Tryck UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen för att avsluta affären.</p>
-            <p data-i18n="Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.">Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.</p>
-            <p data-i18n="För varje 5 krediter över eller under startkapitalet på 1 000 ändras attackkraften med 1 procentenhet. Den kan gå från 75 till 125 %. Kapitalet består av dina tillgängliga krediter och det du har satsat i en öppen position.">För varje 5 krediter över eller under startkapitalet på 1 000 ändras attackkraften med 1 procentenhet. Den kan gå från 75 till 125 %. Kapitalet består av dina tillgängliga krediter och det du har satsat i en öppen position.</p>
-            <p data-i18n="Om båda slås ut samtidigt vinner den med högst kapital. Vid lika kapital avgör vem som gjort mest attackskada.">Om båda slås ut samtidigt vinner den med högst kapital. Vid lika kapital avgör vem som gjort mest attackskada.</p>
+            <ul class="tutorial-rules" role="list">
+                <li><span aria-hidden="true">↕</span><span data-i18n="Välj insats → UPP eller NER → Stäng affären.">Välj insats → UPP eller NER → Stäng affären.</span></li>
+                <li><span aria-hidden="true">⚡︎</span><span data-i18n="Attack gör skada. Grow sparar vinsten.">Attack gör skada. Grow sparar vinsten.</span></li>
+            </ul>
+            <details class="help-rules">
+                <summary data-i18n="Fler duellregler">Fler duellregler</summary>
+                <p data-i18n="Grow laddar nästa attack. En förlust kostar krediter och kan kosta HP.">Grow laddar nästa attack. En förlust kostar krediter och kan kosta HP.</p>
+                <p data-i18n="Attackkraften ändras med 1 procentenhet per 2,5 krediter över eller under 500, inom 75–125 %. Kapitalet är kassan plus insatsen i en öppen affär.">Attackkraften ändras med 1 procentenhet per 2,5 krediter över eller under 500, inom 75–125 %. Kapitalet är kassan plus insatsen i en öppen affär.</p>
+                <p data-i18n="Efter 75 sekunder drar stormen HP från båda.">Efter 75 sekunder drar stormen HP från båda.</p>
+                <p data-i18n="Vid dubbel KO avgör kapital, sedan attackskada. Vid lika blir det oavgjort.">Vid dubbel KO avgör kapital, sedan attackskada. Vid lika blir det oavgjort.</p>
+            </details>
             <div class="panel-actions">
                 <button class="button button-secondary" type="button" data-action="tutorial-replay" data-i18n="Spela introduktionen igen">Spela introduktionen igen</button>
                 <button class="button button-primary" type="button" data-action="guide-start" data-i18n="Starta guidad botduell">Starta guidad botduell</button>
@@ -645,13 +679,15 @@
             <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng introduktionen" data-i18n-aria-label="Stäng introduktionen">×</button>
         </div>
         <div class="help-content">
-            <p data-i18n="Välj UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen när du vill avsluta affären.">Välj UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen när du vill avsluta affären.</p>
-            <p data-i18n="Du har startkapitalet på 1 000 krediter. Prova att stänga en affär med 10 krediter i vinst.">Du har startkapitalet på 1 000 krediter. Prova att stänga en affär med 10 krediter i vinst.</p>
+            <dl class="tutorial-stake">
+                <dt data-i18n="Vinst i exemplet">Vinst i exemplet</dt>
+                <dd class="mono" data-i18n="+5 krediter">+5 krediter</dd>
+            </dl>
             <div class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till">
                 <button class="button button-attack" type="button" data-action="guide-example-attack" aria-pressed="false" data-i18n="Prova Attack">Prova Attack</button>
                 <button class="button button-buy" type="button" data-action="guide-example-grow" aria-pressed="false" data-i18n="Prova Grow">Prova Grow</button>
             </div>
-            <p id="guide-example-result" role="status"></p>
+            <p id="guide-example-result" class="tutorial-outcome" role="status" hidden></p>
             <div class="panel-actions">
                 <button class="button button-primary" type="button" data-action="guide-begin" data-i18n="Starta guidad botduell">Starta guidad botduell</button>
                 <button class="button button-secondary" type="button" data-action="guide-bypass" data-i18n="Hoppa över guiden">Hoppa över guiden</button>

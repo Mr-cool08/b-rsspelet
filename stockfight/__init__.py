@@ -11,6 +11,7 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from .campaign_http import register_campaign
 from .data import User, db, get_rating, initialize_database, leaderboard, profile
 from .engine import RANKED
 from .market_data import DatabaseMarketProvider, import_csv, seed_demo, seed_historical
@@ -80,6 +81,7 @@ def create_app(config=None):
     service = MatchService(app, socketio, provider)
     app.extensions["match_service"] = service
     register_http(app, service)
+    register_campaign(app)
     register_cli(app, schema_url)
     with app.app_context():
         initialize_database(schema_url)
@@ -135,7 +137,7 @@ def register_http(app, service):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
-        if request.path == "/" or request.path.startswith("/api/"):
+        if request.path in {"/", "/campaign"} or request.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response
 

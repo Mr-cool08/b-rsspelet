@@ -37,7 +37,7 @@ def test_practice_reveals_only_submitted_rounds_and_never_rates(game, monkeypatc
     assert not player.emit("prediction_submit", {**payload, "moveBps": True})["ok"]
     assert len(player.state()["bars"]) == 12
 
-    for number, (guess, actual) in enumerate([(176, 175), (150, 155), (-233, -233)], start=1):
+    for number, (guess, actual) in enumerate([(851, 850), (675, 680), (-1250, -1250)], start=1):
         command = {"matchId": match_id, "round": number}
         assert player.emit("prediction_submit", {**command, "moveBps": guess})["ok"]
         reveal = player.state()

@@ -300,7 +300,7 @@ def test_two_clients_trade_concurrently_finish_and_persist_once(game):
 
     first_position, second_position = first.state(), second.state()
     assert Decimal(first_position["self"]["cash"]) == 0
-    assert Decimal(second_position["self"]["cash"]) == 500
+    assert Decimal(second_position["self"]["cash"]) == 250
     assert Decimal(first_position["self"]["position"]["entryPrice"]) == 100
     assert first_position["opponent"]["hasPosition"]
     assert "entryPrice" not in first_position["opponent"]
@@ -314,8 +314,8 @@ def test_two_clients_trade_concurrently_finish_and_persist_once(game):
     assert settle(second, at_profit_second, "grow")["ok"]
     after_attack, after_grow = first.state(), second.state()
     assert after_attack["self"]["hp"] == 100 and after_attack["opponent"]["hp"] == 65
-    assert Decimal(after_attack["self"]["cash"]) == 1000
-    assert Decimal(after_grow["self"]["cash"]) == 1010 and after_grow["self"]["growBonus"] == 25
+    assert Decimal(after_attack["self"]["cash"]) == 500
+    assert Decimal(after_grow["self"]["cash"]) == 505 and after_grow["self"]["growBonus"] == 25
     assert not first.trade(first_state, "buy", percent=100)["ok"]
 
     for percent in (100, 75):
@@ -360,21 +360,21 @@ def test_capital_breaks_simultaneous_knockout_and_counts_for_ranked_elo(game):
     assert settle(first, first.state(), "grow")["ok"]
 
     grown = first.state()
-    assert Decimal(grown["self"]["capital"]) == 1020
+    assert Decimal(grown["self"]["capital"]) == 510
     assert grown["self"]["attackPower"] == 104
     assert first.trade(grown, "buy", percent=100)["ok"]
     open_position = first.state()
     assert Decimal(open_position["self"]["cash"]) == 0
     assert open_position["self"]["attackPower"] == 104
-    assert Decimal(second.state()["opponent"]["capital"]) == 1020
+    assert Decimal(second.state()["opponent"]["capital"]) == 510
 
     advance(game, 115)
     winner, = first.events("match_result")
     loser, = second.events("match_result")
     assert winner["hp"] == loser["hp"] == 0
     assert winner["tiebreak"] == loser["tiebreak"] == "capital"
-    assert Decimal(winner["opponentCapital"]) == 1000
-    assert Decimal(loser["opponentCapital"]) == 1020
+    assert Decimal(winner["opponentCapital"]) == 500
+    assert Decimal(loser["opponentCapital"]) == 510
     assert winner["outcome"] == "win" and winner["eloAfter"] == 116
     assert loser["outcome"] == "lose" and loser["eloAfter"] == 84
 
@@ -388,7 +388,7 @@ def test_short_trade_on_falling_price_can_attack_via_socket(game):
     assert first.trade(entry, "short", percent=50)["ok"]
     opened = first.state()
     assert opened["self"]["position"]["side"] == "short"
-    assert Decimal(opened["self"]["cash"]) == 500
+    assert Decimal(opened["self"]["cash"]) == 250
     assert second.state()["opponent"]["hasPosition"]
 
     advance(game, 1)
@@ -399,7 +399,7 @@ def test_short_trade_on_falling_price_can_attack_via_socket(game):
 
     closed = first.state()
     assert closed["self"]["position"] is None
-    assert Decimal(closed["self"]["cash"]) == 1000
+    assert Decimal(closed["self"]["cash"]) == 500
     assert closed["self"]["attackDamage"] == 19
     assert second.state()["self"]["hp"] == 81
 
@@ -446,7 +446,7 @@ def test_reconnecting_player_cannot_set_authoritative_fields(game):
     assert not first.trade(before, "buy", percent=150)["ok"]
     advance(game, 1)
     state = first.state()
-    assert Decimal(state["self"]["cash"]) == 1000 and state["self"]["hp"] == 100
+    assert Decimal(state["self"]["cash"]) == 500 and state["self"]["hp"] == 100
     assert state["self"]["position"] is None and Decimal(state["price"]) == 102
 
     forged = first.trade(state, "buy", percent=25, price="0.01", cash="500000", hp=500, damage=100)
@@ -454,11 +454,11 @@ def test_reconnecting_player_cannot_set_authoritative_fields(game):
         first.socket.disconnect()
         first.connect()
         state = first.state()
-        assert Decimal(state["self"]["cash"]) == 1000 and state["self"]["position"] is None
+        assert Decimal(state["self"]["cash"]) == 500 and state["self"]["position"] is None
         assert first.trade(state, "buy", percent=25)["ok"]
     opened = first.state()
     assert opened["self"]["hp"] == opened["opponent"]["hp"] == 100
-    assert Decimal(opened["self"]["cash"]) == 750
+    assert Decimal(opened["self"]["cash"]) == 375
     assert Decimal(opened["self"]["position"]["entryPrice"]) == 102
     first.socket.disconnect()
     advance(game, 105)
@@ -467,7 +467,7 @@ def test_reconnecting_player_cannot_set_authoritative_fields(game):
     peer = second.state()
     assert rejoined["id"] == opened["id"] == peer["id"]
     assert rejoined["nextSeq"] == opened["nextSeq"]
-    assert Decimal(rejoined["self"]["cash"]) == 750
+    assert Decimal(rejoined["self"]["cash"]) == 375
     assert Decimal(rejoined["self"]["position"]["entryPrice"]) == 102
     assert rejoined["elapsed"] == 106 and rejoined["storm"] == "final"
     assert 0 < rejoined["self"]["hp"] < 100
@@ -489,7 +489,7 @@ def test_pending_close_and_result_details_survive_reconnect(game):
     pending = first.state()
     quote = pending["self"]["position"]["closePreview"]
     assert quote["positionId"] == sale["positionId"]
-    assert quote["attackDamage"] == 10 and Decimal(quote["growCredits"]) == 5
+    assert quote["attackDamage"] == 10 and Decimal(quote["growCredits"]) == Decimal("2.5")
     assert "closePreview" not in second.state()["opponent"]
 
     first.socket.disconnect()
@@ -532,6 +532,7 @@ def test_bot_match_uses_ranked_elo_and_supports_reconnect_and_rematch(game):
     initial = player.state()
     assert initial["mode"] == "bot"
     assert initial["status"] == "countdown" and initial["countdown"] == 3
+    assert Decimal(initial["self"]["cash"]) == Decimal(initial["opponent"]["capital"]) == 500
     assert initial["opponent"]["name"] == "Bot" and initial["opponent"]["elo"] == 525
     assert not initial["opponent"]["hasPosition"]
     assert len(initial["bars"]) == 12
@@ -550,7 +551,7 @@ def test_bot_match_uses_ranked_elo_and_supports_reconnect_and_rematch(game):
     assert rejoined["id"] == initial["id"]
     assert rejoined["mode"] == "bot" and rejoined["opponent"]["elo"] == 525
     assert rejoined["nextSeq"] == active["nextSeq"] + 1
-    assert Decimal(rejoined["self"]["cash"]) == 750
+    assert Decimal(rejoined["self"]["cash"]) == 375
     assert len(rejoined["bars"]) == 13
 
     saw_bot_position = active["opponent"]["hasPosition"] or rejoined["opponent"]["hasPosition"]

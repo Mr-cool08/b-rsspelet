@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import and_, create_engine, false, func, inspect, literal
+from sqlalchemy import and_, create_engine, false, func, inspect, literal, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import URL
@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 __all__ = [
     "db",
     "User",
+    "CampaignSave",
     "PlayerRating",
     "Match",
     "MatchResult",
@@ -41,6 +42,7 @@ __all__ = [
     "leaderboard",
     "profile",
     "save_match",
+    "save_campaign",
     "import_csv",
     "seed_demo",
     "MarketProvider",
@@ -103,6 +105,14 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: _utc_naive(datetime.now(UTC)))
     duel_tutorial_pending = db.Column(db.Boolean, nullable=False, server_default=false())
+
+
+class CampaignSave(db.Model):
+    __tablename__ = "campaign_saves"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    revision = db.Column(db.Integer, nullable=False)
+    state = db.Column(db.JSON, nullable=False)
 
 
 class PlayerRating(db.Model):
@@ -226,6 +236,30 @@ def initialize_database(schema_url: URL | None = None) -> None:
             connection.exec_driver_sql(
                 "ALTER TABLE users ADD COLUMN duel_tutorial_pending BOOLEAN NOT NULL DEFAULT FALSE"
             )
+
+
+def save_campaign(user_id: int, revision: int, state: dict) -> bool:
+    dialect = db.session.get_bind().dialect.name
+    if revision == 0:
+        insert = _insert_for_dialect(dialect)
+        command = insert(CampaignSave).values(user_id=user_id, revision=1, state=state)
+        command = command.on_conflict_do_nothing(index_elements=[CampaignSave.user_id])
+    else:
+        command = (
+            update(CampaignSave)
+            .where(CampaignSave.user_id == user_id, CampaignSave.revision == revision)
+            .values(revision=revision + 1, state=state)
+            .execution_options(synchronize_session=False)
+        )
+    if dialect == "postgresql":
+        written = db.session.scalar(command.returning(CampaignSave.revision)) is not None
+    else:
+        written = db.session.execute(command).rowcount == 1
+    if not written:
+        db.session.rollback()
+        return False
+    db.session.commit()
+    return True
 
 
 def _new_rating(user_id: int, mode: str) -> PlayerRating:

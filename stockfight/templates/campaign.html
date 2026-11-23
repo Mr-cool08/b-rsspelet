@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="sv">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#101923">
+    <title>Börskarriär · Stock Fight</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/campaign.css') }}">
+    <script defer src="{{ url_for('static', filename='vendor/lightweight-charts.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/campaign.js') }}"></script>
+</head>
+<body class="career-body">
+    <header class="topbar career-topbar">
+        <div class="topbar-inner">
+            <a class="brand career-brand" href="/" aria-label="Stock Fight">
+                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="brand-name">STOCK <strong>FIGHT</strong></span>
+            </a>
+            <div class="topbar-tools">
+                <a class="career-home" href="/" data-career-text="Till huvudmenyn">Till huvudmenyn</a>
+                <select id="language-select" class="language-select" aria-label="Språk" data-i18n-aria-label="Språk">
+                    <option value="sv" lang="sv">Svenska</option>
+                    <option value="en" lang="en">English</option>
+                </select>
+            </div>
+        </div>
+    </header>
+    <main class="career-stage" id="main">
+        <p id="career-notice" class="career-notice" role="status" hidden></p>
+        <div id="career-content" aria-busy="true">
+            <header class="career-intro"><h1>Börskarriär</h1></header>
+            <p data-career-text="Laddar fondkontoret …">Laddar fondkontoret …</p>
+        </div>
+        <noscript>Börskarriär behöver JavaScript för att kunna spelas.</noscript>
+    </main>
+</body>
+</html>
