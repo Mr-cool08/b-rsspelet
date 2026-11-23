@@ -32,6 +32,7 @@ __all__ = [
     "db",
     "User",
     "CampaignSave",
+    "CompanySave",
     "PlayerRating",
     "Match",
     "MatchResult",
@@ -109,6 +110,14 @@ class User(db.Model):
 
 class CampaignSave(db.Model):
     __tablename__ = "campaign_saves"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    revision = db.Column(db.Integer, nullable=False)
+    state = db.Column(db.JSON, nullable=False)
+
+
+class CompanySave(db.Model):
+    __tablename__ = "company_saves"
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
     revision = db.Column(db.Integer, nullable=False)
@@ -238,21 +247,21 @@ def initialize_database(schema_url: URL | None = None) -> None:
             )
 
 
-def save_campaign(user_id: int, revision: int, state: dict) -> bool:
+def save_campaign(user_id: int, revision: int, state: dict, *, model=CampaignSave) -> bool:
     dialect = db.session.get_bind().dialect.name
     if revision == 0:
         insert = _insert_for_dialect(dialect)
-        command = insert(CampaignSave).values(user_id=user_id, revision=1, state=state)
-        command = command.on_conflict_do_nothing(index_elements=[CampaignSave.user_id])
+        command = insert(model).values(user_id=user_id, revision=1, state=state)
+        command = command.on_conflict_do_nothing(index_elements=[model.user_id])
     else:
         command = (
-            update(CampaignSave)
-            .where(CampaignSave.user_id == user_id, CampaignSave.revision == revision)
+            update(model)
+            .where(model.user_id == user_id, model.revision == revision)
             .values(revision=revision + 1, state=state)
             .execution_options(synchronize_session=False)
         )
     if dialect == "postgresql":
-        written = db.session.scalar(command.returning(CampaignSave.revision)) is not None
+        written = db.session.scalar(command.returning(model.revision)) is not None
     else:
         written = db.session.execute(command).rowcount == 1
     if not written:

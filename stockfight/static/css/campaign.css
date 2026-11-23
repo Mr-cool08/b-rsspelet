@@ -140,6 +140,7 @@
 .career-goals li span:last-child { text-align: right; }
 .career-goals small { display: block; margin-top: 3px; color: var(--career-muted); }
 .career-catalog-note { color: var(--career-muted); font-size: .83rem; line-height: 1.5; }
+.career-replay-note { margin-top: 7px; }
 .career-best { display: flex; justify-content: space-between; gap: 8px; font-size: .86rem; }
 .career-best dd { color: var(--career-aqua); font-family: var(--mono); font-weight: 700; }
 .career-symbols { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 0; }
@@ -206,6 +207,15 @@
 .career-trade-panel section + section { margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--career-line); }
 .career-clock { color: var(--gold); white-space: nowrap; font: 700 1.03rem var(--mono); }
 .career-trade-panel p { line-height: 1.45; }
+.career-outlook-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
+.career-outlook-heading h3 { color: var(--career-aqua); font-size: 1rem; margin: 0; }
+.career-outlook-heading > span { color: var(--career-muted); font: .73rem var(--mono); }
+.career-outlook-list { margin: 8px 0; padding: 5px 9px; border-radius: 5px; background: var(--career-deep); }
+.career-outlook-list > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 8px; padding: 4px 0; }
+.career-outlook-list > div + div { border-top: 1px solid var(--career-line); }
+.career-outlook-list dt { font: 700 .76rem var(--mono); }
+.career-outlook-list dd { font-size: .76rem; font-weight: 650; }
+.career-phase-plan { margin-top: 6px; }
 .career-allocation { padding: 0; margin: 0; border: 0; min-width: 0; }
 .career-allocation legend { padding: 0; margin-bottom: 6px; font-weight: 750; font-size: 1.02rem; }
 .career-trade-hints { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--career-muted); font-size: .73rem; }

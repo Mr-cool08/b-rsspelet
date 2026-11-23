@@ -2,10 +2,11 @@
 
 from copy import deepcopy
 from decimal import Decimal, InvalidOperation, ROUND_DOWN
-from secrets import randbits
 from uuid import uuid4
 
-from .campaign_catalog import ASSET_NAMES, MISSIONS, PHASE_COUNT, PHASE_STEPS, PREVIEW, RANKS, TOOLS, generate_prices
+from .campaign_catalog import (
+    ASSET_NAMES, MISSIONS, PHASE_COUNT, PHASE_STEPS, PREVIEW, RANKS, TOOLS, generate_prices, market_outlooks,
+)
 
 
 TICK_SECONDS = 5
@@ -138,7 +139,9 @@ def _start_attempt(state: dict, command: dict) -> None:
         "id": uuid4().hex,
         "mission": _mission_summary(mission),
         "preview": PREVIEW,
-        "prices": generate_prices(mission, randbits(64)),
+        # A replay lets the player test a different strategy against the same market.
+        "prices": generate_prices(mission, mission_id),
+        "outlooks": market_outlooks(mission, mission_id),
         "status": "setup",
         "tools": list(tools),
         "step": 0,
@@ -198,7 +201,7 @@ def _charge_trade(attempt: dict, target: list[int]) -> None:
 
 def _allocate(attempt: dict, command: dict) -> None:
     setup = attempt["status"] == "setup"
-    if attempt["status"] not in ("setup", "trading", "phaseActive"):
+    if attempt["status"] not in ("setup", "trading", "phaseReady", "phaseActive"):
         raise CampaignError("invalid_phase")
     _require_current_step(command, attempt)
     if not setup and not attempt["rebalances"] and not _extra_available(attempt):
@@ -393,13 +396,17 @@ def _public_attempt(attempt: dict, now: float) -> dict:
     holdings = [Decimal(shares) * price for shares, price in zip(attempt["shares"], _prices(attempt, step))]
     started = attempt["phaseStartedAt"]
     report = attempt["report"]
+    outlook = None
+    if report is None:
+        outlook = next((item for item in attempt.get("outlooks", ())
+                        if item["startStep"] <= step < item["throughStep"]), None)
     return {
         "id": attempt["id"], "missionId": mission["id"], "mission": _mission_summary(mission),
         "status": attempt["status"], "step": step, "phase": attempt["phase"], "serverNow": now,
         "phaseEndsAt": None if started is None else started + PHASE_STEPS * TICK_SECONDS,
         "tools": attempt["tools"], "rebalances": attempt["rebalances"] if not report else 0,
         "extraAvailable": _extra_available(attempt), "stopAvailable": _stop_available(attempt),
-        "stopOrder": attempt["stopOrder"],
+        "stopOrder": attempt["stopOrder"], "outlook": outlook,
         "cash": float(Decimal(attempt["cash"])), "cashPercent": float(metrics["cashPercent"]),
         "value": float(metrics["value"]), "returnPercent": float(metrics["returnPercent"]),
         "indexReturn": float(metrics["indexReturn"]), "drawdown": float(Decimal(attempt["drawdown"])),

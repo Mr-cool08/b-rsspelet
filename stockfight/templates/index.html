@@ -16,7 +16,7 @@
     {% set latest = candles[-1][1] %}
     <figure class="market-preview">
         <figcaption class="preview-heading">
-            <span class="eyebrow" data-i18n="Exempelgraf">Exempelgraf</span>
+            <span class="eyebrow" data-i18n="Exempelgraf">Nvidia</span>
             <span class="preview-quote mono">
                 <strong data-i18n-number="{{ '%.2f'|format(latest) }}">{{ '%.2f'|format(latest)|replace('.', ',') }}</strong>
                 <span data-i18n-signed-percent="{{ latest / candles[0][0] - 1 }}">{{ '%+.2f'|format((latest / candles[0][0] - 1) * 100)|replace('.', ',') }} %</span>
@@ -213,12 +213,12 @@
                 </section>
                 <section class="career-panel mode-panel panel" aria-labelledby="career-title">
                     <div>
-                        <p class="eyebrow" data-i18n="Solo · Strategi">Solo · Strategi</p>
-                        <h2 id="career-title" data-i18n="Börskarriär">Börskarriär</h2>
-                        <p data-i18n="Bygg en portfölj, klara kundmandat och jobba dig upp till fondchef.">Bygg en portfölj, klara kundmandat och jobba dig upp till fondchef.</p>
+                        <p class="eyebrow" data-i18n="Strategi · Flerspelare">Strategi · Flerspelare</p>
+                        <h2 id="career-title" data-i18n="Börsföretag">Börsföretag</h2>
+                        <p data-i18n="Handla aktieposter, bygg upp din firma och jämför resultat med andra spelare.">Handla aktieposter, bygg upp din firma och jämför resultat med andra spelare.</p>
                     </div>
                     <div class="panel-actions">
-                        <a class="button button-secondary" href="{{ url_for('campaign_page') }}" data-i18n="Öppna fondkontoret">Öppna fondkontoret</a>
+                        <a class="button button-secondary" href="{{ url_for('campaign_page') }}" data-i18n="Öppna handelsfirman">Öppna handelsfirman</a>
                     </div>
                 </section>
                 <section class="menu-modes" aria-labelledby="modes-title">

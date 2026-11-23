@@ -137,7 +137,7 @@ def register_http(app, service):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
-        if request.path in {"/", "/campaign"} or request.path.startswith("/api/"):
+        if request.path in {"/", "/campaign", "/campaign/portfolio"} or request.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response
 

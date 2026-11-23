@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 
 from stockfight import create_app
 from stockfight import campaign as career
-from stockfight.campaign_catalog import MISSIONS, PREVIEW, generate_prices
+from stockfight.campaign_catalog import MISSIONS, PHASE_STEPS, PREVIEW, generate_prices, market_outlooks
 from stockfight.data import CampaignSave, Match, PlayerRating, db
 
 from test_multiplayer import Clock, PASSWORD, post
@@ -44,6 +44,13 @@ def command(http, revision, action, **payload):
 
 
 def test_catalog_has_five_playable_stages_and_seeded_variations():
+    direction_ranges = {
+        "strongDown": (float("-inf"), -5),
+        "down": (-6, -1),
+        "steady": (-2, 2),
+        "up": (1, 6),
+        "strongUp": (5, float("inf")),
+    }
     for rank, capital in enumerate((5_000, 12_500, 25_000, 50_000, 125_000)):
         missions = [mission for mission in MISSIONS.values() if mission["rank"] == rank]
         assert sorted(mission["kind"] for mission in missions) == ["comeback"] + ["elective"] * 7 + ["exam"] + ["fixed"] * 3
@@ -55,8 +62,96 @@ def test_catalog_has_five_playable_stages_and_seeded_variations():
             assert len(prices) == PREVIEW + 1 + mission["steps"]
             assert all(len(prices_on_day) == len(mission["assets"]) for prices_on_day in prices)
             assert mission["titleEn"] and mission["briefEn"]
+            for outlook in market_outlooks(mission, 21):
+                assert set(outlook["assets"]) == set(mission["assets"])
+                for column, asset in enumerate(mission["assets"]):
+                    before = float(prices[PREVIEW + outlook["startStep"]][column])
+                    after = float(prices[PREVIEW + outlook["throughStep"]][column])
+                    lower, upper = direction_ranges[outlook["assets"][asset]["direction"]]
+                    assert lower < (after / before - 1) * 100 < upper
             if mission["kind"] in {"fixed", "elective"}:
                 assert 18 <= mission["steps"] <= 24
+
+
+def test_mission_replays_keep_prices_and_reveal_only_the_current_outlook():
+    mission = MISSIONS["rank1-fixed-1"]
+    state = career.default_state()
+
+    def play(action, **data):
+        career.apply_command(state, {"action": action, **data}, 100)
+        return career.public_state(state, 100)["attempt"]
+
+    started = play("start", missionId=mission["id"])
+    original = state["attempt"]
+    assert len(started["prices"]) == PREVIEW + 1
+    assert "outlooks" not in started
+    first, second, third = original["outlooks"]
+    for index, outlook in enumerate((first, second, third)):
+        assert outlook["startStep"] == mission["steps"] * index // 3
+        assert outlook["throughStep"] == mission["steps"] * (index + 1) // 3
+    assert started["outlook"] == first
+
+    play("allocate", weights={})
+    for step in range(1, mission["steps"] + 1):
+        current = play("advance")
+        assert len(current["prices"]) == PREVIEW + step + 1
+        if step < first["throughStep"]:
+            assert current["outlook"] == first
+        elif step < second["throughStep"]:
+            assert current["outlook"] == second
+        elif step < third["throughStep"]:
+            assert current["outlook"] == third
+        else:
+            assert current["outlook"] is None and current["status"] == "complete"
+
+    replay = play("start", missionId=mission["id"])
+    assert replay["id"] != started["id"]
+    assert replay["prices"] == started["prices"]
+    assert replay["outlook"] == first
+    assert state["attempt"]["prices"] == original["prices"]
+
+
+def test_exam_can_spend_its_rebalance_during_a_pause():
+    exam = MISSIONS["rank1-exam"]
+    state = career.default_state()
+    state["achievements"] = {
+        mission["id"]: {"passed": True, "mastered": False, "score": 0}
+        for mission in MISSIONS.values()
+        if mission["rank"] == exam["rank"] and mission["kind"] in ("fixed", "elective")
+    }
+    now = 100
+
+    def play(action, **data):
+        career.apply_command(state, {"action": action, **data}, now)
+        return career.public_state(state, now)["attempt"]
+
+    play("start", missionId=exam["id"])
+    first_asset, second_asset, _ = exam["assets"]
+    ready = play("allocate", weights={first_asset: 80}, step=0)
+    assert ready["rebalances"] == 1
+    play("phase")
+    now += PHASE_STEPS * career.TICK_SECONDS
+    paused = career.public_state(state, now)["attempt"]
+    assert paused["status"] == "phaseReady"
+    assert paused["rebalances"] == 1
+    assert paused["outlook"]["startStep"] == PHASE_STEPS
+
+    with pytest.raises(career.CampaignError, match="stale_quote"):
+        play("allocate", weights={second_asset: 80}, step=PHASE_STEPS - 1)
+    adjusted = play("allocate", weights={second_asset: 80}, step=PHASE_STEPS)
+    assert adjusted["status"] == "phaseReady" and adjusted["phaseEndsAt"] is None
+    assert adjusted["step"] == PHASE_STEPS
+    assert adjusted["fees"] > paused["fees"]
+    assert adjusted["weights"][first_asset] == 0
+    assert adjusted["weights"][second_asset] == pytest.approx(80)
+    assert adjusted["rebalances"] == 0
+    with pytest.raises(career.CampaignError, match="no_rebalances"):
+        play("allocate", weights={first_asset: 80}, step=PHASE_STEPS)
+
+    assert play("phase")["rebalances"] == 0
+    now += PHASE_STEPS * career.TICK_SECONDS
+    next_pause = career.public_state(state, now)["attempt"]
+    assert next_pause["phase"] == 3 and next_pause["rebalances"] == 1
 
 
 def test_http_account_revisions_visible_prices_and_restart(campaign):
@@ -240,11 +335,13 @@ def test_saved_attempt_keeps_its_original_capital(monkeypatch):
         patch.setitem(mission, "capital", 10_000)
         career.apply_command(state, {"action": "start", "missionId": mission["id"]}, 100)
 
+    del state["attempt"]["outlooks"]  # Older saves don't have stored outlooks.
     career.apply_command(state, {"action": "allocate", "weights": {}}, 100)
     career.apply_command(state, {"action": "advance"}, 100)
     resumed = career.public_state(state, 100)["attempt"]
     assert resumed["mission"]["capital"] == resumed["value"] == 10_000
     assert resumed["returnPercent"] == 0
+    assert resumed["outlook"] is None
 
     career.apply_command(state, {"action": "leave"}, 100)
     career.apply_command(state, {"action": "start", "missionId": mission["id"]}, 100)

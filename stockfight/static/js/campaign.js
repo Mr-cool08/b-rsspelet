@@ -44,6 +44,7 @@
         startExam: ["Starta slutprov", "Start exam"],
         startComeback: ["Starta comeback", "Start recovery mandate"],
         replay: ["Spela om", "Play again"],
+        replayMarket: ["Varje nytt försök på det här mandatet använder samma kursscenario.", "Each new attempt at this mandate uses the same price scenario."],
         lockedExam: ["Klara tre fasta och fem valbara mandat för att låsa upp slutprovet.", "Pass three core and five elective mandates to unlock the exam."],
         lockedComeback: ["Klara comebackuppdraget för att försöka igen.", "Pass the recovery mandate to try again."],
         lockedStage: ["Klara det föregående karriärsteget för att spela här.", "Complete the previous career stage to play here."],
@@ -66,6 +67,16 @@
         portfolio: ["Portföljen", "Portfolio"],
         chartLabel: ["Kursgraf, indexerad till 100 vid start", "Price chart, indexed to 100 at the start"],
         chartUnavailable: ["Kursgrafen kunde inte laddas.", "The chart could not load."],
+        outlook: ["Marknadsutsikter", "Market outlook"],
+        outlookDays: ["Handelsdag {first}–{last}", "Trading days {first}–{last}"],
+        outlookPoints: ["Kurspunkter {first}–{last}", "Price points {first}–{last}"],
+        outlookNote: ["Väg den övergripande trenden mot mandatets riskmål och kassakrav. Kurserna kan svänga under perioden.",
+            "Weigh the broad trend against the mandate’s risk and cash goals. Prices can fluctuate during the period."],
+        strongUp: ["Tydligt uppåt", "Strong upward trend"],
+        up: ["Svagt uppåt", "Slight upward trend"],
+        steady: ["Sidledes", "Broadly flat"],
+        down: ["Svagt nedåt", "Slight downward trend"],
+        strongDown: ["Tydligt nedåt", "Strong downward trend"],
         allocate: ["Fördela startkapitalet", "Allocate your starting capital"],
         rebalance: ["Ändra portföljen", "Rebalance your portfolio"],
         feesDesc: ["Handelsavgift 0,1 %", "Trading fee 0.1%"],
@@ -81,6 +92,7 @@
         lastDay: ["Spela sista dagen", "Play final day"],
         phaseFirst: ["Ny kurs var 5:e sekund", "New prices every 5 seconds"],
         phaseStart: ["Starta fas", "Start phase"],
+        phasePlan: ["Du kan använda en ombalansering redan innan du startar fasen.", "You can use a rebalance before starting the phase."],
         timeLeft: ["Tid kvar", "Time left"],
         holdings: ["Innehav", "Holdings"],
         price: ["Kurs", "Price"],
@@ -313,6 +325,7 @@
                 ${!mission.available ? `<p class="career-catalog-note">${tx(lockedReason(mission))}</p>` :
                     active ? `<p class="career-catalog-note">${tx("activeExists")}</p>` : ""}
             </div>
+            ${mission.available && !active ? `<p class="career-catalog-note career-replay-note">${tx("replayMarket")}</p>` : ""}
             <details class="career-briefing-block career-briefing-details">
                 <summary>${tx("details")}</summary>
                 <p class="career-catalog-note">${brief(mission)}</p>
@@ -404,13 +417,33 @@
         return Math.floor(cap / 10) * 10;
     }
 
+    function renderOutlook(mission, outlook) {
+        if (!outlook) return "";
+        const directions = {
+            strongUp: ["↑↑", "career-goal-pass"], up: ["↑", "career-goal-pass"], steady: ["→", ""],
+            down: ["↓", "career-goal-fail"], strongDown: ["↓↓", "career-goal-fail"],
+        };
+        const period = tx(mission.kind === "exam" ? "outlookPoints" : "outlookDays", {
+            first: outlook.startStep + 1, last: outlook.throughStep,
+        });
+        return `<section class="career-outlook" aria-labelledby="career-outlook-title">
+            <div class="career-outlook-heading"><h3 id="career-outlook-title">${tx("outlook")}</h3><span>${period}</span></div>
+            <dl class="career-outlook-list">${mission.assets.map((asset, index) => {
+                const direction = outlook.assets[asset].direction;
+                const [arrow, color] = directions[direction];
+                return `<div><dt title="${escapeHTML(state.assetNames[asset])}">
+                    <span class="career-symbol-dot" style="--stock-color:${colors[index]}" aria-hidden="true"></span>${escapeHTML(asset)}</dt>
+                    <dd class="${color}"><span aria-hidden="true">${arrow}</span> ${tx(direction)}</dd></div>`;
+            }).join("")}</dl>
+            <p class="career-catalog-note">${tx("outlookNote")}</p>
+        </section>`;
+    }
+
     function allocation(mission, attempt) {
         const setup = attempt.status === "setup";
         const planning = attempt.status === "phaseReady";
-        const active = ["trading", "phaseActive"].includes(attempt.status);
-        const canTrade = active && (attempt.rebalances > 0 || attempt.extraAvailable);
         const changes = attempt.rebalances + Number(attempt.extraAvailable);
-        if (!setup && !canTrade && !planning) {
+        if (!setup && changes === 0) {
             return `<h3>${tx("holdings")}</h3>
                 <p class="career-trade-hints">${tx("rebalances", { count: changes })}</p>
                 ${holdings(mission, attempt, false)}`;
@@ -420,16 +453,17 @@
             <fieldset class="career-allocation">
                 <legend>${tx(setup ? "allocate" : "rebalance")}</legend>
                 <div class="career-trade-hints"><span>${tx("feesDesc")}</span>
-                    ${setup || planning ? "" : `<span>${tx("rebalances", { count: changes })}</span>`}
+                    ${setup ? "" : `<span>${tx("rebalances", { count: changes })}</span>`}
                     ${limit < 100 ? `<span>${tx("weightLimit", { value: percent(limit) })}</span>` : ""}</div>
+                ${planning ? `<p class="career-catalog-note career-phase-plan">${tx("phasePlan")}</p>` : ""}
                 <div class="career-presets">${button("evenSplit", "split")}${button("allCash", "cash")}</div>
                 ${holdings(mission, attempt, true)}
                 <div class="career-allocation-bar" aria-hidden="true">${mission.assets.map((asset, index) =>
                     `<span id="mix-${escapeHTML(asset)}" style="--stock-color:${colors[index]}"></span>`).join("")}</div>
                 <p class="career-allocation-total"><span>${tx("cashAfter")}</span><strong id="career-allocation-total" aria-live="polite"></strong></p>
             </fieldset>
-            ${planning ? "" : `<div class="career-actions"><button id="career-allocate" class="career-button${setup ? " career-button-primary" : ""}" type="submit">
-                <span class="career-button-icon" aria-hidden="true">✓</span>${tx(setup ? "allocateSubmit" : "rebalanceSubmit")}</button></div>`}
+            <div class="career-actions"><button id="career-allocate" class="career-button${setup ? " career-button-primary" : ""}" type="submit">
+                <span class="career-button-icon" aria-hidden="true">✓</span>${tx(setup ? "allocateSubmit" : "rebalanceSubmit")}</button></div>
         </form>`;
     }
 
@@ -523,6 +557,7 @@
                 ])}
             </section>
             <section class="career-trade-panel career-trade-controls" aria-label="${tx("portfolio")}">
+                ${renderOutlook(mission, attempt.outlook)}
                 <section>
                     ${allocation(mission, attempt)}
                 </section>
@@ -764,8 +799,9 @@
         if (first || attemptChanged || statusChanged || cursorChanged || revisionChanged || !phasePoll) {
             let focus;
             if (action === "start" || (statusChanged && attempt?.status === "complete" && !office)) focus = "career-heading";
-            if (action === "allocate" && previous?.status === "setup") {
-                focus = attempt.status === "phaseReady" ? "button-phase" : "button-advance";
+            if (action === "allocate") {
+                if (attempt.status === "phaseReady") focus = "button-phase";
+                else if (previous?.status === "setup") focus = "button-advance";
             }
             if (action === "stop") focus = "career-order-status";
             render(focus);
@@ -927,7 +963,7 @@
     content.addEventListener("submit", (event) => {
         event.preventDefault();
         const step = state.attempt.step;
-        if (event.target.id === "career-allocation" && state.attempt.status !== "phaseReady") {
+        if (event.target.id === "career-allocation") {
             send({ action: "allocate", weights, step });
         }
         if (event.target.id === "career-stop-form") {

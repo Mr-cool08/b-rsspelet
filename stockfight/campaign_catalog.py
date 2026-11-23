@@ -25,8 +25,8 @@ _CAPITAL = (5_000, 12_500, 25_000, 50_000, 125_000)
 _ASSET_COUNTS = (3, 3, 4, 4, 5)
 _CENT = Decimal("0.01")
 
-# Approximate percentage change per asset in each third of a scenario.
-# Asset roles vary across scenarios. Temporary moves within a third can differ from its overall direction.
+# Approximate percentage change per asset role in each third of a scenario.
+# Short-term moves can still differ from the outlook for the period.
 _MARKETS = {
     "climb": ((5, 2, -2, 2, 0), (4, 1, 1, 3, -2), (5, 2, 0, 2, 1)),
     "rotation": ((9, -3, 2, 1, 4), (-5, 9, 1, -2, 2), (-2, 7, 4, 2, 0)),
@@ -293,40 +293,78 @@ for _rank, _cases in enumerate(_REGULAR_CASES):
 
 def generate_prices(mission: dict, seed: str | int) -> list[list[str]]:
     """Six preview closes, the opening close, then one close per trading step."""
-    pattern, location = _MARKET_BY_MISSION[mission["id"]]
-    market = _MARKETS[pattern]
-    rng = Random(str(seed) + ":" + mission["id"])
-    steps = mission["steps"]
-    assets = mission["assets"]
-    opening = [35.0 + 5 * ((location + offset * 4) % 15) for offset in range(len(assets))]
+    _, location = _MARKET_BY_MISSION[mission["id"]]
+    sections = _market_sections(mission, seed)
+    _, _, opening_changes = sections[0]
+    rng = Random(f"{seed}:{mission['id']}:prices")
+    asset_slots = range(len(mission["assets"]))
+    opening = [35.0 + 5 * ((location + offset * 4) % 15) for offset in asset_slots]
     preview_prices = opening.copy()
     preview = []
     for _ in range(PREVIEW):
-        for asset in range(len(assets)):
-            anticipation = market[0][asset] * 0.0007
-            preview_prices[asset] *= 1 - anticipation + rng.uniform(-0.005, 0.005)
+        for asset, change in enumerate(opening_changes):
+            anticipation = change * 0.0007
+            preview_prices[asset] *= 1 - anticipation + rng.uniform(-0.0015, 0.0015)
         preview.append(preview_prices.copy())
     closes = [*reversed(preview), opening]
     current = opening.copy()
-    for third, changes in enumerate(market):
-        length = steps * (third + 1) // 3 - steps * third // 3
+    for start, end, changes in sections:
+        length = end - start
         initial = current.copy()
-        variation = [rng.uniform(-0.012, 0.012) for _ in assets]
+        trends = [change / 100 + rng.uniform(-0.002, 0.002) for change in changes]
         turn = rng.uniform(0.35, 0.65)
-        interim_moves = [rng.uniform(-0.016, 0.016) for _ in assets]
+        interim_moves = [rng.uniform(-0.0045, 0.0045) for _ in asset_slots]
         for step in range(1, length + 1):
             fraction = step / length
             interim_weight = min(fraction / turn, (1 - fraction) / (1 - turn))
-            common_move = rng.uniform(-0.005, 0.005)
-            for asset in range(len(assets)):
-                trend = changes[asset] / 100 + variation[asset]
-                noise = common_move + rng.uniform(-0.006, 0.006)
-                current[asset] = initial[asset] * (1 + fraction * trend + interim_weight * interim_moves[asset] + noise)
+            common_move = rng.uniform(-0.0018, 0.0018)
+            for asset in asset_slots:
+                noise = common_move + rng.uniform(-0.0028, 0.0028)
+                current[asset] = initial[asset] * (
+                    1 + fraction * trends[asset] + interim_weight * interim_moves[asset] + noise
+                )
             closes.append(current.copy())
-    # A replay keeps the market regime but can give its winning and losing roles to different stocks.
-    asset_order = list(range(len(assets)))
-    rng.shuffle(asset_order)
     return [
-        [str(Decimal(str(row[asset])).quantize(_CENT, rounding=ROUND_HALF_UP)) for asset in asset_order]
+        [str(Decimal(str(price)).quantize(_CENT, rounding=ROUND_HALF_UP)) for price in row]
         for row in closes
+    ]
+
+
+def _market_sections(mission: dict, seed: str | int) -> list[tuple[int, int, list[int]]]:
+    pattern, _ = _MARKET_BY_MISSION[mission["id"]]
+    market = _MARKETS[pattern]
+    asset_order = list(range(len(mission["assets"])))
+    Random(f"{seed}:{mission['id']}:asset-order").shuffle(asset_order)
+    steps = mission["steps"]
+    count = len(market)
+    return [
+        (steps * index // count, steps * (index + 1) // count, [changes[role] for role in asset_order])
+        for index, changes in enumerate(market)
+    ]
+
+
+def _direction(change: int) -> str:
+    if change <= -6:
+        return "strongDown"
+    if change <= -2:
+        return "down"
+    if change < 2:
+        return "steady"
+    if change < 6:
+        return "up"
+    return "strongUp"
+
+
+def market_outlooks(mission: dict, seed: str | int) -> list[dict]:
+    """Coarse outlooks with step boundaries shared by the price simulation."""
+    return [
+        {
+            "startStep": start,
+            "throughStep": end,
+            "assets": {
+                asset: {"direction": _direction(change)}
+                for asset, change in zip(mission["assets"], changes)
+            },
+        }
+        for start, end, changes in _market_sections(mission, seed)
     ]

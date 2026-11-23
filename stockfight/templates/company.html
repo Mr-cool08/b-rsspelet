@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="sv">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0e171d">
+    <title>Börsföretag · Stock Fight</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/company.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/company-standings.css') }}">
+    <script defer src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/company.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/company-standings.js') }}"></script>
+</head>
+<body class="company-body">
+    <header class="topbar company-topbar">
+        <div class="topbar-inner">
+            <a class="brand company-brand" href="/" aria-label="Stock Fight">
+                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="brand-name">STOCK <strong>FIGHT</strong></span>
+            </a>
+            <div class="topbar-tools">
+                <a class="company-home" href="/" data-company-text="home">Till huvudmenyn</a>
+                <select id="language-select" class="language-select" aria-label="Språk" data-i18n-aria-label="Språk">
+                    <option value="sv" lang="sv">Svenska</option>
+                    <option value="en" lang="en">English</option>
+                </select>
+            </div>
+        </div>
+    </header>
+    <main class="company-main" id="main">
+        <p class="company-notice" id="company-notice" role="status" hidden></p>
+        <div id="company-content" aria-busy="true">
+            <h1 class="company-title" data-company-text="title">Börsföretag</h1>
+            <p class="company-description" data-company-text="loading">Laddar börsföretaget …</p>
+        </div>
+        <section id="company-standings"></section>
+        <noscript>Börsföretag behöver JavaScript för att kunna spelas.</noscript>
+    </main>
+</body>
+</html>
