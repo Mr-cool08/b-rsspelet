@@ -146,11 +146,14 @@ def test_private_registration_and_login(game):
         assert user.password_hash and user.password_hash != PASSWORD
 
     profile = http.get("/api/profile").get_json()
-    assert profile["elo"] == 1000 and profile["league"] == "Silver"
+    assert profile["elo"] == 100 and profile["league"] == "Bronze"
     assert (profile["wins"], profile["losses"], profile["draws"], profile["winRate"]) == (0, 0, 0, 0)
     assert profile["history"] == []
     leaders = http.get("/api/leaderboard").get_json()["players"]
-    assert any(row["username"] == "SwedishBull" and row["elo"] == 1000 for row in leaders)
+    assert any(row["username"] == "SwedishBull" and row["elo"] == 100 for row in leaders)
+    page = http.get("/").get_data(as_text=True)
+    assert '<th scope="row">Iron</th>' in page and "Under 50" in page
+    assert '<th scope="row">Grandmaster</th>' in page and "800–899" in page
     wrong_token = socketio.test_client(app, flask_test_client=http, auth={"csrfToken": "wrong"})
     assert not wrong_token.is_connected()
 
@@ -201,7 +204,7 @@ def test_matchmaking_widens_only_to_200_points(game, elo_gap, matches_after_wide
         if rating is None:
             rating = PlayerRating(user_id=second.id, mode="ranked")
             db.session.add(rating)
-        rating.elo = 1000 + elo_gap
+        rating.elo = 100 + elo_gap
         db.session.commit()
 
     assert first.emit("queue_join")["ok"]
@@ -302,7 +305,7 @@ def test_two_clients_trade_concurrently_finish_and_persist_once(game):
     assert len(first_results) == len(second_results) == 1
     winner, loser = first_results[0], second_results[0]
     assert (winner["outcome"], loser["outcome"]) == ("win", "lose")
-    assert (winner["eloBefore"], winner["eloAfter"], loser["eloBefore"], loser["eloAfter"]) == (1000, 1016, 1000, 984)
+    assert (winner["eloBefore"], winner["eloAfter"], loser["eloBefore"], loser["eloAfter"]) == (100, 116, 100, 84)
     assert (winner["trades"], winner["winningTrades"], winner["losingTrades"]) == (3, 3, 0)
     assert winner["attackDamage"] == 100 and loser["growCount"] == 1
     assert winner["duration"] == 5
@@ -313,7 +316,7 @@ def test_two_clients_trade_concurrently_finish_and_persist_once(game):
     advance(game, 180)
     assert first.events("match_result") == second.events("match_result") == []
     winner_profile = first.http.get("/api/profile").get_json()
-    assert (winner_profile["elo"], winner_profile["matches"], winner_profile["wins"], winner_profile["winRate"]) == (1016, 1, 1, 100)
+    assert (winner_profile["elo"], winner_profile["matches"], winner_profile["wins"], winner_profile["winRate"]) == (116, 1, 1, 100)
     assert [match["id"] for match in winner_profile["history"]] == [winner["id"]]
     with app.app_context():
         assert db.session.scalar(select(func.count()).select_from(Match)) == 1
@@ -346,8 +349,8 @@ def test_capital_breaks_simultaneous_knockout_and_counts_for_ranked_elo(game):
     assert winner["tiebreak"] == loser["tiebreak"] == "capital"
     assert Decimal(winner["opponentCapital"]) == 1000
     assert Decimal(loser["opponentCapital"]) == 1020
-    assert winner["outcome"] == "win" and winner["eloAfter"] == 1016
-    assert loser["outcome"] == "lose" and loser["eloAfter"] == 984
+    assert winner["outcome"] == "win" and winner["eloAfter"] == 116
+    assert loser["outcome"] == "lose" and loser["eloAfter"] == 84
 
 
 def test_short_trade_on_falling_price_can_attack_via_socket(game):
@@ -491,7 +494,7 @@ def test_bot_match_uses_ranked_elo_and_supports_reconnect_and_rematch(game):
     app, _ = game
     player = register(app, "BotChallenger")
     with app.app_context():
-        db.session.get(PlayerRating, (player.id, "ranked")).elo = 1425
+        db.session.get(PlayerRating, (player.id, "ranked")).elo = 525
         db.session.commit()
 
     ranked_profile = player.http.get("/api/profile").get_json()
@@ -503,7 +506,7 @@ def test_bot_match_uses_ranked_elo_and_supports_reconnect_and_rematch(game):
     initial = player.state()
     assert initial["mode"] == "bot"
     assert initial["status"] == "countdown" and initial["countdown"] == 3
-    assert initial["opponent"]["name"] == "Bot" and initial["opponent"]["elo"] == 1425
+    assert initial["opponent"]["name"] == "Bot" and initial["opponent"]["elo"] == 525
     assert not initial["opponent"]["hasPosition"]
     assert len(initial["bars"]) == 12
 
@@ -519,7 +522,7 @@ def test_bot_match_uses_ranked_elo_and_supports_reconnect_and_rematch(game):
     player.connect()
     rejoined = player.state()
     assert rejoined["id"] == initial["id"]
-    assert rejoined["mode"] == "bot" and rejoined["opponent"]["elo"] == 1425
+    assert rejoined["mode"] == "bot" and rejoined["opponent"]["elo"] == 525
     assert rejoined["nextSeq"] == active["nextSeq"] + 1
     assert Decimal(rejoined["self"]["cash"]) == 750
     assert len(rejoined["bars"]) == 13
@@ -543,13 +546,13 @@ def test_bot_match_uses_ranked_elo_and_supports_reconnect_and_rematch(game):
     assert len(results) == 1
     result = results[0]
     assert result["id"] == initial["id"] and result["mode"] == "bot"
-    assert result["eloBefore"] == result["eloAfter"] == 1425
+    assert result["eloBefore"] == result["eloAfter"] == 525
     assert result["outcome"] in {"win", "lose", "draw"}
     assert player.http.get("/api/profile").get_json() == ranked_profile
     assert player.http.get("/api/leaderboard").get_json() == ranked_leaders
     with app.app_context():
         assert db.session.scalar(select(func.count()).select_from(User)) == 1
-        db.session.get(PlayerRating, (player.id, "ranked")).elo = 975
+        db.session.get(PlayerRating, (player.id, "ranked")).elo = 75
         db.session.commit()
 
     player.socket.disconnect()
@@ -558,7 +561,7 @@ def test_bot_match_uses_ranked_elo_and_supports_reconnect_and_rematch(game):
     assert player.emit("bot_start")["ok"]
     rematch = player.state()
     assert rematch["id"] != result["id"] and rematch["mode"] == "bot"
-    assert rematch["opponent"]["elo"] == 975
+    assert rematch["opponent"]["elo"] == 75
 
 
 def test_failed_bot_start_keeps_ranked_queue_entry(game, monkeypatch):
@@ -583,7 +586,7 @@ def test_prediction_queue_pairs_only_with_prediction_and_uses_its_elo(game):
     first = register(app, "FirstPredictor")
     second = register(app, "SecondPredictor")
     with app.app_context():
-        db.session.get(PlayerRating, (second.id, "ranked")).elo = 1450
+        db.session.get(PlayerRating, (second.id, "ranked")).elo = 550
         db.session.commit()
 
     assert trader.emit("queue_join")["ok"]
@@ -675,7 +678,7 @@ def test_prediction_rounds_reconnect_and_persist_in_separate_ranking(game):
     assert winner["id"] == loser["id"] == initial["id"]
     assert winner["mode"] == loser["mode"] == "prediction"
     assert (winner["outcome"], loser["outcome"]) == ("win", "lose")
-    assert (winner["eloBefore"], winner["eloAfter"], loser["eloBefore"], loser["eloAfter"]) == (1000, 1016, 1000, 984)
+    assert (winner["eloBefore"], winner["eloAfter"], loser["eloBefore"], loser["eloAfter"]) == (100, 116, 100, 84)
     assert winner["roundsPlayed"] == loser["roundsPlayed"] == 4
     assert winner["hp"] == winner["attackDamage"] == 100
     assert winner["lastRound"]["actualMoveBps"] == -196
@@ -700,7 +703,7 @@ def test_prediction_rounds_reconnect_and_persist_in_separate_ranking(game):
     assert first.http.get("/api/leaderboard").get_json() == ranked_leaders
     leaders = first.http.get("/api/leaderboard?mode=prediction").get_json()["players"]
     assert [(row["username"], row["elo"]) for row in leaders] == [
-        ("BullPredictor", 1016), ("BearPredictor", 984),
+        ("BullPredictor", 116), ("BearPredictor", 84),
     ]
     with app.app_context():
         stored_match = db.session.scalars(select(Match)).one()

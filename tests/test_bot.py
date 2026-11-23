@@ -24,12 +24,12 @@ def opening_trade(elo, unrevealed_prices):
 
 
 def test_elo_changes_the_bot_opening_decision():
-    low_side, low_stake = opening_trade(600, [103, 104])
-    high_side, high_stake = opening_trade(2000, [103, 104])
+    low_side, low_stake = opening_trade(-300, [103, 104])
+    high_side, high_stake = opening_trade(1100, [103, 104])
 
     assert (low_side, high_side) == ("short", "long")
     assert low_stake < high_stake
 
 
 def test_unrevealed_prices_do_not_change_the_bot_opening_decision():
-    assert opening_trade(2000, [103, 104]) == opening_trade(2000, [99, 98])
+    assert opening_trade(1100, [103, 104]) == opening_trade(1100, [99, 98])

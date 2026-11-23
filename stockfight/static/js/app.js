@@ -1,33 +1,28 @@
 (() => {
     "use strict";
 
+    const { t, getLocale } = window.StockFightI18n;
     const byId = (id) => document.getElementById(id);
     const buttons = (action) => document.querySelectorAll(`[data-action="${action}"]`);
-    const positionDirection = (position) => position.side === "short" ? "Ner" : "Upp";
-    const amountFormat = new Intl.NumberFormat("sv-SE", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
-    const integerFormat = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 0 });
-    const dateFormat = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short" });
-    const marketDateFormat = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZone: "UTC" });
-    const marketTimeFormat = new Intl.DateTimeFormat("sv-SE", {
-        hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC",
-    });
+    const positionDirection = (position) => position.side === "short" ? t("Ner") : t("Upp");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const primaryTouch = window.matchMedia("(pointer: coarse)");
     const screenIds = ["auth", "menu", "queue", "invite", "match", "result", "spectate", "spectate-live"];
-    const screenFocus = { auth: "auth-title", menu: "menu-name", queue: "queue-title",
+    const screenFocus = { auth: "auth-title", menu: "menu-title", queue: "queue-title",
         invite: "invite-title", match: "match-screen", result: "result-outcome",
         spectate: "spectate-title", "spectate-live": "spectate-mode" };
     const phaseLabels = { normal: "Handel", market: "Marknadsstorm", final: "Slutstorm" };
-    const outcomeLabels = { win: "WIN", lose: "LOSE", loss: "LOSE", draw: "DRAW" };
+    const outcomeLabels = { win: "VANN", lose: "FÖRLORADE", loss: "FÖRLORADE", draw: "OAVGJORT" };
     const spectateModeLabels = { ranked: "Handelsduell", prediction: "Ritduell", bot: "Botduell", private: "Vänduell" };
     const acknowledgements = 5000;
     const chartRightPadding = 24;
     const chartZoomFactor = 1.5;
     const activityActions = ["play", "play-bot", "play-prediction", "practice-prediction", "guide-start",
         "guide-begin", "guide-bypass", "friend-create", "main-menu", "spectate"];
+    const localizedValues = new Map();
+
+    let amountFormat, integerFormat, percentFormat, predictionPercentFormat, dateFormat, marketDateFormat, marketTimeFormat;
+    configureFormats();
 
     let soundEnabled = preference("sound", "false") === "true";
     let effectsEnabled = preference("effects", "true") === "true";
@@ -41,14 +36,19 @@
     let profileVersion = 0;
     let menuProfileVersion = 0;
     let rankingVersion = 0;
+    let menuProfileData;
+    let profileData;
+    let rankingData;
     let toastTimer;
     let onlineCountPending = false;
+    let onlineCount;
     let socket;
     let queueWanted = false;
     let queueMode = "ranked";
     let queueLeavePending = false;
     let queueReconnect = false;
     let queueCommand;
+    let queueData;
     let activityCommand;
     let inviteCode = new URL(window.location.href).searchParams.get("match");
     let invitation;
@@ -68,6 +68,7 @@
     let tradeFocus;
     let percent = 100;
     let lastEventId;
+    let activeMatchEvent;
     let effectTimer;
     let drawPredictionChart;
     let predictionRound;
@@ -76,16 +77,46 @@
     let spectateCommands = Promise.resolve();
     let spectateListRequest;
     let spectateJoinRequest;
+    let spectateListData;
+    let spectateState;
     let spectatedMatchId;
     let spectateFinished = false;
     let drawSpectatePredictionChart;
 
     function put(id, value) {
+        localizedValues.delete(id);
         const element = byId(id);
+        element?.removeAttribute("data-i18n");
         const content = value == null ? "—" : String(value);
         if (element && element.textContent !== content) {
             element.textContent = content;
         }
+    }
+
+    function putLocalized(id, value) {
+        put(id, value == null ? value : t(value));
+        localizedValues.set(id, value);
+    }
+
+    function configureFormats() {
+        const locale = getLocale();
+        amountFormat = new Intl.NumberFormat(locale, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        integerFormat = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+        percentFormat = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
+        predictionPercentFormat = new Intl.NumberFormat(locale, {
+            style: "percent",
+            signDisplay: "exceptZero",
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: "short" });
+        marketDateFormat = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeZone: "UTC" });
+        marketTimeFormat = new Intl.DateTimeFormat(locale, {
+            hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC",
+        });
     }
 
     function show(id, visible) {
@@ -150,11 +181,12 @@
     }
 
     function percentage(value) {
-        return numeric(value) == null ? "—" : `${formatNumber(value)} %`;
+        const number = numeric(value);
+        return number == null ? "—" : percentFormat.format(number / 100);
     }
 
     function message(id, value, tone = "info") {
-        put(id, value || "");
+        putLocalized(id, value || "");
         stateAttribute(id, "tone", tone);
         show(id, Boolean(value));
     }
@@ -205,19 +237,25 @@
         onlineCountPending = true;
         try {
             const { count } = await request("/api/online");
-            put("online-count", `${formatNumber(count)} online`);
+            onlineCount = count;
         } catch {
-            put("online-count", "— online");
+            onlineCount = undefined;
         } finally {
             onlineCountPending = false;
+            renderOnlineCount();
         }
+    }
+
+    function renderOnlineCount() {
+        if (onlineCount == null) return;
+        put("online-count", t("{count} online", { count: formatNumber(onlineCount) }));
     }
 
     function setAuthMode(mode) {
         authMode = mode;
         const register = mode === "register";
-        put("auth-title", register ? "Nytt spelarkonto" : "Spelarkonto");
-        put("auth-submit", register ? "Skapa konto" : "Logga in");
+        putLocalized("auth-title", register ? "Nytt spelarkonto" : "Spelarkonto");
+        putLocalized("auth-submit", register ? "Skapa konto" : "Logga in");
         for (const name of ["login", "register"]) {
             for (const button of buttons(`auth-${name}`)) {
                 const selected = String(name === mode);
@@ -265,6 +303,10 @@
             queueLeavePending = false;
             queueReconnect = false;
             queueCommand = undefined;
+            queueData = undefined;
+            menuProfileData = undefined;
+            profileData = undefined;
+            rankingData = undefined;
             lastResultId = undefined;
             resetMatch();
             fillTable("ranking-list", []);
@@ -358,6 +400,7 @@
             && requestVersion === (includeDialog ? profileVersion : menuProfileVersion);
         const mode = includeDialog ? byId("profile-mode").value : "ranked";
         if (includeDialog) {
+            profileData = undefined;
             put("profile-name", session.user.username);
             for (const field of ["league", "elo", "matches", "wins", "losses", "draws", "win-rate"]) {
                 put(`profile-${field}`, null);
@@ -368,32 +411,13 @@
         try {
             const data = await request(mode === "prediction" ? "/api/profile?mode=prediction" : "/api/profile");
             if (!ownsResponse()) return;
-            if (!includeDialog) {
-                put("menu-level", data.level ?? data.league);
-                put("menu-elo", formatNumber(data.elo));
-                progress("menu-progress", data.progress);
-                put("menu-progress-label", percentage(data.progress));
-                put("menu-next", data.nextLeague
-                    ? `${data.nextLeague} · ${formatNumber(data.nextElo)} Elo` : "Högsta ligan");
-                return;
+            if (includeDialog) {
+                profileData = data;
+                renderProfile(data);
+            } else {
+                menuProfileData = data;
+                renderMenuProfile(data);
             }
-            put("profile-name", session.user.username);
-            put("profile-league", data.league);
-            put("profile-elo", formatNumber(data.elo));
-            put("profile-matches", formatNumber(data.matches));
-            put("profile-wins", formatNumber(data.wins));
-            put("profile-losses", formatNumber(data.losses));
-            put("profile-draws", formatNumber(data.draws));
-            put("profile-win-rate", percentage(data.winRate));
-            const rows = (data.history ?? []).map((item) => [
-                item.opponent,
-                outcomeLabels[item.outcome],
-                item.symbol,
-                `${formatNumber(item.eloBefore)} → ${formatNumber(item.eloAfter)}`,
-                date(item.endedAt),
-            ]);
-            fillTable("profile-history", rows);
-            message("profile-status", rows.length ? "" : "Inga avslutade matcher ännu.");
         } catch (error) {
             if (!ownsResponse()) return;
             if (includeDialog) message("profile-status", error.message, "error");
@@ -403,29 +427,64 @@
         }
     }
 
+    function renderMenuProfile(data) {
+        putLocalized("menu-level", data.level ?? data.league);
+        put("menu-elo", formatNumber(data.elo));
+        progress("menu-progress", data.progress);
+        put("menu-progress-label", percentage(data.progress));
+        put("menu-next", data.nextLeague
+            ? `${t(data.nextLeague)} · ${formatNumber(data.nextElo)} Elo` : t("Högsta ligan"));
+    }
+
+    function renderProfile(data) {
+        put("profile-name", session.user.username);
+        putLocalized("profile-league", data.league);
+        put("profile-elo", formatNumber(data.elo));
+        put("profile-matches", formatNumber(data.matches));
+        put("profile-wins", formatNumber(data.wins));
+        put("profile-losses", formatNumber(data.losses));
+        put("profile-draws", formatNumber(data.draws));
+        put("profile-win-rate", percentage(data.winRate));
+        const rows = (data.history ?? []).map((item) => [
+            item.opponent,
+            outcomeLabels[item.outcome] ? t(outcomeLabels[item.outcome]) : null,
+            item.symbol,
+            `${formatNumber(item.eloBefore)} → ${formatNumber(item.eloAfter)}`,
+            date(item.endedAt),
+        ]);
+        fillTable("profile-history", rows);
+        message("profile-status", rows.length ? "" : "Inga avslutade matcher ännu.");
+    }
+
     async function refreshRanking() {
         const version = sessionVersion;
         const requestVersion = ++rankingVersion;
         const ownsResponse = () => version === sessionVersion && requestVersion === rankingVersion;
         const mode = byId("ranking-mode").value;
+        rankingData = undefined;
         fillTable("ranking-list", []);
         message("ranking-status", "Hämtar ranking …");
         try {
             const data = await request(mode === "prediction" ? "/api/leaderboard?mode=prediction" : "/api/leaderboard");
             if (!ownsResponse()) return;
-            const rows = (data.players ?? []).map((player, index) => [
-                index + 1,
-                player.username,
-                formatNumber(player.elo),
-                player.league,
-                formatNumber(player.wins),
-                formatNumber(player.matches),
-            ]);
-            fillTable("ranking-list", rows);
-            message("ranking-status", rows.length ? "" : "Rankingen är tom.");
+            rankingData = data;
+            renderRanking(data);
         } catch (error) {
             if (ownsResponse()) message("ranking-status", error.message, "error");
         }
+    }
+
+    function renderRanking(data) {
+        const rows = (data.players ?? []).map((player, index) => [
+            formatNumber(index + 1),
+            player.username,
+            formatNumber(player.elo),
+            player.league ? t(player.league) : null,
+            formatNumber(player.wins),
+            formatNumber(player.matches),
+        ]);
+        fillTable("ranking-list", rows);
+        message("ranking-status", rows.length ? "" : "Rankingen är tom.");
     }
 
     function openDialog(name) {
@@ -440,7 +499,7 @@
         const labels = { connecting: "Ansluter …", offline: "Återansluter …", online: "Ansluten" };
         show("connection-status", Boolean(status));
         if (!status) return;
-        put("connection-status", detail || labels[status]);
+        putLocalized("connection-status", detail || labels[status]);
         stateAttribute("connection-status", "state", status);
     }
 
@@ -558,6 +617,13 @@
     function receiveSpectateList(data) {
         if (screen !== "spectate" || !Array.isArray(data?.matches)) return;
         spectateListRequest = undefined;
+        spectateListData = data;
+        renderSpectateList(data);
+        message("spectate-list-status", data.matches.length ? "" : "Inga matcher pågår just nu.");
+        show("spectate-list-retry", false);
+    }
+
+    function renderSpectateList(data) {
         const list = byId("spectate-list");
         const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.matchId : undefined;
         let focusTarget;
@@ -569,11 +635,11 @@
             details.className = "spectate-match-details";
             const players = document.createElement("strong");
             players.className = "spectate-match-players";
-            players.textContent = live.players.map((player) => player.name).join(" mot ");
+            players.textContent = live.players.map((player) => player.name).join(t(" mot "));
             const mode = spectateModeLabels[live.mode] ?? "Duell";
             const meta = document.createElement("span");
             meta.className = "spectate-match-meta";
-            meta.textContent = [mode, live.symbol, live.status === "countdown" ? "Startar snart" : "Live"]
+            meta.textContent = [t(mode), live.symbol, live.status === "countdown" ? t("Startar snart") : t("Live")]
                 .filter(Boolean).join(" · ");
             const button = document.createElement("button");
             button.type = "button";
@@ -581,8 +647,8 @@
             button.dataset.action = "spectate-watch";
             button.dataset.matchId = live.id;
             button.dataset.mode = mode;
-            button.textContent = "Titta live";
-            button.setAttribute("aria-label", `Titta live på ${players.textContent}`);
+            button.textContent = t("Titta live");
+            button.setAttribute("aria-label", t("Titta live på {players}", { players: players.textContent }));
             if (focusedId === live.id) focusTarget = button;
             details.append(players, meta);
             row.append(details, button);
@@ -590,26 +656,25 @@
         }
         list.replaceChildren(rows);
         if (focusedId) (focusTarget ?? byId("spectate-title")).focus({ preventScroll: true });
-        message("spectate-list-status", data.matches.length ? "" : "Inga matcher pågår just nu.");
-        show("spectate-list-retry", false);
     }
 
     function leaveSpectateList() {
         spectateListRequest = undefined;
+        spectateListData = undefined;
         if (socket?.connected) sendSpectateCommand("spectate_list_leave");
         byId("spectate-list").replaceChildren();
     }
 
     function openSpectateMatch(button) {
         spectatedMatchId = button.dataset.matchId;
-        put("spectate-mode", button.dataset.mode);
+        putLocalized("spectate-mode", button.dataset.mode);
         show("spectate-contest", false);
         activate("spectate-live");
         subscribeSpectateMatch();
     }
 
     function setSpectateLiveStatus(value, state, retry = false) {
-        put("spectate-status", value);
+        putLocalized("spectate-status", value);
         stateAttribute("spectate-status", "state", state);
         stateAttribute("spectate-status", "tone", state === "error" ? "error" : "info");
         show("spectate-live-retry", retry);
@@ -630,7 +695,7 @@
             if (ack?.ok) receiveSpectateState(ack.state);
             else {
                 spectateFinished = ack?.code === "match_unavailable";
-                if (spectateFinished) put("spectate-live-phase", "Inte live");
+                if (spectateFinished) putLocalized("spectate-live-phase", "Inte live");
                 setSpectateLiveStatus(ack?.error || "Liveuppdateringarna kunde inte startas.",
                     spectateFinished ? "finished" : "error", !spectateFinished);
             }
@@ -641,6 +706,7 @@
         if (socket?.connected) sendSpectateCommand("spectate_leave");
         spectatedMatchId = undefined;
         spectateJoinRequest = undefined;
+        spectateState = undefined;
         spectateFinished = false;
         spectateChart.reset();
         drawSpectatePredictionChart?.();
@@ -659,6 +725,11 @@
         if (screen !== "spectate-live" || data?.id !== spectatedMatchId) return;
         spectateJoinRequest = undefined;
         spectateFinished = data.status === "finished";
+        spectateState = data;
+        renderSpectateState(data);
+    }
+
+    function renderSpectateState(data, updateStatus = true) {
         const prediction = data.mode === "prediction";
         const counting = data.status === "countdown";
         const [first, second] = data.players;
@@ -666,11 +737,14 @@
         const phase = prediction ? (data.round?.phase === "reveal" ? "Facit" : "Prognos") : phaseLabels[data.storm];
         const timing = counting ? data.countdown : prediction && !spectateFinished ? data.remaining : data.elapsed;
         const storm = data.storm === "final" ? "KO" : data.storm === "market" ? "Slutstorm" : "Storm";
-        const detail = prediction ? `Runda ${data.round.number} av ${data.roundLimit}` : `${storm} om ${clock(data.remaining)}`;
-        const finalStatus = winner ? `${winner.name} vann matchen.` : "Matchen slutade oavgjort.";
-        setSpectateLiveStatus(spectateFinished ? finalStatus : counting ? "Matchen startar snart" : "Live",
-            spectateFinished ? "finished" : counting ? "countdown" : "live");
-        put("spectate-live-phase", spectateFinished ? "Avslutad" : counting ? "Startar" : phase);
+        const detail = prediction ? t("Runda {round} av {limit}", { round: data.round.number, limit: data.roundLimit })
+            : t("{storm} om {time}", { storm: t(storm), time: clock(data.remaining) });
+        if (updateStatus) {
+            const finalStatus = winner ? t("{winner} vann matchen.", { winner: winner.name }) : "Matchen slutade oavgjort.";
+            setSpectateLiveStatus(spectateFinished ? finalStatus : counting ? "Matchen startar snart" : "Live",
+                spectateFinished ? "finished" : counting ? "countdown" : "live");
+            putLocalized("spectate-live-phase", spectateFinished ? "Avslutad" : counting ? "Startar" : phase);
+        }
         put("spectate-live-timing", clock(timing));
         put("spectate-live-detail", detail);
         show("spectate-live-detail", !counting && !spectateFinished);
@@ -686,7 +760,7 @@
             put(`${prefix}-capital`, formatNumber(player.capital, amountFormat));
             const active = prediction ? data.round.phase === "predict" && player.locked : player.hasPosition;
             show(`${prefix}-activity`, active && !spectateFinished);
-            put(`${prefix}-activity`, prediction ? "Prognos låst" : "Öppen position");
+            putLocalized(`${prefix}-activity`, prediction ? "Prognos låst" : "Öppen position");
         }
         show("spectate-contest", true);
         show("spectate-prediction-chart-panel", prediction);
@@ -701,10 +775,10 @@
             const target = data.players.find((player) => player.id === event?.targetId)?.name;
             const damage = event?.damage > 0 ? ` · −${formatNumber(event.damage)} HP` : "";
             const eventLabels = {
-                attack: `${actor} · Attack${damage}`,
-                grow: `${actor} · Grow`,
-                loss: `${actor} · Förlustaffär${damage}`,
-                ko: target ? `${target} · KO` : "Storm · KO",
+                attack: t("{actor} · Attack{damage}", { actor, damage }),
+                grow: t("{actor} · Grow", { actor }),
+                loss: t("{actor} · Förlustaffär{damage}", { actor, damage }),
+                ko: target ? `${target} · KO` : t("Storm · KO"),
             };
             show("spectate-prediction-reveal", false);
             message("spectate-event", eventLabels[event?.type]);
@@ -732,7 +806,9 @@
         stateAttribute("spectate-first-prediction-card", "winner", String(first.id === outcome.winnerId));
         stateAttribute("spectate-second-prediction-card", "winner", String(second.id === outcome.winnerId));
         const winner = data.players.find((player) => player.id === outcome.winnerId);
-        message("spectate-event", winner ? `${winner.name} vann rundan · ${formatNumber(outcome.damage)} HP i skada`
+        message("spectate-event", winner ? t("{winner} vann rundan · {damage} HP i skada", {
+            winner: winner.name, damage: formatNumber(outcome.damage),
+        })
             : "Oavgjord runda");
     }
 
@@ -745,11 +821,12 @@
         resetMatch();
         queueWanted = true;
         queueMode = mode;
+        queueData = undefined;
         queueLeavePending = false;
         queueReconnect = !socket.connected;
         put("queue-wait", clock(0));
         put("queue-radius", "—");
-        put("queue-title", mode === "prediction" ? "Söker en ritduell" : "Söker motståndare");
+        putLocalized("queue-title", mode === "prediction" ? "Söker en ritduell" : "Söker motståndare");
         disable("leave-queue", false);
         activate("queue");
         if (socket.connected) sendQueueCommand(true);
@@ -758,7 +835,7 @@
     function setActivityCommand(command) {
         activityCommand = command;
         for (const action of activityActions) disable(action, Boolean(command));
-        put("bot-start-label", command?.event === "bot_start" ? "Startar …" : "Spela mot bot");
+        putLocalized("bot-start-label", command?.event === "bot_start" ? "Startar …" : "Spela mot bot");
         renderPrivate();
         renderPrediction();
         renderPlayAgain();
@@ -860,12 +937,12 @@
         show("invite-join", Boolean(inviteCode) && !hosting);
         disable("friend-join", !socket?.connected || Boolean(activityCommand));
         disable("friend-cancel", Boolean(activityCommand) || (hosting && !socket?.connected));
-        put("invite-cancel", hosting || inviteCode ? "Avbryt" : "Till huvudmenyn");
+        putLocalized("invite-cancel", hosting || inviteCode ? "Avbryt" : "Till huvudmenyn");
         let status = "Inbjudan är inte längre aktiv.";
         if (activityCommand?.event === "private_create") status = "Skapar inbjudan …";
         else if (hosting) status = "Dela länken och vänta på att din vän går med.";
         else if (inviteCode) status = "Du har fått en inbjudan till en orankad handelsduell.";
-        put("invite-status", status);
+        putLocalized("invite-status", status);
     }
 
     function receivePrivateState(data) {
@@ -970,9 +1047,8 @@
             if (!queueWanted && screen === "result") resetMatch();
             queueWanted = true;
             queueMode = data.mode === "prediction" ? "prediction" : "ranked";
-            put("queue-wait", clock(data.waited));
-            put("queue-radius", numeric(data.radius) == null ? "—" : `±${formatNumber(data.radius)}`);
-            put("queue-title", queueMode === "prediction" ? "Söker en ritduell" : "Söker motståndare");
+            queueData = data;
+            renderQueue(data);
             activate("queue");
             return;
         }
@@ -985,6 +1061,12 @@
         disable("leave-queue", false);
         if (screen === "queue") activate("menu");
         if (data.error) toast(data.error, "error");
+    }
+
+    function renderQueue(data) {
+        put("queue-wait", clock(data.waited));
+        put("queue-radius", numeric(data.radius) == null ? "—" : `±${formatNumber(data.radius)}`);
+        putLocalized("queue-title", queueMode === "prediction" ? "Söker en ritduell" : "Söker motståndare");
     }
 
     function preference(name, fallback) {
@@ -1030,7 +1112,7 @@
             attack: "Attack gör upp till 20 HP skada och förbrukar vinsten.",
             grow: "Grow ger 10 krediter, höjer attackkraften till 102 % och laddar nästa attack med 25 bonus-HP.",
         };
-        put("guide-example-result", outcomes[choice] ?? "");
+        putLocalized("guide-example-result", outcomes[choice] ?? "");
     }
 
     function openBotGuide() {
@@ -1058,7 +1140,7 @@
         if (sellChoice?.kind === "flat" || sellChoice?.kind === "loss") {
             step = "Kursen har ändrats. Stäng positionen vid den nya kursen.";
         }
-        put("bot-guide-step", step);
+        putLocalized("bot-guide-step", step);
     }
 
     function applyEffects() {
@@ -1100,6 +1182,7 @@
 
     function clearEffect() {
         window.clearTimeout(effectTimer);
+        activeMatchEvent = undefined;
         byId("match-screen")?.classList.remove("is-hit", "is-grow", "is-ko", "hit-self", "hit-opponent");
         show("match-event", false);
     }
@@ -1134,24 +1217,37 @@
         stateAttribute(`${prefix}-hp`, "health", hp === 0 ? "ko" : hp > 0 && hp <= 25 ? "low" : "normal");
     }
 
+    function sameId(left, right) {
+        return left != null && right != null && String(left) === String(right);
+    }
+
+    function matchEventLabel(event) {
+        const acting = sameId(event.actorId, match.self?.id);
+        const defending = sameId(event.targetId, match.self?.id);
+        const actor = acting ? t("Du") : match.opponent?.name ?? t("Motståndaren");
+        const target = defending ? t("Du") : match.opponent?.name ?? t("Motståndaren");
+        const damage = numeric(event.damage);
+        const messages = {
+            attack: t("{actor} · ATTACK{damage}", {
+                actor, damage: damage == null ? "" : ` · −${formatNumber(damage)} HP`,
+            }),
+            grow: t("{actor} · GROW", { actor }),
+            loss: t("{actor} · Förlustaffär{damage}", {
+                actor, damage: damage > 0 ? ` · −${formatNumber(damage)} HP` : "",
+            }),
+            ko: event.targetId == null ? t("Storm · KO") : `${target} · KO`,
+        };
+        return Object.hasOwn(messages, event.type) ? messages[event.type] : "";
+    }
+
     function animateEvent(event) {
         if (!event || event.id === lastEventId) return;
         lastEventId = event.id;
         clearEffect();
-        const same = (left, right) => left != null && right != null && String(left) === String(right);
-        const acting = same(event.actorId, match.self?.id);
-        const defending = same(event.targetId, match.self?.id);
-        const actor = acting ? "Du" : match.opponent?.name ?? "Motståndaren";
-        const target = defending ? "Du" : match.opponent?.name ?? "Motståndaren";
-        const damage = numeric(event.damage);
-        const messages = {
-            attack: `${actor} · ATTACK${damage == null ? "" : ` · −${formatNumber(damage)} HP`}`,
-            grow: `${actor} · GROW`,
-            loss: `${actor} · Förlustaffär${damage > 0 ? ` · −${formatNumber(damage)} HP` : ""}`,
-            ko: event.targetId == null ? "Storm · KO" : `${target} · KO`,
-        };
-        if (!Object.hasOwn(messages, event.type)) return;
-        put("match-event", messages[event.type]);
+        const label = matchEventLabel(event);
+        if (!label) return;
+        activeMatchEvent = event;
+        put("match-event", label);
         stateAttribute("match-event", "event", event.type);
         show("match-event", true);
         playSound(event.type);
@@ -1160,7 +1256,8 @@
             // Restart the animation when two consecutive events have the same type.
             void stage.offsetWidth;
             const effect = { attack: "is-hit", loss: "is-hit", grow: "is-grow", ko: "is-ko" }[event.type];
-            const ownSide = event.type === "grow" || event.type === "loss" ? acting : defending;
+            const relatedId = event.type === "grow" || event.type === "loss" ? event.actorId : event.targetId;
+            const ownSide = sameId(relatedId, match.self?.id);
             stage.classList.add(effect);
             if (event.targetId == null) stage.classList.add("hit-self", "hit-opponent");
             else stage.classList.add(ownSide ? "hit-self" : "hit-opponent");
@@ -1213,10 +1310,7 @@
                     rightOffsetPixels: chartRightPadding,
                     rightBarStaysOnScroll: true,
                 },
-                localization: {
-                    priceFormatter: (price) => formatNumber(price, amountFormat),
-                    timeFormatter: (time) => `Kurspunkt ${time}`,
-                },
+                localization: this.localization(),
                 handleScale: { mouseWheel: false, pinch: true },
                 handleScroll: { mouseWheel: false, horzTouchDrag: false, vertTouchDrag: false },
                 trackingMode: { exitMode: library.TrackingModeExitMode.OnTouchEnd },
@@ -1231,15 +1325,28 @@
                     wickDownColor: down,
                     priceLineColor: label,
                 });
-                container.setAttribute("aria-label", "Kursgraf med ljusstaplar");
             } else {
                 this.series = this.chart.addSeries(library.LineSeries, {
                     color: price,
                     lineWidth: 2,
                     priceLineColor: label,
                 });
-                container.setAttribute("aria-label", "Linjegraf över aktiekursen");
             }
+            this.localize();
+        }
+
+        localization() {
+            return {
+                priceFormatter: (price) => formatNumber(price, amountFormat),
+                timeFormatter: (time) => t("Kurspunkt {time}", { time }),
+            };
+        }
+
+        localize() {
+            if (!this.series) return;
+            this.chart.applyOptions({ localization: this.localization() });
+            byId(this.containerId).setAttribute("aria-label",
+                this.series.seriesType() === "Candlestick" ? t("Kursgraf med ljusstaplar") : t("Linjegraf över aktiekursen"));
         }
 
         zoom(factor) {
@@ -1325,34 +1432,35 @@
         const magnitude = Math.abs(bps);
         const fraction = magnitude % 100;
         const whole = (magnitude - fraction) / 100;
-        const decimal = fraction ? `,${String(fraction).padStart(2, "0").replace(/0$/, "")}` : "";
+        const separator = getLocale() === "sv-SE" ? "," : ".";
+        const decimal = fraction ? separator + String(fraction).padStart(2, "0").replace(/0$/, "") : "";
         return `${bps < 0 ? "-" : ""}${whole}${decimal}`;
     }
 
     function formatPrediction(bps) {
-        if (bps == null) return "Inget svar";
-        return `${signed(bps / 100, amountFormat)} %`;
+        if (bps == null) return t("Inget svar");
+        return predictionPercentFormat.format(bps / 10_000);
     }
 
     function predictionVerdict(outcome, selfId, opponentName) {
         if (outcome.winnerId == null) {
             if (outcome.selfMoveBps == null && outcome.opponentMoveBps == null) {
-                return { side: "draw", title: "Inga prognoser", reason: "Tiden gick ut för båda spelarna. Ingen tog skada." };
+                return { side: "draw", title: t("Inga prognoser"), reason: t("Tiden gick ut för båda spelarna. Ingen tog skada.") };
             }
-            return { side: "draw", title: "Oavgjord runda", reason: "Ni kom lika nära facit. Ingen tog skada." };
+            return { side: "draw", title: t("Oavgjord runda"), reason: t("Ni kom lika nära facit. Ingen tog skada.") };
         }
 
         const won = String(outcome.winnerId) === String(selfId);
-        const winner = won ? "Du" : opponentName;
+        const winner = won ? t("Du") : opponentName;
         const side = won ? "self" : "opponent";
-        const title = `${winner} vann rundan`;
+        const title = t("{winner} vann rundan", { winner });
         const otherError = won ? outcome.opponentErrorBps : outcome.selfErrorBps;
         if (otherError == null) {
-            return { side, title, reason: `${winner} var ensam om att låsa en prognos.` };
+            return { side, title, reason: t("{winner} var ensam om att låsa en prognos.", { winner }) };
         }
         const winnerError = won ? outcome.selfErrorBps : outcome.opponentErrorBps;
         const margin = formatNumber((otherError - winnerError) / 100, amountFormat);
-        return { side, title, reason: `${winner} kom ${margin} procentenheter närmare facit.` };
+        return { side, title, reason: t("{winner} kom {margin} procentenheter närmare facit.", { winner, margin }) };
     }
 
     function predictionReady() {
@@ -1414,10 +1522,10 @@
         disable("practice-next", !socket?.connected || !matchSynchronized || Boolean(activityCommand) || Boolean(result));
         disable("practice-leave", !socket?.connected || !matchSynchronized || Boolean(activityCommand));
         if (practice) {
-            put("practice-next", round?.number === match.roundLimit ? "Se sammanfattning" : "Nästa runda");
+            putLocalized("practice-next", round?.number === match.roundLimit ? "Se sammanfattning" : "Nästa runda");
         }
 
-        const opponentName = match.opponent?.name || "Motståndaren";
+        const opponentName = match.opponent?.name || t("Motståndaren");
         const verdict = outcome && !practice ? predictionVerdict(outcome, match.self?.id, opponentName) : null;
         stateAttribute("prediction-verdict", "side", verdict?.side ?? "");
         stateAttribute("prediction-self-breakdown", "winner", String(verdict?.side === "self"));
@@ -1431,23 +1539,26 @@
             for (const [side, bps] of [["self", outcome.selfErrorBps], ["opponent", outcome.opponentErrorBps]]) {
                 const id = `prediction-${side}-error`;
                 show(id, bps != null);
-                if (bps != null) put(id, `${formatNumber(bps / 100, amountFormat)} procentenheter fel`);
+                if (bps != null) put(id, t("{error} procentenheter fel", { error: formatNumber(bps / 100, amountFormat) }));
             }
-            put("prediction-status", verdict?.title ?? "Facit för rundan");
+            put("prediction-status", verdict?.title ?? t("Facit för rundan"));
             if (verdict) {
-                const damage = outcome.damage ? ` ${verdict.side === "self" ? opponentName : "Du"} förlorade ${formatNumber(outcome.damage)} HP.` : "";
-                put("prediction-reason", verdict.reason + damage);
+                const damage = outcome.damage ? t("{player} förlorade {damage} HP.", {
+                    player: verdict.side === "self" ? opponentName : t("Du"),
+                    damage: formatNumber(outcome.damage),
+                }) : null;
+                put("prediction-reason", [verdict.reason, damage].filter(Boolean).join(" "));
             }
         } else if (match.status === "countdown") {
-            put("prediction-status", "Gör dig redo att gissa nästa kursrörelse.");
+            putLocalized("prediction-status", "Gör dig redo att gissa nästa kursrörelse.");
         } else if (round?.selfLocked) {
-            put("prediction-status", "Prognosen är låst. Väntar på facit.");
+            putLocalized("prediction-status", "Prognosen är låst. Väntar på facit.");
         } else if (predictionCommand) {
-            put("prediction-status", "Låser prognosen …");
+            putLocalized("prediction-status", "Låser prognosen …");
         } else if (!socket?.connected || !matchSynchronized) {
-            put("prediction-status", "Väntar på anslutning …");
+            putLocalized("prediction-status", "Väntar på anslutning …");
         } else {
-            put("prediction-status", round?.opponentLocked ? "Motståndaren har låst sin prognos." : "Hur rör sig kursen härnäst?");
+            putLocalized("prediction-status", round?.opponentLocked ? "Motståndaren har låst sin prognos." : "Hur rör sig kursen härnäst?");
         }
         drawPredictionChart?.({ bars: match.bars, guess, outcome, editable });
     }
@@ -1515,6 +1626,11 @@
         sellChoice = data.self?.position?.closePreview ?? undefined;
         if (data.mode === "private") forgetInviteCode();
         activate("match");
+        renderMatch(data, true);
+        animateEvent(data.event);
+    }
+
+    function renderMatch(data, syncRound = false) {
         stateAttribute("match-screen", "mode", data.mode ?? "ranked");
         stateAttribute("match-screen", "phase", data.status);
         stateAttribute("match-screen", "storm", data.storm ?? "normal");
@@ -1524,13 +1640,13 @@
         const finished = data.status === "finished";
         const phase = prediction ? (data.round?.phase === "reveal" ? "Facit" : "Prognos")
             : phaseLabels[data.storm] ?? "Handel";
-        put("match-phase", counting ? "Startar" : finished ? "Avslutad" : phase);
+        putLocalized("match-phase", counting ? "Startar" : finished ? "Avslutad" : phase);
         const remaining = prediction ? data.remaining : data.elapsed;
         put("match-time", clock(counting ? data.countdown : remaining));
         const stormTime = clock(data.remaining);
-        const stormClock = data.storm === "final" ? `KO om ${stormTime}`
-            : data.storm === "market" ? `Slutstorm om ${stormTime}` : `Storm om ${stormTime}`;
-        const roundLabel = `Runda ${data.round?.number} av ${data.roundLimit ?? 8}`;
+        const storm = data.storm === "final" ? "KO" : data.storm === "market" ? "Slutstorm" : "Storm";
+        const stormClock = t("{storm} om {time}", { storm: t(storm), time: stormTime });
+        const roundLabel = t("Runda {round} av {limit}", { round: data.round?.number, limit: data.roundLimit ?? 8 });
         put("match-clock-detail", prediction ? roundLabel : stormClock);
         put("practice-round", roundLabel);
         show("match-hud", !practice);
@@ -1538,8 +1654,8 @@
         show("match-clock-detail", !counting && !finished);
         put("countdown-number", Math.max(1, Math.ceil(numeric(data.countdown) ?? 3)));
         show("countdown-overlay", counting);
-        put("match-symbol", data.symbol);
-        put("match-name", data.name);
+        put("match-symbol", instrumentSymbol(data, practice));
+        put("match-name", instrumentName(data, practice));
         put("match-market", [data.market, data.interval].filter(Boolean).join(" · "));
         put("match-price", formatNumber(data.price, amountFormat));
         show("match-synthetic", Boolean(data.synthetic));
@@ -1561,8 +1677,11 @@
         renderGuide();
         if (prediction) {
             show("match-chart-status", false);
-            syncPredictionRound();
-            animateEvent(data.event);
+            if (syncRound) syncPredictionRound();
+            else {
+                if (data.round?.selfLocked) byId("prediction-move").value = predictionInputValue(data.round.selfMoveBps);
+                renderPrediction();
+            }
             return;
         }
         const position = data.self?.position;
@@ -1581,7 +1700,14 @@
         stateAttribute("match-pnl", "sign", sign(numeric(position?.pnl)));
         matchChart.update(data.bars, position);
         renderTradeControls();
-        animateEvent(data.event);
+    }
+
+    function instrumentSymbol(data, practice) {
+        return practice && data.symbol === "ÖVNING" ? t("ÖVNING") : data.symbol;
+    }
+
+    function instrumentName(data, practice) {
+        return practice && data.name === "Ritduell" ? t("Ritduell") : data.name;
     }
 
     function setPercent(value) {
@@ -1625,14 +1751,18 @@
         show("pending-close", Boolean(sellChoice) && !profitable);
         renderStake();
         if (sellChoice) {
-            let hint = "Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.";
+            let hint = t("Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.");
             if (profitable) {
-                put("attack-preview", `${formatNumber(sellChoice.attackDamage)} HP skada`);
-                put("grow-preview", `${signed(sellChoice.growCredits, amountFormat)} krediter · ${formatNumber(sellChoice.growBonus)} bonus-HP`);
+                put("attack-preview", t("{damage} HP skada", { damage: formatNumber(sellChoice.attackDamage) }));
+                put("grow-preview", t("{credits} krediter · {bonus} bonus-HP", {
+                    credits: signed(sellChoice.growCredits, amountFormat), bonus: formatNumber(sellChoice.growBonus),
+                }));
             } else if (sellChoice.kind === "loss") {
-                hint = `Vid aktuell kurs förlorar du ${formatNumber(sellChoice.lossCredits, amountFormat)} krediter och ${formatNumber(sellChoice.lossDamage)} HP.`;
+                hint = t("Vid aktuell kurs förlorar du {credits} krediter och {damage} HP.", {
+                    credits: formatNumber(sellChoice.lossCredits, amountFormat), damage: formatNumber(sellChoice.lossDamage),
+                });
             } else {
-                hint = "Vid aktuell kurs stänger du positionen utan vinst eller förlust.";
+                hint = t("Vid aktuell kurs stänger du positionen utan vinst eller förlust.");
             }
             put("sell-choice-hint", hint);
         }
@@ -1713,13 +1843,13 @@
         if (!result) return;
         const mode = result.mode ?? match?.mode ?? "ranked";
         if (mode !== "private") {
-            put("result-rematch", activityCommand ? "Startar …" : mode === "ranked" ? "PLAY AGAIN" : "Spela igen");
+            putLocalized("result-rematch", activityCommand ? "Startar …" : "Spela igen");
             disable("play-again", Boolean(activityCommand));
             message("result-revenge-status", "");
             return;
         }
         const offer = rematchOffer?.matchId === result.id ? rematchOffer : null;
-        put("result-rematch", "Revansch mot samma spelare");
+        putLocalized("result-rematch", "Revansch mot samma spelare");
         disable("play-again", !socket?.connected || Boolean(activityCommand) || !offer?.available || offer.selfAccepted);
         let status = "Revansch är inte tillgänglig.";
         if (activityCommand?.event === "private_rematch") status = "Skickar ditt svar …";
@@ -1734,8 +1864,8 @@
         const self = data.endActor === "self";
         const opponent = data.endActor === "opponent";
         switch (data.endReason) {
-            case "attack": return self ? "Din attack avgjorde matchen." : opponent ? "Motståndarens attack avgjorde matchen." : "Matchen avgjordes av en attack.";
-            case "trade_loss": return self ? "Din förlustaffär avslutade matchen." : "Motståndarens förlustaffär avslutade matchen.";
+            case "attack": return t(self ? "Din attack avgjorde matchen." : opponent ? "Motståndarens attack avgjorde matchen." : "Matchen avgjordes av en attack.");
+            case "trade_loss": return t(self ? "Din förlustaffär avslutade matchen." : "Motståndarens förlustaffär avslutade matchen.");
             case "market_storm":
             case "final_storm": {
                 const storm = data.endReason === "market_storm" ? "marknadsstormen" : "slutstormen";
@@ -1744,34 +1874,36 @@
                         capital: "Högst slutkapital avgjorde.",
                         attack_damage: "Kapitalet var lika, så mest attackskada avgjorde.",
                     }[data.tiebreak] ?? "Ni hade lika mycket kapital och gjorde lika mycket attackskada.";
-                    return `Båda slogs ut i ${storm}. ${tiebreak}`;
+                    return t("Båda slogs ut i {storm}. {tiebreak}", { storm: t(storm), tiebreak: t(tiebreak) });
                 }
-                return `Matchen avgjordes i ${storm}.`;
+                return t("Matchen avgjordes i {storm}.", { storm: t(storm) });
             }
-            case "knockout": return "Matchen avgjordes genom knockout.";
-            case "round_limit": return "Matchen avgjordes av slut-HP efter sista rundan.";
+            case "knockout": return t("Matchen avgjordes genom knockout.");
+            case "round_limit": return t("Matchen avgjordes av slut-HP efter sista rundan.");
             default: return "";
         }
     }
 
     function predictionMatchExplanation(data, opponentName) {
         if (data.endReason === "knockout") {
-            const knockout = data.outcome === "win" ? `Du sänkte ${opponentName} till 0 HP.` : `${opponentName} sänkte dig till 0 HP.`;
+            const knockout = t(data.outcome === "win" ? "Du sänkte {opponent} till 0 HP." : "{opponent} sänkte dig till 0 HP.", {
+                opponent: opponentName,
+            });
             const round = data.lastRound ?? data.rounds?.at(-1);
             return round ? `${knockout} ${predictionVerdict(round, session.user.id, opponentName).reason}` : knockout;
         }
         if (data.endReason === "round_limit") {
-            if (data.outcome === "draw") return "Ni hade lika mycket HP kvar efter sista rundan.";
-            const winner = data.outcome === "win" ? "Du" : opponentName;
-            return `${winner} hade mest HP kvar efter sista rundan.`;
+            if (data.outcome === "draw") return t("Ni hade lika mycket HP kvar efter sista rundan.");
+            const winner = data.outcome === "win" ? t("Du") : opponentName;
+            return t("{winner} hade mest HP kvar efter sista rundan.", { winner });
         }
         return matchExplanation(data);
     }
 
-    function renderResultDetails(data, mode) {
+    function renderResultDetails(data, mode, preserveDetails) {
         const practice = mode === "prediction_practice";
         const prediction = mode === "prediction";
-        const opponentName = data.opponentName || match?.opponent?.name || "Motståndaren";
+        const opponentName = data.opponentName || match?.opponent?.name || t("Motståndaren");
         const explanation = prediction ? predictionMatchExplanation(data, opponentName) : matchExplanation(data);
         const comparison = numeric(data.opponentHp) != null;
         show("result-explanation", comparison || Boolean(explanation));
@@ -1780,29 +1912,32 @@
         put("result-decisive", explanation);
         put("result-self-hp", formatNumber(data.hp));
         put("result-opponent-hp", formatNumber(data.opponentHp));
-        put("result-opponent-label", prediction ? `${opponentName} · slut-HP` : "Motståndarens slut-HP");
+        put("result-opponent-label", prediction ? t("{opponent} · slut-HP", { opponent: opponentName })
+            : t("Motståndarens slut-HP"));
         show("result-trade-hp-stat", !comparison);
         show("result-prediction-hp-stat", !practice && !comparison);
 
         const tradeLabels = { attack: "Attack", grow: "Grow", loss: "Förlust", flat: "Ingen vinst eller förlust" };
         const trades = (data.tradeDetails ?? []).map((trade) => [
-            clock(trade.time), positionDirection(trade), tradeLabels[trade.choice],
-            `${signed(trade.profit, amountFormat)} krediter`, `${formatNumber(trade.damage)} HP`,
+            clock(trade.time), positionDirection(trade), tradeLabels[trade.choice] ? t(tradeLabels[trade.choice]) : null,
+            t("{credits} krediter", { credits: signed(trade.profit, amountFormat) }), `${formatNumber(trade.damage)} HP`,
         ]);
-        byId("result-trade-detail").open = false;
+        if (!preserveDetails) byId("result-trade-detail").open = false;
         show("result-trade-detail", trades.length > 0);
         fillTable("result-trade-list", trades);
 
-        const forecast = (value) => value == null ? "Ingen prognos" : formatPrediction(value);
-        const error = (value) => value == null ? "—" : `${formatNumber(value / 100, amountFormat)} procentenheter`;
+        const forecast = (value) => value == null ? t("Ingen prognos") : formatPrediction(value);
+        const error = (value) => value == null ? "—" : t("{error} procentenheter", {
+            error: formatNumber(value / 100, amountFormat),
+        });
         const rounds = (data.rounds ?? []).map((round) => {
             const values = [formatPrediction(round.actualMoveBps), forecast(round.selfMoveBps), error(round.selfErrorBps)];
             if (practice) return [round.number, ...values];
             const verdict = predictionVerdict(round, session.user.id, opponentName);
-            const impact = round.damage ? ` · ${formatNumber(round.damage)} HP i skada` : "";
+            const impact = round.damage ? " · " + t("{damage} HP i skada", { damage: formatNumber(round.damage) }) : "";
             return [round.number, verdict.title + impact, ...values, forecast(round.opponentMoveBps), error(round.opponentErrorBps)];
         });
-        byId("result-round-detail").open = rounds.length > 0;
+        if (!preserveDetails) byId("result-round-detail").open = rounds.length > 0;
         show("result-round-detail", rounds.length > 0);
         put("round-opponent-header", opponentName);
         show("round-opponent-header", !practice);
@@ -1815,6 +1950,13 @@
         resultTimer = undefined;
         if (result !== data || !session.user) return;
         const mode = data.mode ?? match?.mode ?? "ranked";
+        renderResultView(data, mode);
+        activate("result");
+        if (mode !== "prediction_practice") playSound(data.outcome);
+        if (mode === "ranked") void refreshProfile();
+    }
+
+    function renderResultView(data, mode, preserveDetails = false) {
         const practice = mode === "prediction_practice";
         const prediction = isPrediction(mode);
         const rated = mode === "ranked" || mode === "prediction";
@@ -1823,10 +1965,10 @@
         const labels = { prediction: "Ritduell", prediction_practice: "Ritduell · Övning",
             bot: "Botduell · Orankad", private: "Vänduell · Orankad" };
         const label = labels[mode] ?? "Matchresultat";
-        put("result-mode", label);
+        putLocalized("result-mode", label);
         const predictionOutcomes = { win: "Du vann", lose: "Du förlorade", draw: "Oavgjort" };
         const outcomes = prediction ? predictionOutcomes : outcomeLabels;
-        put("result-outcome", practice ? "Övning klar" : outcomes[data.outcome] ?? "MATCH SLUT");
+        putLocalized("result-outcome", practice ? "Övning klar" : outcomes[data.outcome] ?? "MATCH SLUT");
         show("result-elo", rated);
         if (rated) {
             put("result-elo-before", formatNumber(data.eloBefore));
@@ -1858,15 +2000,36 @@
             put("result-peak", formatNumber(data.peakCapital, amountFormat));
             put("result-duration", clock(data.duration));
         }
-        const instrument = [data.symbol, data.name, data.market, data.interval].filter(Boolean);
-        if (data.synthetic) instrument.push("Syntetisk");
+        const instrument = [instrumentSymbol(data, practice), instrumentName(data, practice), data.market, data.interval].filter(Boolean);
+        if (data.synthetic) instrument.push(t("Syntetisk"));
         put("result-symbol", instrument.join(" · "));
         put("result-period", period(data.periodStart, data.periodEnd, data.interval));
-        renderResultDetails(data, mode);
+        renderResultDetails(data, mode, preserveDetails);
         renderPlayAgain();
-        activate("result");
-        if (!practice) playSound(data.outcome);
-        if (mode === "ranked") void refreshProfile();
+    }
+
+    function refreshLanguage() {
+        configureFormats();
+        for (const [id, value] of [...localizedValues]) putLocalized(id, value);
+        renderOnlineCount();
+        if (menuProfileData) renderMenuProfile(menuProfileData);
+        if (profileData) renderProfile(profileData);
+        if (rankingData) renderRanking(rankingData);
+        if (screen === "queue" && queueData) renderQueue(queueData);
+        if (screen === "spectate" && spectateListData) renderSpectateList(spectateListData);
+        if (screen === "spectate-live" && spectateState) {
+            const state = byId("spectate-status").dataset.state;
+            spectateChart.localize();
+            renderSpectateState(spectateState, ["live", "countdown", "finished"].includes(state));
+        }
+        if (screen === "match" && match) {
+            matchChart.localize();
+            renderMatch(match);
+            if (activeMatchEvent) put("match-event", matchEventLabel(activeMatchEvent));
+        }
+        if (screen === "result" && result) {
+            renderResultView(result, result.mode ?? match?.mode ?? "ranked", true);
+        }
     }
 
     function onClick(event) {
@@ -1943,6 +2106,7 @@
 
     async function initialize() {
         document.addEventListener("click", onClick);
+        window.addEventListener("stockfight:languagechange", refreshLanguage);
         document.addEventListener("visibilitychange", refreshOnlineCount);
         window.setInterval(refreshOnlineCount, 10_000);
         byId("auth-form")?.addEventListener("submit", submitAuth);

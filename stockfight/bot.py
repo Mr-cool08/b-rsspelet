@@ -1,6 +1,7 @@
 from random import Random
 
 from .engine import Match, PlayerState, Position
+from .ranking import STARTING_ELO
 
 
 class TradingBot:
@@ -9,7 +10,8 @@ class TradingBot:
     def __init__(self, elo: int, rng: Random) -> None:
         self.elo = elo
         self._rng = rng
-        self._skill = max(0.0, min(1.0, (elo - 600) / 1400))
+        rating_offset = elo - STARTING_ELO
+        self._skill = max(0.0, min(1.0, (rating_offset + 400) / 1400))
         self._last_revealed_count = 0
         self._last_close_at = float("-inf")
 

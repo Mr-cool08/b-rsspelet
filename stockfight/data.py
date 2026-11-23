@@ -5,13 +5,13 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import and_, create_engine, func, inspect
+from sqlalchemy import and_, create_engine, func, inspect, literal
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.pool import NullPool
-from sqlalchemy.types import Text, TypeDecorator
+from sqlalchemy.types import Integer, Text, TypeDecorator
 
 from .market_data import (
     DatabaseMarketProvider,
@@ -74,6 +74,20 @@ class ExactDecimal(TypeDecorator[Decimal]):
         return Decimal(value) if value is not None else None
 
 
+class EloRating(TypeDecorator[int]):
+    """Translate Elo while retaining the original 1000-point start in storage."""
+
+    impl = Integer
+    cache_ok = True
+    _offset = 1000 - STARTING_ELO
+
+    def process_bind_param(self, value, dialect):
+        return value + self._offset if value is not None else None
+
+    def process_result_value(self, value, dialect):
+        return value - self._offset if value is not None else None
+
+
 def _utc_naive(timestamp: datetime) -> datetime:
     if timestamp.utcoffset() is not None:
         return timestamp.astimezone(UTC).replace(tzinfo=None)
@@ -95,7 +109,7 @@ class PlayerRating(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
     mode = db.Column(db.String(32), primary_key=True)
-    elo = db.Column(db.Integer, nullable=False, default=STARTING_ELO)
+    elo = db.Column(EloRating, nullable=False, default=STARTING_ELO)
     matches = db.Column(db.Integer, nullable=False, default=0)
     wins = db.Column(db.Integer, nullable=False, default=0)
     losses = db.Column(db.Integer, nullable=False, default=0)
@@ -137,8 +151,8 @@ class MatchResult(db.Model):
     winning_trades = db.Column(db.Integer, nullable=False)
     losing_trades = db.Column(db.Integer, nullable=False)
     peak_capital = db.Column(ExactDecimal, nullable=False)
-    elo_before = db.Column(db.Integer, nullable=False)
-    elo_after = db.Column(db.Integer, nullable=False)
+    elo_before = db.Column(EloRating, nullable=False)
+    elo_after = db.Column(EloRating, nullable=False)
 
 
 class TradeHistory(db.Model):
@@ -220,7 +234,7 @@ def get_rating(user_id: int, mode: str = "ranked") -> PlayerRating:
 
 
 def leaderboard(mode: str = "ranked", limit: int = 50) -> list[dict]:
-    elo = func.coalesce(PlayerRating.elo, STARTING_ELO)
+    elo = func.coalesce(PlayerRating.elo, literal(STARTING_ELO, type_=PlayerRating.elo.type))
     wins = func.coalesce(PlayerRating.wins, 0)
     matches = func.coalesce(PlayerRating.matches, 0)
     rows = db.session.execute(

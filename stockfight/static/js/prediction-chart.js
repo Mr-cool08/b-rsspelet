@@ -1,13 +1,25 @@
 (() => {
     "use strict";
 
-    const compact = new Intl.NumberFormat("sv-SE", { notation: "compact", maximumFractionDigits: 1 });
-    const decimal = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 2 });
+    const { getLocale, t } = window.StockFightI18n;
     const minimumRadiusBps = 500;
 
+    function axisFormats() {
+        const style = { style: "percent", signDisplay: "exceptZero" };
+        return {
+            compact: new Intl.NumberFormat(getLocale(), { ...style, notation: "compact", maximumFractionDigits: 1 }),
+            decimal: new Intl.NumberFormat(getLocale(), { ...style, maximumFractionDigits: 2 }),
+        };
+    }
+
+    let formats = axisFormats();
+    window.addEventListener("stockfight:languagechange", () => {
+        formats = axisFormats();
+    });
+
     function axisLabel(bps) {
-        const format = Math.abs(bps) >= 1_000_000 ? compact : decimal;
-        return `${bps > 0 ? "+" : ""}${format.format(bps / 100)} %`;
+        const format = Math.abs(bps) >= 1_000_000 ? formats.compact : formats.decimal;
+        return format.format(bps / 10_000);
     }
 
     function chartRadius(history, forecast) {
@@ -108,8 +120,8 @@
             segment(end, top, end, bottom, colors.grid);
             context.textAlign = "center";
             context.fillStyle = colors.labels;
-            context.fillText("Historik", (left + anchor) / 2, height - 11);
-            context.fillText(editable ? "Rita prognos" : "Nästa punkt", (anchor + end) / 2, height - 11);
+            context.fillText(t("Historik"), (left + anchor) / 2, height - 11);
+            context.fillText(editable ? t("Rita prognos") : t("Nästa punkt"), (anchor + end) / 2, height - 11);
 
             context.beginPath();
             context.strokeStyle = colors.history;
@@ -175,6 +187,7 @@
         });
         if (window.ResizeObserver) new ResizeObserver(draw).observe(canvas);
         else window.addEventListener("resize", draw);
+        window.addEventListener("stockfight:languagechange", draw);
 
         return (data) => {
             view = data;

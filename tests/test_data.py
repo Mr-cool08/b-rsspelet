@@ -112,16 +112,16 @@ def _completed_match(match_id, players, *, draw=False, mode="ranked"):
 
 def test_empty_rankings_return_transient_defaults(players):
     rating = get_rating(players[0])
-    assert rating.elo == 1000
+    assert rating.elo == 100
     assert rating.matches == rating.wins == rating.losses == rating.draws == 0
     assert object_session(rating) is None
     assert _count(PlayerRating) == 0
     assert profile(players[0]) == {
-        "elo": 1000, "league": "Silver", "nextLeague": "Gold", "nextElo": 1100, "progress": 50,
+        "elo": 100, "league": "Bronze", "nextLeague": "Silver", "nextElo": 150, "progress": 50,
         "matches": 0, "wins": 0, "losses": 0, "draws": 0, "winRate": 0, "history": [],
     }
     assert leaderboard(limit=1) == [
-        {"username": "Agnes", "elo": 1000, "league": "Silver", "wins": 0, "matches": 0},
+        {"username": "Agnes", "elo": 100, "league": "Bronze", "wins": 0, "matches": 0},
     ]
 
 
@@ -130,7 +130,7 @@ def test_save_match_records_exact_period_stats_and_trade_once(players):
     first, second = reversed(players)
     engine_match = _completed_match("knockout", (first, second))
     expected = {
-        first: {"eloBefore": 1000, "eloAfter": 1016}, second: {"eloBefore": 1000, "eloAfter": 984},
+        first: {"eloBefore": 100, "eloAfter": 116}, second: {"eloBefore": 100, "eloAfter": 84},
     }
     assert save_match(engine_match, STARTED, ENDED) == expected
     match = db.session.get(Match, engine_match.id)
@@ -153,13 +153,42 @@ def test_save_match_records_exact_period_stats_and_trade_once(players):
     assert profile(first)["history"] == [
         {
             "id": match.id, "opponent": "Agnes", "outcome": "win", "symbol": match.symbol,
-            "eloBefore": 1000, "eloAfter": 1016, "endedAt": ENDED.astimezone(UTC).isoformat(),
+            "eloBefore": 100, "eloAfter": 116, "endedAt": ENDED.astimezone(UTC).isoformat(),
         },
     ]
     assert profile(second)["history"][0]["outcome"] == "lose"
     assert (profile(first)["wins"], profile(second)["losses"]) == (1, 1)
     assert profile(first)["winRate"] == 100
-    assert [entry["elo"] for entry in leaderboard()] == [1016, 984]
+    assert [entry["elo"] for entry in leaderboard()] == [116, 84]
+
+
+def test_legacy_saved_elo_uses_the_new_scale(players):
+    first, second = players
+    legacy_match = _completed_match("legacy-elo", players)
+    save_match(legacy_match, STARTED, ENDED)
+    with db.engine.begin() as connection:
+        connection.exec_driver_sql(
+            "UPDATE player_ratings SET elo = ? WHERE user_id = ?",
+            [(1116, first), (1084, second)],
+        )
+        connection.exec_driver_sql(
+            "UPDATE match_results SET elo_before = 1100, elo_after = ? WHERE match_id = ? AND user_id = ?",
+            [(1116, legacy_match.id, first), (1084, legacy_match.id, second)],
+        )
+
+    assert get_rating(first).elo == 216
+    assert [entry["elo"] for entry in leaderboard()] == [216, 184]
+    [entry] = profile(first)["history"]
+    assert (entry["eloBefore"], entry["eloAfter"]) == (200, 216)
+
+    next_match = _completed_match("next-elo", players)
+    assert save_match(next_match, STARTED, ENDED) == {
+        first: {"eloBefore": 216, "eloAfter": 231},
+        second: {"eloBefore": 184, "eloAfter": 169},
+    }
+    with db.engine.connect() as connection:
+        stored_ratings = connection.exec_driver_sql("SELECT elo FROM player_ratings ORDER BY user_id").scalars().all()
+    assert stored_ratings == [1131, 1069]
 
 
 def test_database_upgrade_preserves_old_trades_and_stores_short_side(database, players):
@@ -208,9 +237,9 @@ def test_retry_returns_original_elo_and_profiles_are_mode_specific(players):
     independent = _completed_match("separate", players, mode="future-mode")
     assert save_match(independent, STARTED, ENDED) == original
     assert save_match(initial, STARTED, ENDED) == original
-    assert get_rating(first).elo == 1015
-    assert get_rating(second).elo == 985
-    assert get_rating(first, "future-mode").elo == 1016
+    assert get_rating(first).elo == 115
+    assert get_rating(second).elo == 85
+    assert get_rating(first, "future-mode").elo == 116
     ranked = profile(first)
     assert [entry["id"] for entry in ranked["history"]] == ["draw", "initial"]
     assert (ranked["matches"], ranked["wins"], ranked["draws"], ranked["winRate"]) == (2, 1, 1, 50)
@@ -224,7 +253,7 @@ def test_failed_trade_rolls_back_match_results_and_elo(players):
         save_match(match, STARTED, ENDED)
     assert all(_count(model) == 0 for model in (Match, MatchResult, TradeHistory, PlayerRating))
     match.trades.pop()
-    assert save_match(match, STARTED, ENDED)[players[0]]["eloAfter"] == 1016
+    assert save_match(match, STARTED, ENDED)[players[0]]["eloAfter"] == 116
 
 
 def test_concurrent_saves_are_idempotent_and_preserve_rating_updates(database, players):
@@ -241,8 +270,8 @@ def test_concurrent_saves_are_idempotent_and_preserve_rating_updates(database, p
         first, retry, other = executor.map(save_in_context, (previous, previous, subsequent))
 
     assert first == retry
-    assert {first[players[0]]["eloBefore"], other[players[0]]["eloBefore"]} == {1000, 1016}
-    assert get_rating(players[0]).elo == 1031
+    assert {first[players[0]]["eloBefore"], other[players[0]]["eloBefore"]} == {100, 116}
+    assert get_rating(players[0]).elo == 131
     assert get_rating(players[0]).wins == get_rating(players[1]).losses == 2
     assert (_count(Match), _count(MatchResult), _count(TradeHistory)) == (2, 4, 2)
 

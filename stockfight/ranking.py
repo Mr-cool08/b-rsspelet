@@ -2,16 +2,19 @@ from math import floor
 from typing import TypedDict
 
 
-STARTING_ELO = 1000
+STARTING_ELO = 100
 K_FACTOR = 32
 
 LEAGUES = (
-    (0, "Bronze"),
-    (900, "Silver"),
-    (1100, "Gold"),
-    (1300, "Platinum"),
-    (1500, "Diamond"),
-    (1800, "Stock Legend"),
+    (0, "Iron"),
+    (50, "Bronze"),
+    (150, "Silver"),
+    (250, "Gold"),
+    (350, "Platinum"),
+    (500, "Diamond"),
+    (650, "Master"),
+    (800, "Grandmaster"),
+    (900, "Stock Legend"),
 )
 
 

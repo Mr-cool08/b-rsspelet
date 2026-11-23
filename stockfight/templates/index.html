@@ -1,3 +1,45 @@
+{% macro market_preview() -%}
+    {% set candles = [
+        (100, 100.46, 99.63, 100.74), (100.46, 100.89, 100.18, 101.13),
+        (100.89, 100.52, 100.17, 101.19), (100.52, 99.97, 99.56, 100.72),
+        (99.97, 100.34, 99.64, 100.77), (100.34, 101.19, 100.11, 101.44),
+        (101.19, 101.7, 100.88, 102.04), (101.7, 101.38, 101.1, 102.18),
+        (101.38, 101.74, 101.15, 102.11), (101.74, 102.58, 101.46, 102.92),
+        (102.58, 102.27, 101.85, 102.95), (102.27, 101.58, 101.18, 102.48),
+        (101.58, 102.13, 101.26, 102.5), (102.13, 102.85, 101.89, 103.18),
+        (102.85, 103.31, 102.5, 103.73), (103.31, 103.96, 103, 104.37),
+        (103.96, 103.3, 103.03, 104.18), (103.3, 103.42, 103.02, 103.84)
+    ] %}
+    {% set axis_ticks = [106, 104, 102, 100, 98] %}
+    {% set floor = axis_ticks[-1] %}
+    {% set scale = 100 / (axis_ticks[0] - floor) %}
+    {% set latest = candles[-1][1] %}
+    <figure class="market-preview">
+        <figcaption class="preview-heading">
+            <span class="eyebrow" data-i18n="Exempelgraf">Exempelgraf</span>
+            <span class="preview-quote mono">
+                <strong data-i18n-number="{{ '%.2f'|format(latest) }}">{{ '%.2f'|format(latest)|replace('.', ',') }}</strong>
+                <span data-i18n-signed-percent="{{ latest / candles[0][0] - 1 }}">{{ '%+.2f'|format((latest / candles[0][0] - 1) * 100)|replace('.', ',') }} %</span>
+            </span>
+        </figcaption>
+        <div class="preview-frame mono" aria-hidden="true">
+            <div class="preview-plot" style="--last-price: {{ ((latest - floor) * scale)|round(3) }}%">
+                <div class="preview-candles">
+                    {% for open, close, low, high in candles %}
+                    {% set bottom, top = (open, close) if close >= open else (close, open) %}
+                    <span{% if close < open %} class="candle-down"{% endif %}
+                          style="--low: {{ ((low - floor) * scale)|round(3) }}%; --range: {{ ((high - low) * scale)|round(3) }}%;
+                                 --bottom: {{ ((bottom - floor) * scale)|round(3) }}%; --body: {{ ((top - bottom) * scale)|round(3) }}%"></span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="preview-axis">
+                {% for tick in axis_ticks %}<span data-i18n-number="{{ tick }}.00">{{ tick }},00</span>{% endfor %}
+            </div>
+            <div class="preview-timeline"><span>Start</span><span data-i18n="Senaste">Senaste</span></div>
+        </div>
+    </figure>
+{%- endmacro %}
 <!doctype html>
 <html lang="sv">
 <head>
@@ -8,6 +50,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <script defer src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
     <script defer src="{{ url_for('static', filename='vendor/lightweight-charts.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/i18n.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/prediction-chart.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
 </head>
@@ -22,137 +65,149 @@
                 <span id="connection-status" class="connection" role="status" hidden></span>
                 <div id="header-account" class="header-account" hidden>
                     <span id="header-name" class="header-name"></span>
-                    <button id="header-logout" class="header-button" type="button" data-action="logout" hidden>Logga ut</button>
+                    <button id="header-logout" class="header-button" type="button" data-action="logout" hidden data-i18n="Logga ut">Logga ut</button>
                 </div>
                 <span id="online-count" class="online-count">{{ online_count }} online</span>
+                <select id="language-select" class="language-select" aria-label="Språk" data-i18n-aria-label="Språk">
+                    <option value="sv" lang="sv">Svenska</option>
+                    <option value="en" lang="en">English</option>
+                </select>
             </div>
         </div>
     </header>
 
     <main class="stage" id="main">
         <section id="auth-screen" class="screen auth-screen" aria-label="Stock Fight">
-            <div class="auth-intro">
+            <div class="auth-intro panel">
                 <div class="intro-copy">
-                    <h1>Börsduell<br><em>i realtid.</em></h1>
-                    <p>Handla med virtuella pengar mot en annan spelare eller en bot.</p>
-                    <p id="auth-invite-note" hidden>Logga in eller skapa ett konto för att öppna din vänduell.</p>
+                    <h1 class="screen-title"><span data-i18n="Börsduell">Börsduell</span> <em data-i18n="i realtid">i realtid</em></h1>
+                    <p data-i18n="Handla med virtuella krediter på historiska börskurser. Tävla mot andra spelare eller öva mot en bot.">Handla med virtuella krediter på historiska börskurser. Tävla mot andra spelare eller öva mot en bot.</p>
+                    <p id="auth-invite-note" hidden data-i18n="Logga in eller skapa ett konto för att öppna din vänduell.">Logga in eller skapa ett konto för att öppna din vänduell.</p>
                 </div>
-                <div class="intro-chart" aria-hidden="true">
-                    <span></span><span></span><span></span><span></span><span></span><span></span>
-                    <span></span><span></span><span></span><span></span><span></span>
-                </div>
+                {{ market_preview() }}
             </div>
             <div class="auth-card">
-                <h2 id="auth-title" class="card-title" tabindex="-1">Spelarkonto</h2>
-                <div class="auth-tabs" role="group" aria-label="Välj kontoåtgärd">
-                    <button type="button" data-action="auth-login" aria-pressed="true">Logga in</button>
-                    <button type="button" data-action="auth-register" aria-pressed="false">Registrera</button>
+                <h2 id="auth-title" class="card-title" tabindex="-1" data-i18n="Spelarkonto">Spelarkonto</h2>
+                <div class="auth-tabs" role="group" aria-label="Välj kontoåtgärd" data-i18n-aria-label="Välj kontoåtgärd">
+                    <button type="button" data-action="auth-login" aria-pressed="true" data-i18n="Logga in">Logga in</button>
+                    <button type="button" data-action="auth-register" aria-pressed="false" data-i18n="Registrera">Registrera</button>
                 </div>
                 <form id="auth-form" method="post" aria-labelledby="auth-title">
                     <label class="field">
-                        <span>Spelarnamn</span>
+                        <span data-i18n="Spelarnamn">Spelarnamn</span>
                         <input name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
                     </label>
                     <label class="field">
-                        <span>Lösenord</span>
+                        <span data-i18n="Lösenord">Lösenord</span>
                         <input name="password" type="password" autocomplete="current-password" required>
                     </label>
                     <label class="field" id="invite-field" hidden>
-                        <span>Inbjudningskod</span>
+                        <span data-i18n="Inbjudningskod">Inbjudningskod</span>
                         <input name="inviteCode" type="text" spellcheck="false" autocapitalize="none" autocomplete="off">
                     </label>
                     <p id="auth-error" class="form-error" role="alert" hidden></p>
-                    <button id="auth-submit" class="button button-primary auth-submit" type="submit" disabled>Logga in</button>
+                    <button id="auth-submit" class="button button-primary auth-submit" type="submit" disabled data-i18n="Logga in">Logga in</button>
                 </form>
             </div>
         </section>
 
-        <section id="menu-screen" class="screen menu-screen" aria-label="Huvudmeny" hidden>
+        <section id="menu-screen" class="screen menu-screen" aria-labelledby="menu-title" hidden>
+            <header class="menu-greeting">
+                <h1 id="menu-title" class="screen-title" tabindex="-1" data-i18n="Handelsgolvet">Handelsgolvet</h1>
+                <p><span data-i18n="Inloggad som">Inloggad som</span> <strong id="menu-name">—</strong></p>
+            </header>
             <div class="menu-main">
-                <div class="menu-greeting">
-                    <p class="eyebrow">Spelare</p>
-                    <h1 id="menu-name" class="screen-title" tabindex="-1">Stock Fight</h1>
-                </div>
-                <div class="play-panel">
-                    <div class="play-decoration" aria-hidden="true">
-                        <i></i><i></i><i></i>
-                    </div>
+                <section class="play-panel panel" aria-labelledby="ranked-title">
                     <div class="play-copy">
-                        <h2>Rankad<br>duell</h2>
-                        <p>Spela 1 mot 1 om Elo.</p>
-                    </div>
-                    <button class="button button-primary play-button" type="button" data-action="play">
-                        PLAY <span class="arrow-right" aria-hidden="true"></span>
-                    </button>
-                </div>
-                <div class="bot-panel panel spectate-entry">
-                    <h2>Pågående matcher</h2>
-                    <button class="button button-secondary" type="button" data-action="spectate">
-                        Titta live <span class="arrow-right" aria-hidden="true"></span>
-                    </button>
-                </div>
-                <div class="bot-panel panel prediction-menu">
-                    <div>
-                        <h2>Ritduell</h2>
-                        <p id="prediction-description">Rita nästa kursrörelse. Den som kommer närmast gör skada.</p>
-                    </div>
-                    <div class="panel-actions">
-                        <button class="button button-secondary" type="button" data-action="play-prediction" aria-describedby="prediction-description">
-                            Spela ritduell <span class="arrow-right" aria-hidden="true"></span>
+                        <p class="eyebrow" data-i18n="Rankad · 1 mot 1">Rankad · 1 mot 1</p>
+                        <h2 id="ranked-title" data-i18n="Handelsduell">Handelsduell</h2>
+                        <p data-i18n="Handla på samma aktiekurs som motståndaren och tävla om Elo.">Handla på samma aktiekurs som motståndaren och tävla om Elo.</p>
+                        <button class="button button-primary play-button" type="button" data-action="play">
+                            <span data-i18n="Spela rankad duell">Spela rankad duell</span> <span class="arrow-right" aria-hidden="true"></span>
                         </button>
-                        <button class="button button-secondary" type="button" data-action="practice-prediction">Öva ritduell</button>
                     </div>
-                </div>
-                <div class="bot-panel panel">
-                    <div>
-                        <h2>Botduell</h2>
-                        <p id="bot-description">Orankad duell med svårighetsgrad anpassad till ditt Elo.</p>
+                    {{ market_preview() }}
+                </section>
+                <section class="menu-modes" aria-labelledby="modes-title">
+                    <h2 id="modes-title" data-i18n="Fler spellägen">Fler spellägen</h2>
+                    <div class="menu-mode-grid">
+                        <article class="mode-panel panel">
+                            <div>
+                                <h3 data-i18n="Ritduell">Ritduell</h3>
+                                <p id="prediction-description" data-i18n="Rita nästa kursrörelse. Den som kommer närmast gör skada.">Rita nästa kursrörelse. Den som kommer närmast gör skada.</p>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="button button-secondary" type="button" data-action="play-prediction" aria-describedby="prediction-description" data-i18n="Spela ritduell">Spela ritduell</button>
+                                <button class="button button-secondary" type="button" data-action="practice-prediction" data-i18n="Öva ritduell">Öva ritduell</button>
+                            </div>
+                        </article>
+                        <article class="mode-panel panel">
+                            <div>
+                                <h3 data-i18n="Botduell">Botduell</h3>
+                                <p id="bot-description" data-i18n="Orankad duell med svårighetsgrad anpassad till ditt Elo.">Orankad duell med svårighetsgrad anpassad till ditt Elo.</p>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="button button-secondary" type="button" data-action="play-bot" aria-describedby="bot-description">
+                                    <span id="bot-start-label" data-i18n="Spela mot bot">Spela mot bot</span>
+                                </button>
+                                <button class="button button-secondary" type="button" data-action="help" data-i18n="Så spelar du">Så spelar du</button>
+                            </div>
+                        </article>
+                        <article class="mode-panel panel">
+                            <div>
+                                <h3 data-i18n="Vänduell">Vänduell</h3>
+                                <p data-i18n="Skicka en länk till en vän och spela en orankad handelsduell.">Skicka en länk till en vän och spela en orankad handelsduell.</p>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="button button-secondary" type="button" data-action="friend-create" data-i18n="Spela med en vän">Spela med en vän</button>
+                            </div>
+                        </article>
+                        <article class="mode-panel panel">
+                            <div>
+                                <h3 data-i18n="Pågående matcher">Pågående matcher</h3>
+                                <p data-i18n="Följ andra spelares dueller i realtid.">Följ andra spelares dueller i realtid.</p>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="button button-secondary" type="button" data-action="spectate" data-i18n="Titta live">Titta live</button>
+                            </div>
+                        </article>
                     </div>
-                    <div class="panel-actions">
-                        <button class="button button-secondary" type="button" data-action="play-bot" aria-describedby="bot-description">
-                            <span id="bot-start-label">Spela mot bot</span><span class="arrow-right" aria-hidden="true"></span>
-                        </button>
-                        <button class="button button-secondary" type="button" data-action="help">Så spelar du</button>
-                    </div>
-                </div>
-                <div class="bot-panel panel">
-                    <div>
-                        <h2>Vänduell</h2>
-                        <p>Spela en orankad handelsduell mot en vän.</p>
-                    </div>
-                    <button class="button button-secondary" type="button" data-action="friend-create">Spela med en vän</button>
-                </div>
+                </section>
             </div>
             <aside class="menu-side">
-                <div class="rating-panel panel">
+                <section class="rating-panel panel" aria-labelledby="rating-title">
+                    <header class="rating-heading">
+                        <h2 id="rating-title" data-i18n="Din ranking">Din ranking</h2>
+                        <span class="eyebrow" data-i18n="Handelsduell">Handelsduell</span>
+                    </header>
                     <div class="rating-top">
                         <div>
-                            <p class="eyebrow">Handelsduell</p>
-                            <h2 id="menu-level" class="league">—</h2>
+                            <p class="eyebrow" data-i18n="Liga">Liga</p>
+                            <h3 id="menu-level" class="league">—</h3>
                         </div>
-                        <button class="league-mark" type="button" data-action="leagues" aria-label="Visa alla ranker" aria-haspopup="dialog" aria-controls="leagues-dialog" title="Visa alla ranker">
+                        <button class="league-mark" type="button" data-action="leagues" aria-label="Visa alla ranker" data-i18n-aria-label="Visa alla ranker" aria-haspopup="dialog" aria-controls="leagues-dialog" title="Visa alla ranker" data-i18n-title="Visa alla ranker">
                             <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
                         </button>
                     </div>
                     <div class="rating-value mono"><strong id="menu-elo">—</strong><span>ELO</span></div>
                     <div class="progress-labels">
-                        <span id="menu-next">Nästa nivå</span>
+                        <span id="menu-next" data-i18n="Nästa nivå">Nästa nivå</span>
                         <span id="menu-progress-label" class="mono">0 %</span>
                     </div>
-                    <progress id="menu-progress" class="meter league-meter" aria-label="Mot nästa nivå" max="100" value="0"></progress>
-                </div>
-                <nav class="menu-nav" aria-label="Spelarmeny">
+                    <progress id="menu-progress" class="meter league-meter" aria-label="Mot nästa nivå" data-i18n-aria-label="Mot nästa nivå" max="100" value="0"></progress>
+                </section>
+                <nav class="menu-nav panel" aria-label="Spelarmeny" data-i18n-aria-label="Spelarmeny">
                     <button class="menu-link" type="button" data-action="ranking">
                         <span class="menu-icon icon-ranking" aria-hidden="true"><i></i><i></i><i></i></span>
-                        <span>Ranking</span><span class="chevron" aria-hidden="true"></span>
+                        <span data-i18n="Ranking">Ranking</span><span class="chevron" aria-hidden="true"></span>
                     </button>
                     <button class="menu-link" type="button" data-action="profile">
                         <span class="menu-icon icon-profile" aria-hidden="true"></span>
-                        <span>Profil</span><span class="chevron" aria-hidden="true"></span>
+                        <span data-i18n="Profil">Profil</span><span class="chevron" aria-hidden="true"></span>
                     </button>
                     <button class="menu-link" type="button" data-action="settings">
                         <span class="menu-icon icon-settings" aria-hidden="true"><i></i><i></i></span>
-                        <span>Inställningar</span><span class="chevron" aria-hidden="true"></span>
+                        <span data-i18n="Inställningar">Inställningar</span><span class="chevron" aria-hidden="true"></span>
                     </button>
                 </nav>
             </aside>
@@ -160,81 +215,81 @@
 
         <section id="spectate-screen" class="screen spectate-screen" aria-labelledby="spectate-title" hidden>
             <header class="spectate-heading">
-                <h1 id="spectate-title" class="screen-title" tabindex="-1">Pågående matcher</h1>
-                <button class="button button-secondary" type="button" data-action="spectate-menu">Till huvudmenyn</button>
+                <h1 id="spectate-title" class="screen-title" tabindex="-1" data-i18n="Pågående matcher">Pågående matcher</h1>
+                <button class="button button-secondary" type="button" data-action="spectate-menu" data-i18n="Till huvudmenyn">Till huvudmenyn</button>
             </header>
-            <p id="spectate-list-status" class="spectate-list-status panel" role="status">Laddar pågående matcher …</p>
-            <ul id="spectate-list" class="spectate-list" role="list" aria-label="Matcher att följa live"></ul>
-            <button class="button button-secondary spectate-retry" id="spectate-list-retry" type="button" data-action="spectate-list-retry" hidden>Försök igen</button>
+            <p id="spectate-list-status" class="spectate-list-status panel" role="status" data-i18n="Laddar pågående matcher …">Laddar pågående matcher …</p>
+            <ul id="spectate-list" class="spectate-list" role="list" aria-label="Matcher att följa live" data-i18n-aria-label="Matcher att följa live"></ul>
+            <button class="button button-secondary spectate-retry" id="spectate-list-retry" type="button" data-action="spectate-list-retry" hidden data-i18n="Försök igen">Försök igen</button>
         </section>
 
         <section id="spectate-live-screen" class="screen match-screen spectate-live-screen" aria-labelledby="spectate-mode" hidden>
             <header class="spectate-heading">
                 <div>
-                    <h1 id="spectate-mode" class="screen-title" tabindex="-1">Åskådarläge</h1>
+                    <h1 id="spectate-mode" class="screen-title" tabindex="-1" data-i18n="Åskådarläge">Åskådarläge</h1>
                     <p id="spectate-status" class="spectate-status" role="status"></p>
                 </div>
                 <div class="spectate-heading-actions">
-                    <button class="button button-secondary" id="spectate-live-retry" type="button" data-action="spectate-live-retry" hidden>Försök igen</button>
-                    <button class="button button-secondary" type="button" data-action="spectate-back">Till matchlistan</button>
+                    <button class="button button-secondary" id="spectate-live-retry" type="button" data-action="spectate-live-retry" hidden data-i18n="Försök igen">Försök igen</button>
+                    <button class="button button-secondary" type="button" data-action="spectate-back" data-i18n="Till matchlistan">Till matchlistan</button>
                 </div>
             </header>
             <div id="spectate-contest" hidden>
                 <div class="match-hud">
                     <div class="duelist duelist-self">
                         <div class="duelist-label"><strong id="spectate-first-name">—</strong><span id="spectate-first-hp-label" class="mono">—</span></div>
-                        <progress id="spectate-first-hp" class="meter health-meter" aria-label="Första spelarens hälsa" max="100" value="0"></progress>
+                        <progress id="spectate-first-hp" class="meter health-meter" aria-label="Första spelarens hälsa" data-i18n-aria-label="Första spelarens hälsa" max="100" value="0"></progress>
                         <div id="spectate-first-capital-row" class="duelist-details" hidden>
-                            <span>Kapital <strong id="spectate-first-capital" class="mono">—</strong></span>
+                            <span><span data-i18n="Kapital">Kapital</span> <strong id="spectate-first-capital" class="mono">—</strong></span>
                         </div>
                         <p id="spectate-first-activity" class="duelist-details" hidden></p>
                     </div>
                     <div class="match-clock">
-                        <span id="spectate-live-phase">Startar</span>
+                        <span id="spectate-live-phase" data-i18n="Startar">Startar</span>
                         <strong id="spectate-live-timing" class="mono">00:00</strong>
                         <small id="spectate-live-detail" hidden></small>
                     </div>
                     <div class="duelist duelist-opponent">
                         <div class="duelist-label"><strong id="spectate-second-name">—</strong><span id="spectate-second-hp-label" class="mono">—</span></div>
-                        <progress id="spectate-second-hp" class="meter health-meter" aria-label="Andra spelarens hälsa" max="100" value="0"></progress>
+                        <progress id="spectate-second-hp" class="meter health-meter" aria-label="Andra spelarens hälsa" data-i18n-aria-label="Andra spelarens hälsa" max="100" value="0"></progress>
                         <div id="spectate-second-capital-row" class="duelist-details" hidden>
-                            <span>Kapital <strong id="spectate-second-capital" class="mono">—</strong></span>
+                            <span><span data-i18n="Kapital">Kapital</span> <strong id="spectate-second-capital" class="mono">—</strong></span>
                         </div>
                         <p id="spectate-second-activity" class="duelist-details" hidden></p>
                     </div>
                 </div>
-                <section class="market-panel panel" aria-label="Marknad och kursgraf">
+                <section class="market-panel panel" aria-label="Marknad och kursgraf" data-i18n-aria-label="Marknad och kursgraf">
                     <div class="ticker">
                         <div class="ticker-instrument">
-                            <div class="ticker-label"><strong id="spectate-instrument" class="mono">—</strong><span id="spectate-synthetic" class="market-badge" hidden>Syntetisk</span></div>
+                            <div class="ticker-label"><strong id="spectate-instrument" class="mono">—</strong><span id="spectate-synthetic" class="market-badge" hidden data-i18n="Syntetisk">Syntetisk</span></div>
                             <div id="spectate-instrument-detail" class="ticker-details"></div>
                         </div>
                         <div class="ticker-quote">
-                            <span class="eyebrow">Kurs</span>
+                            <span class="eyebrow" data-i18n="Kurs">Kurs</span>
                             <strong id="spectate-price" class="mono">—</strong>
                         </div>
                     </div>
                     <div class="chart-frame">
                         <div id="spectate-trading-chart">
-                            <div id="spectate-chart" class="chart" role="img" aria-label="Graf över aktiekursen"></div>
+                            <div id="spectate-chart" class="chart" role="img" aria-label="Graf över aktiekursen" data-i18n-aria-label="Graf över aktiekursen"></div>
                             <p id="spectate-chart-status" class="chart-status" role="status" hidden></p>
                         </div>
                         <div id="spectate-prediction-chart-panel" hidden>
-                            <canvas id="spectate-prediction-chart" class="prediction-chart" role="img" aria-label="Kurshistorik och avslöjade prognoser"></canvas>
+                            <canvas id="spectate-prediction-chart" class="prediction-chart" role="img" aria-label="Kurshistorik och avslöjade prognoser" data-i18n-aria-label="Kurshistorik och avslöjade prognoser"></canvas>
                         </div>
                     </div>
                     <div id="spectate-chart-footer" class="chart-footer">
-                        <div id="spectate-chart-controls" class="chart-controls" role="group" aria-label="Zoom för kursgrafen" hidden>
-                            <button class="button button-secondary" type="button" data-action="spectate-zoom-out" aria-label="Zooma ut" title="Zooma ut">−</button>
-                            <button class="button button-secondary" type="button" data-action="spectate-zoom-in" aria-label="Zooma in" title="Zooma in">+</button>
+                        <div id="spectate-chart-controls" class="chart-controls" role="group" aria-label="Zoom för kursgrafen" data-i18n-aria-label="Zoom för kursgrafen" hidden>
+                            <button class="button button-secondary" type="button" data-action="spectate-zoom-out" aria-label="Zooma ut" data-i18n-aria-label="Zooma ut" title="Zooma ut" data-i18n-title="Zooma ut">−</button>
+                            <button class="button button-secondary" type="button" data-action="spectate-zoom-in" aria-label="Zooma in" data-i18n-aria-label="Zooma in" title="Zooma in" data-i18n-title="Zooma in">+</button>
                         </div>
                         <div class="chart-credit"><a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView Lightweight Charts™</a> · © 2025 TradingView, Inc.</div>
                     </div>
                     <p id="spectate-event" class="spectate-event" role="status" hidden></p>
                     <dl id="spectate-prediction-reveal" class="prediction-breakdown spectate-prediction-reveal" hidden>
-                        <div><dt>Facit</dt><dd id="spectate-actual-prediction" class="mono">—</dd></div>
-                        <div id="spectate-first-prediction-card"><dt id="spectate-first-prediction-name">Första spelaren</dt><dd id="spectate-first-prediction" class="mono">—</dd></div>
-                        <div id="spectate-second-prediction-card"><dt id="spectate-second-prediction-name">Andra spelaren</dt><dd id="spectate-second-prediction" class="mono">—</dd></div>
+                        <div><dt data-i18n="Facit">Facit</dt><dd id="spectate-actual-prediction" class="mono">—</dd></div>
+                        <div id="spectate-first-prediction-card"><dt id="spectate-first-prediction-name" data-i18n="Första spelaren">Första spelaren</dt><dd id="spectate-first-prediction" class="mono">—</dd></div>
+                        <div id="spectate-second-prediction-card"><dt id="spectate-second-prediction-name" data-i18n="Andra spelaren">Andra spelaren</dt><dd id="spectate-second-prediction" class="mono">—</dd></div>
                     </dl>
                 </section>
             </div>
@@ -243,27 +298,27 @@
         <section id="queue-screen" class="screen queue-screen" aria-labelledby="queue-title" hidden>
             <div class="queue-card panel">
                 <div class="queue-scan" aria-hidden="true"><i></i><i></i><b></b></div>
-                <h1 id="queue-title" class="screen-title" tabindex="-1">Söker motståndare</h1>
+                <h1 id="queue-title" class="screen-title" tabindex="-1" data-i18n="Söker motståndare">Söker motståndare</h1>
                 <dl class="queue-stats">
-                    <div><dt>Väntetid</dt><dd id="queue-wait" class="mono">00:00</dd></div>
-                    <div><dt>Elo-intervall</dt><dd id="queue-radius" class="mono">—</dd></div>
+                    <div><dt data-i18n="Väntetid">Väntetid</dt><dd id="queue-wait" class="mono">00:00</dd></div>
+                    <div><dt data-i18n="Elo-intervall">Elo-intervall</dt><dd id="queue-radius" class="mono">—</dd></div>
                 </dl>
-                <button class="button button-secondary" type="button" data-action="leave-queue">Lämna kön</button>
+                <button class="button button-secondary" type="button" data-action="leave-queue" data-i18n="Lämna kön">Lämna kön</button>
             </div>
         </section>
 
         <section id="invite-screen" class="screen queue-screen" aria-labelledby="invite-title" hidden>
             <div class="queue-card invite-card panel">
-                <h1 id="invite-title" class="screen-title" tabindex="-1">Vänduell</h1>
+                <h1 id="invite-title" class="screen-title" tabindex="-1" data-i18n="Vänduell">Vänduell</h1>
                 <p id="invite-status" class="invite-status" role="status"></p>
                 <label id="invite-share" class="field" hidden>
-                    <span>Inbjudningslänk</span>
+                    <span data-i18n="Inbjudningslänk">Inbjudningslänk</span>
                     <input id="invite-link" type="url" readonly>
                 </label>
                 <div class="panel-actions">
-                    <button id="invite-copy" class="button button-secondary" type="button" data-action="friend-copy" hidden>Kopiera länk</button>
-                    <button id="invite-join" class="button button-primary" type="button" data-action="friend-join" hidden>Gå med i duellen</button>
-                    <button id="invite-cancel" class="button button-secondary" type="button" data-action="friend-cancel">Avbryt</button>
+                    <button id="invite-copy" class="button button-secondary" type="button" data-action="friend-copy" hidden data-i18n="Kopiera länk">Kopiera länk</button>
+                    <button id="invite-join" class="button button-primary" type="button" data-action="friend-join" hidden data-i18n="Gå med i duellen">Gå med i duellen</button>
+                    <button id="invite-cancel" class="button button-secondary" type="button" data-action="friend-cancel" data-i18n="Avbryt">Avbryt</button>
                 </div>
             </div>
         </section>
@@ -271,154 +326,154 @@
         <section id="match-screen" class="screen match-screen" aria-label="Match" tabindex="-1" data-phase="countdown" data-storm="normal" hidden>
             <div id="match-hud" class="match-hud">
                 <div class="duelist duelist-self">
-                    <div class="duelist-label"><strong id="self-name">Du</strong><span id="self-hp-label" class="mono">100</span></div>
-                    <progress id="self-hp" class="meter health-meter" aria-label="Din hälsa" max="100" value="100"></progress>
+                    <div class="duelist-label"><strong id="self-name" data-i18n="Du">Du</strong><span id="self-hp-label" class="mono">100</span></div>
+                    <progress id="self-hp" class="meter health-meter" aria-label="Din hälsa" data-i18n-aria-label="Din hälsa" max="100" value="100"></progress>
                     <div id="self-trade-details" class="duelist-details" hidden>
-                        <span>Kapital <strong id="self-capital" class="mono">—</strong></span>
-                        <span>Attackkraft <strong id="self-attack-power" class="mono">—</strong></span>
+                        <span><span data-i18n="Kapital">Kapital</span> <strong id="self-capital" class="mono">—</strong></span>
+                        <span><span data-i18n="Attackkraft">Attackkraft</span> <strong id="self-attack-power" class="mono">—</strong></span>
                     </div>
                 </div>
                 <div class="match-clock">
-                    <span id="match-phase">Startar</span>
+                    <span id="match-phase" data-i18n="Startar">Startar</span>
                     <strong id="match-time" class="mono">00:00</strong>
                     <small id="match-clock-detail" hidden></small>
                 </div>
                 <div class="duelist duelist-opponent">
-                    <div class="duelist-label"><strong id="opponent-name">Motståndare</strong><span id="opponent-hp-label" class="mono">100</span></div>
-                    <progress id="opponent-hp" class="meter health-meter" aria-label="Motståndarens hälsa" max="100" value="100"></progress>
+                    <div class="duelist-label"><strong id="opponent-name" data-i18n="Motståndare">Motståndare</strong><span id="opponent-hp-label" class="mono">100</span></div>
+                    <progress id="opponent-hp" class="meter health-meter" aria-label="Motståndarens hälsa" data-i18n-aria-label="Motståndarens hälsa" max="100" value="100"></progress>
                     <div id="opponent-details" class="duelist-details" hidden>
-                        <span id="opponent-capital-stat" hidden>Kapital <strong id="opponent-capital" class="mono">—</strong></span>
+                        <span id="opponent-capital-stat" hidden><span data-i18n="Kapital">Kapital</span> <strong id="opponent-capital" class="mono">—</strong></span>
                         <span id="opponent-elo" class="mono" hidden></span>
-                        <span id="opponent-position" hidden>Öppen position</span>
+                        <span id="opponent-position" hidden data-i18n="Öppen position">Öppen position</span>
                     </div>
                 </div>
             </div>
             <div id="practice-header" class="practice-header" hidden>
-                <div><h1>Öva ritduell</h1><p id="practice-round" class="mono"></p></div>
-                <button class="button button-secondary" type="button" data-action="practice-leave">Avsluta övning</button>
+                <div><h1 data-i18n="Öva ritduell">Öva ritduell</h1><p id="practice-round" class="mono"></p></div>
+                <button class="button button-secondary" type="button" data-action="practice-leave" data-i18n="Avsluta övning">Avsluta övning</button>
             </div>
             <div id="bot-guide" class="bot-guide panel" hidden>
                 <p id="bot-guide-step" role="status"></p>
-                <button class="button button-secondary" type="button" data-action="guide-skip">Hoppa över guiden</button>
+                <button class="button button-secondary" type="button" data-action="guide-skip" data-i18n="Hoppa över guiden">Hoppa över guiden</button>
             </div>
             <div class="match-layout">
-                <section class="market-panel panel" aria-label="Marknad och kursgraf">
+                <section class="market-panel panel" aria-label="Marknad och kursgraf" data-i18n-aria-label="Marknad och kursgraf">
                     <div class="ticker">
                         <div class="ticker-instrument">
-                            <div class="ticker-label"><strong id="match-symbol" class="mono">—</strong><span id="match-synthetic" class="market-badge" hidden>Syntetisk</span></div>
+                            <div class="ticker-label"><strong id="match-symbol" class="mono">—</strong><span id="match-synthetic" class="market-badge" hidden data-i18n="Syntetisk">Syntetisk</span></div>
                             <div class="ticker-details"><span id="match-name"></span><span id="match-market"></span></div>
                         </div>
                         <div class="ticker-quote">
-                            <span class="eyebrow">Kurs</span>
+                            <span class="eyebrow" data-i18n="Kurs">Kurs</span>
                             <strong id="match-price" class="mono">—</strong>
                         </div>
                     </div>
                     <div class="chart-frame">
-                        <div id="match-chart" class="chart" role="img" aria-label="Linjegraf över aktiekursen"></div>
-                        <canvas id="prediction-chart" class="prediction-chart" role="img" aria-label="Kurshistorik och nästa kurspunkt. Ange en prognos med procentfältet eller genom att dra i prognosfältet i grafen." hidden></canvas>
+                        <div id="match-chart" class="chart" role="img" aria-label="Linjegraf över aktiekursen" data-i18n-aria-label="Linjegraf över aktiekursen"></div>
+                        <canvas id="prediction-chart" class="prediction-chart" role="img" aria-label="Kurshistorik och nästa kurspunkt. Ange en prognos med procentfältet eller genom att dra i prognosfältet i grafen." data-i18n-aria-label="Kurshistorik och nästa kurspunkt. Ange en prognos med procentfältet eller genom att dra i prognosfältet i grafen." hidden></canvas>
                         <div id="prediction-draw-target" class="prediction-draw-target" aria-hidden="true" hidden></div>
                         <p id="match-chart-status" class="chart-status" role="status" hidden></p>
                         <div id="countdown-overlay" class="countdown-overlay" hidden>
-                            <span>Matchstart</span>
+                            <span data-i18n="Matchstart">Matchstart</span>
                             <strong id="countdown-number" class="mono">3</strong>
                         </div>
                         <div id="match-event" class="match-event" role="status" hidden></div>
                     </div>
                     <div id="chart-footer" class="chart-footer">
-                        <div id="chart-controls" class="chart-controls" role="group" aria-label="Zoom för kursgrafen" hidden>
-                            <button class="button button-secondary" type="button" data-action="chart-zoom-out" aria-label="Zooma ut" title="Zooma ut">−</button>
-                            <button class="button button-secondary" type="button" data-action="chart-zoom-in" aria-label="Zooma in" title="Zooma in">+</button>
+                        <div id="chart-controls" class="chart-controls" role="group" aria-label="Zoom för kursgrafen" data-i18n-aria-label="Zoom för kursgrafen" hidden>
+                            <button class="button button-secondary" type="button" data-action="chart-zoom-out" aria-label="Zooma ut" data-i18n-aria-label="Zooma ut" title="Zooma ut" data-i18n-title="Zooma ut">−</button>
+                            <button class="button button-secondary" type="button" data-action="chart-zoom-in" aria-label="Zooma in" data-i18n-aria-label="Zooma in" title="Zooma in" data-i18n-title="Zooma in">+</button>
                         </div>
                         <div class="chart-credit"><a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView Lightweight Charts™</a> · © 2025 TradingView, Inc.</div>
                     </div>
                 </section>
-                <section id="trade-panel" class="trade-panel panel" aria-label="Position och handel">
+                <section id="trade-panel" class="trade-panel panel" aria-label="Position och handel" data-i18n-aria-label="Position och handel">
                     <div id="open-order" class="trade-order">
-                        <div class="percent-buttons" role="group" aria-label="Andel av tillgängliga krediter att satsa">
+                        <div class="percent-buttons" role="group" aria-label="Andel av tillgängliga krediter att satsa" data-i18n-aria-label="Andel av tillgängliga krediter att satsa">
                             <button type="button" data-percent="25" aria-pressed="false">25 %</button>
                             <button type="button" data-percent="50" aria-pressed="false">50 %</button>
                             <button type="button" data-percent="75" aria-pressed="false">75 %</button>
                             <button type="button" data-percent="100" aria-pressed="true">100 %</button>
                         </div>
-                        <p id="stake-preview" class="trade-detail">Vald insats <strong id="stake-amount" class="mono">—</strong> krediter</p>
-                        <div class="order-buttons" role="group" aria-label="Välj riktning för din position">
+                        <p id="stake-preview" class="trade-detail"><span data-i18n="Vald insats">Vald insats</span> <strong id="stake-amount" class="mono">—</strong> <span data-i18n="krediter">krediter</span></p>
+                        <div class="order-buttons" role="group" aria-label="Välj riktning för din position" data-i18n-aria-label="Välj riktning för din position">
                             <button class="button button-buy direction-button" type="button" data-action="buy" disabled>
-                                <span>UPP <span aria-hidden="true">↗</span></span>
-                                <small>Vinst vid uppgång</small>
+                                <span><span data-i18n="UPP">UPP</span> <span aria-hidden="true">↗</span></span>
+                                <small data-i18n="Vinst vid uppgång">Vinst vid uppgång</small>
                             </button>
                             <button class="button button-short direction-button" type="button" data-action="short" disabled>
-                                <span>NER <span aria-hidden="true">↘</span></span>
-                                <small>Vinst vid nedgång</small>
+                                <span><span data-i18n="NER">NER</span> <span aria-hidden="true">↘</span></span>
+                                <small data-i18n="Vinst vid nedgång">Vinst vid nedgång</small>
                             </button>
                         </div>
                     </div>
                     <div id="close-order" class="order-buttons" hidden>
-                        <button class="button button-secondary" type="button" data-action="sell" disabled>STÄNG POSITION</button>
+                        <button class="button button-secondary" type="button" data-action="sell" disabled data-i18n="STÄNG POSITION">STÄNG POSITION</button>
                     </div>
                     <div id="sell-choice" class="sell-choice" hidden>
-                        <p id="sell-choice-hint">Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.</p>
+                        <p id="sell-choice-hint" data-i18n="Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.">Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.</p>
                         <div id="profit-actions" class="order-buttons">
                             <button class="button button-attack direction-button" type="button" data-action="attack">
-                                <span>ATTACK</span><small id="attack-preview">Gör skada</small>
+                                <span>ATTACK</span><small id="attack-preview" data-i18n="Gör skada">Gör skada</small>
                             </button>
                             <button class="button button-buy direction-button" type="button" data-action="grow">
-                                <span>GROW</span><small id="grow-preview">Bygg kapital och bonus</small>
+                                <span>GROW</span><small id="grow-preview" data-i18n="Bygg kapital och bonus">Bygg kapital och bonus</small>
                             </button>
                         </div>
-                        <button id="pending-close" class="button button-secondary" type="button" data-action="confirm-close" hidden>STÄNG POSITION</button>
+                        <button id="pending-close" class="button button-secondary" type="button" data-action="confirm-close" hidden data-i18n="STÄNG POSITION">STÄNG POSITION</button>
                     </div>
                     <p id="match-feedback" class="match-feedback" role="status" hidden></p>
                     <dl class="trade-stats">
-                        <div><dt>Tillgängligt</dt><dd id="match-cash" class="mono">—</dd></div>
-                        <div><dt>Investerat</dt><dd id="match-invested" class="mono">—</dd></div>
-                        <div id="grow-stat" class="grow-stat"><dt>Grow-bonus</dt><dd id="match-grow" class="mono">—</dd></div>
+                        <div><dt data-i18n="Tillgängligt">Tillgängligt</dt><dd id="match-cash" class="mono">—</dd></div>
+                        <div><dt data-i18n="Investerat">Investerat</dt><dd id="match-invested" class="mono">—</dd></div>
+                        <div id="grow-stat" class="grow-stat"><dt data-i18n="Grow-bonus">Grow-bonus</dt><dd id="match-grow" class="mono">—</dd></div>
                         <div><dt>Position</dt><dd id="match-direction" class="mono">—</dd></div>
-                        <div><dt>Ingångskurs</dt><dd id="match-entry" class="mono">—</dd></div>
-                        <div><dt>Orealiserat resultat</dt><dd id="match-pnl" class="mono">—</dd></div>
+                        <div><dt data-i18n="Ingångskurs">Ingångskurs</dt><dd id="match-entry" class="mono">—</dd></div>
+                        <div><dt data-i18n="Orealiserat resultat">Orealiserat resultat</dt><dd id="match-pnl" class="mono">—</dd></div>
                     </dl>
                 </section>
-                <section id="prediction-panel" class="prediction-panel panel" aria-label="Ritduellens prognos" hidden>
+                <section id="prediction-panel" class="prediction-panel panel" aria-label="Ritduellens prognos" data-i18n-aria-label="Ritduellens prognos" hidden>
                     <div id="prediction-verdict" class="prediction-verdict" role="status">
                         <p id="prediction-status" class="prediction-status"></p>
                         <p id="prediction-reason" class="prediction-reason" hidden></p>
                     </div>
                     <form id="prediction-controls" class="prediction-controls" novalidate>
-                        <p id="prediction-instructions">Dra uppåt eller nedåt i prognosfältet, eller skriv din gissning i procent.</p>
+                        <p id="prediction-instructions" data-i18n="Dra uppåt eller nedåt i prognosfältet, eller skriv din gissning i procent.">Dra uppåt eller nedåt i prognosfältet, eller skriv din gissning i procent.</p>
                         <div class="field">
-                            <label for="prediction-move">Din prognos (%)</label>
+                            <label for="prediction-move" data-i18n="Din prognos (%)">Din prognos (%)</label>
                             <div class="prediction-input">
-                                <input id="prediction-move" class="mono" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" maxlength="32" placeholder="t.ex. −1,25" aria-describedby="prediction-instructions prediction-feedback">
-                                <button id="prediction-sign" class="button button-secondary" type="button" data-action="prediction-sign" aria-label="Negativt tecken" aria-pressed="false">±</button>
+                                <input id="prediction-move" class="mono" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" maxlength="32" placeholder="t.ex. −1,25" data-i18n-placeholder="t.ex. −1,25" aria-describedby="prediction-instructions prediction-feedback">
+                                <button id="prediction-sign" class="button button-secondary" type="button" data-action="prediction-sign" aria-label="Negativt tecken" data-i18n-aria-label="Negativt tecken" aria-pressed="false">±</button>
                             </div>
                         </div>
                         <div class="prediction-actions">
-                            <button class="button button-secondary" type="button" data-action="prediction-clear">Rensa</button>
-                            <button class="button button-primary" id="prediction-lock" type="submit">Lås prognos</button>
+                            <button class="button button-secondary" type="button" data-action="prediction-clear" data-i18n="Rensa">Rensa</button>
+                            <button class="button button-primary" id="prediction-lock" type="submit" data-i18n="Lås prognos">Lås prognos</button>
                         </div>
                         <p id="prediction-feedback" class="match-feedback" role="status" hidden></p>
                     </form>
                     <dl id="prediction-breakdown" class="prediction-breakdown" hidden>
-                        <div><dt>Facit</dt><dd id="prediction-actual" class="mono">—</dd></div>
-                        <div id="prediction-self-breakdown"><dt>Du</dt><dd id="prediction-self" class="mono">—</dd><dd id="prediction-self-error" class="prediction-error">—</dd></div>
-                        <div id="prediction-opponent-breakdown"><dt id="prediction-opponent-name">Motståndaren</dt><dd id="prediction-opponent" class="mono">—</dd><dd id="prediction-opponent-error" class="prediction-error">—</dd></div>
+                        <div><dt data-i18n="Facit">Facit</dt><dd id="prediction-actual" class="mono">—</dd></div>
+                        <div id="prediction-self-breakdown"><dt data-i18n="Du">Du</dt><dd id="prediction-self" class="mono">—</dd><dd id="prediction-self-error" class="prediction-error">—</dd></div>
+                        <div id="prediction-opponent-breakdown"><dt id="prediction-opponent-name" data-i18n="Motståndaren">Motståndaren</dt><dd id="prediction-opponent" class="mono">—</dd><dd id="prediction-opponent-error" class="prediction-error">—</dd></div>
                     </dl>
-                    <button id="practice-next" class="button button-primary" type="button" data-action="practice-next" hidden>Nästa runda</button>
+                    <button id="practice-next" class="button button-primary" type="button" data-action="practice-next" hidden data-i18n="Nästa runda">Nästa runda</button>
                 </section>
             </div>
         </section>
 
-        <section id="result-screen" class="screen result-screen" aria-label="Matchresultat" hidden>
+        <section id="result-screen" class="screen result-screen" aria-label="Matchresultat" data-i18n-aria-label="Matchresultat" hidden>
             <div class="result-card panel">
                 <div class="result-hero">
                     <div>
-                        <p id="result-mode" class="eyebrow">Matchresultat</p>
+                        <p id="result-mode" class="eyebrow" data-i18n="Matchresultat">Matchresultat</p>
                         <h1 id="result-outcome" class="result-title" tabindex="-1">—</h1>
                     </div>
                     <div id="result-elo" class="elo-summary">
                         <span class="eyebrow">Elo</span>
                         <strong id="result-elo-delta" class="elo-delta mono">—</strong>
                         <span class="elo-route mono">
-                            <span class="sr-only">Elo före </span><span id="result-elo-before">—</span><span aria-hidden="true"> → </span><span class="sr-only">Elo efter </span><span id="result-elo-after">—</span>
+                            <span class="sr-only" data-i18n="Elo före">Elo före</span> <span id="result-elo-before">—</span><span aria-hidden="true"> → </span><span class="sr-only" data-i18n="Elo efter">Elo efter</span> <span id="result-elo-after">—</span>
                         </span>
                     </div>
                 </div>
@@ -429,49 +484,49 @@
                 <div id="result-explanation" class="result-detail" hidden>
                     <p id="result-decisive"></p>
                     <dl id="result-comparison" class="result-stats result-comparison">
-                        <div><dt>Dina slut-HP</dt><dd id="result-self-hp" class="mono">—</dd></div>
-                        <div><dt id="result-opponent-label">Motståndarens slut-HP</dt><dd id="result-opponent-hp" class="mono">—</dd></div>
+                        <div><dt data-i18n="Dina slut-HP">Dina slut-HP</dt><dd id="result-self-hp" class="mono">—</dd></div>
+                        <div><dt id="result-opponent-label" data-i18n="Motståndarens slut-HP">Motståndarens slut-HP</dt><dd id="result-opponent-hp" class="mono">—</dd></div>
                     </dl>
                 </div>
                 <dl id="result-trade-stats" class="result-stats">
-                    <div><dt>Affärer</dt><dd id="result-trades" class="mono">—</dd></div>
-                    <div><dt>Vinstaffärer</dt><dd id="result-wins" class="mono">—</dd></div>
-                    <div><dt>Förlustaffärer</dt><dd id="result-losses" class="mono">—</dd></div>
-                    <div><dt>Attackskada</dt><dd id="result-attack" class="mono">—</dd></div>
-                    <div><dt>Grow-val</dt><dd id="result-grow" class="mono">—</dd></div>
-                    <div><dt>Högsta kapital</dt><dd id="result-peak" class="mono">—</dd></div>
-                    <div><dt>Ditt slutkapital</dt><dd id="result-capital" class="mono">—</dd></div>
-                    <div id="result-opponent-capital-stat" hidden><dt>Motståndarens slutkapital</dt><dd id="result-opponent-capital" class="mono">—</dd></div>
-                    <div id="result-trade-hp-stat"><dt>Hälsa vid slut</dt><dd id="result-hp" class="mono">—</dd></div>
-                    <div><dt>Matchlängd</dt><dd id="result-duration" class="mono">—</dd></div>
+                    <div><dt data-i18n="Affärer">Affärer</dt><dd id="result-trades" class="mono">—</dd></div>
+                    <div><dt data-i18n="Vinstaffärer">Vinstaffärer</dt><dd id="result-wins" class="mono">—</dd></div>
+                    <div><dt data-i18n="Förlustaffärer">Förlustaffärer</dt><dd id="result-losses" class="mono">—</dd></div>
+                    <div><dt data-i18n="Attackskada">Attackskada</dt><dd id="result-attack" class="mono">—</dd></div>
+                    <div><dt data-i18n="Grow-val">Grow-val</dt><dd id="result-grow" class="mono">—</dd></div>
+                    <div><dt data-i18n="Högsta kapital">Högsta kapital</dt><dd id="result-peak" class="mono">—</dd></div>
+                    <div><dt data-i18n="Ditt slutkapital">Ditt slutkapital</dt><dd id="result-capital" class="mono">—</dd></div>
+                    <div id="result-opponent-capital-stat" hidden><dt data-i18n="Motståndarens slutkapital">Motståndarens slutkapital</dt><dd id="result-opponent-capital" class="mono">—</dd></div>
+                    <div id="result-trade-hp-stat"><dt data-i18n="Hälsa vid slut">Hälsa vid slut</dt><dd id="result-hp" class="mono">—</dd></div>
+                    <div><dt data-i18n="Matchlängd">Matchlängd</dt><dd id="result-duration" class="mono">—</dd></div>
                 </dl>
                 <dl id="result-prediction-stats" class="result-stats" hidden>
-                    <div><dt>Rundor</dt><dd id="result-rounds" class="mono">—</dd></div>
-                    <div id="result-prediction-attack-stat"><dt>Attackskada</dt><dd id="result-prediction-attack" class="mono">—</dd></div>
-                    <div id="result-prediction-hp-stat"><dt>Hälsa vid slut</dt><dd id="result-prediction-hp" class="mono">—</dd></div>
-                    <div><dt>Matchlängd</dt><dd id="result-prediction-duration" class="mono">—</dd></div>
+                    <div><dt data-i18n="Rundor">Rundor</dt><dd id="result-rounds" class="mono">—</dd></div>
+                    <div id="result-prediction-attack-stat"><dt data-i18n="Attackskada">Attackskada</dt><dd id="result-prediction-attack" class="mono">—</dd></div>
+                    <div id="result-prediction-hp-stat"><dt data-i18n="Hälsa vid slut">Hälsa vid slut</dt><dd id="result-prediction-hp" class="mono">—</dd></div>
+                    <div><dt data-i18n="Matchlängd">Matchlängd</dt><dd id="result-prediction-duration" class="mono">—</dd></div>
                 </dl>
                 <details id="result-trade-detail" class="result-detail" hidden>
-                    <summary>Dina affärer</summary>
-                    <div class="table-wrap" tabindex="0" aria-label="Dina affärer">
+                    <summary data-i18n="Dina affärer">Dina affärer</summary>
+                    <div class="table-wrap" tabindex="0" aria-label="Dina affärer" data-i18n-aria-label="Dina affärer">
                         <table>
-                            <thead><tr><th scope="col">Tid</th><th scope="col">Position</th><th scope="col">Avslut</th><th scope="col">Kursvinst/förlust</th><th scope="col">Skada</th></tr></thead>
+                            <thead><tr><th scope="col" data-i18n="Tid">Tid</th><th scope="col">Position</th><th scope="col" data-i18n="Avslut">Avslut</th><th scope="col" data-i18n="Kursvinst/förlust">Kursvinst/förlust</th><th scope="col" data-i18n="Skada">Skada</th></tr></thead>
                             <tbody id="result-trade-list"></tbody>
                         </table>
                     </div>
                 </details>
                 <details id="result-round-detail" class="result-detail" hidden>
-                    <summary>Prognos och facit per runda</summary>
-                    <div class="table-wrap" tabindex="0" aria-label="Prognos och facit per runda">
+                    <summary data-i18n="Prognos och facit per runda">Prognos och facit per runda</summary>
+                    <div class="table-wrap" tabindex="0" aria-label="Prognos och facit per runda" data-i18n-aria-label="Prognos och facit per runda">
                         <table>
-                            <thead><tr><th scope="col">Runda</th><th id="round-outcome-header" scope="col">Utfall</th><th scope="col">Facit</th><th scope="col">Du</th><th scope="col">Ditt fel</th><th id="round-opponent-header" scope="col">Motståndaren</th><th id="round-opponent-error-header" scope="col">Motståndarens fel</th></tr></thead>
+                            <thead><tr><th scope="col" data-i18n="Runda">Runda</th><th id="round-outcome-header" scope="col" data-i18n="Utfall">Utfall</th><th scope="col" data-i18n="Facit">Facit</th><th scope="col" data-i18n="Du">Du</th><th scope="col" data-i18n="Ditt fel">Ditt fel</th><th id="round-opponent-header" scope="col" data-i18n="Motståndaren">Motståndaren</th><th id="round-opponent-error-header" scope="col" data-i18n="Motståndarens fel">Motståndarens fel</th></tr></thead>
                             <tbody id="result-round-list"></tbody>
                         </table>
                     </div>
                 </details>
                 <div class="result-actions">
-                    <button id="result-rematch" class="button button-primary" type="button" data-action="play-again">PLAY AGAIN</button>
-                    <button class="button button-secondary" type="button" data-action="main-menu">MAIN MENU</button>
+                    <button id="result-rematch" class="button button-primary" type="button" data-action="play-again" data-i18n="Spela igen">Spela igen</button>
+                    <button class="button button-secondary" type="button" data-action="main-menu" data-i18n="Huvudmeny">Huvudmeny</button>
                     <p id="result-revenge-status" class="match-feedback" role="status" hidden></p>
                 </div>
             </div>
@@ -482,38 +537,38 @@
 
     <dialog id="help-dialog" class="game-dialog" aria-labelledby="help-title">
         <div class="dialog-header">
-            <h2 id="help-title" class="card-title">Så spelar du</h2>
-            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng spelguiden">×</button>
+            <h2 id="help-title" class="card-title" data-i18n="Så spelar du">Så spelar du</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng spelguiden" data-i18n-aria-label="Stäng spelguiden">×</button>
         </div>
         <div class="help-content">
-            <h3>Handelsduell</h3>
-            <p>Välj en insats. Tryck UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen för att avsluta affären.</p>
-            <p>Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.</p>
-            <p>För varje 5 krediter över eller under startkapitalet på 1 000 ändras attackkraften med 1 procentenhet. Den kan gå från 75 till 125 %. Kapitalet består av dina tillgängliga krediter och det du har satsat i en öppen position.</p>
-            <p>Om båda slås ut samtidigt vinner den med högst kapital. Vid lika kapital avgör vem som gjort mest attackskada.</p>
-            <button class="button button-primary" type="button" data-action="guide-start">Starta guidad botduell</button>
-            <h3>Ritduell</h3>
-            <p>Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.</p>
-            <button class="button button-secondary" type="button" data-action="practice-prediction">Öva ritduell</button>
+            <h3 data-i18n="Handelsduell">Handelsduell</h3>
+            <p data-i18n="Välj en insats. Tryck UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen för att avsluta affären.">Välj en insats. Tryck UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen för att avsluta affären.</p>
+            <p data-i18n="Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.">Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.</p>
+            <p data-i18n="För varje 5 krediter över eller under startkapitalet på 1 000 ändras attackkraften med 1 procentenhet. Den kan gå från 75 till 125 %. Kapitalet består av dina tillgängliga krediter och det du har satsat i en öppen position.">För varje 5 krediter över eller under startkapitalet på 1 000 ändras attackkraften med 1 procentenhet. Den kan gå från 75 till 125 %. Kapitalet består av dina tillgängliga krediter och det du har satsat i en öppen position.</p>
+            <p data-i18n="Om båda slås ut samtidigt vinner den med högst kapital. Vid lika kapital avgör vem som gjort mest attackskada.">Om båda slås ut samtidigt vinner den med högst kapital. Vid lika kapital avgör vem som gjort mest attackskada.</p>
+            <button class="button button-primary" type="button" data-action="guide-start" data-i18n="Starta guidad botduell">Starta guidad botduell</button>
+            <h3 data-i18n="Ritduell">Ritduell</h3>
+            <p data-i18n="Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.">Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.</p>
+            <button class="button button-secondary" type="button" data-action="practice-prediction" data-i18n="Öva ritduell">Öva ritduell</button>
         </div>
     </dialog>
 
     <dialog id="bot-guide-dialog" class="game-dialog" aria-labelledby="bot-guide-title">
         <div class="dialog-header">
-            <h2 id="bot-guide-title" class="card-title">Prova Attack och Grow</h2>
-            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng introduktionen">×</button>
+            <h2 id="bot-guide-title" class="card-title" data-i18n="Prova Attack och Grow">Prova Attack och Grow</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng introduktionen" data-i18n-aria-label="Stäng introduktionen">×</button>
         </div>
         <div class="help-content">
-            <p>Välj UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen när du vill avsluta affären.</p>
-            <p>Du har startkapitalet på 1 000 krediter. Prova att stänga en affär med 10 krediter i vinst.</p>
-            <div class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till">
-                <button class="button button-attack" type="button" data-action="guide-example-attack" aria-pressed="false">Prova Attack</button>
-                <button class="button button-buy" type="button" data-action="guide-example-grow" aria-pressed="false">Prova Grow</button>
+            <p data-i18n="Välj UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen när du vill avsluta affären.">Välj UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen när du vill avsluta affären.</p>
+            <p data-i18n="Du har startkapitalet på 1 000 krediter. Prova att stänga en affär med 10 krediter i vinst.">Du har startkapitalet på 1 000 krediter. Prova att stänga en affär med 10 krediter i vinst.</p>
+            <div class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till">
+                <button class="button button-attack" type="button" data-action="guide-example-attack" aria-pressed="false" data-i18n="Prova Attack">Prova Attack</button>
+                <button class="button button-buy" type="button" data-action="guide-example-grow" aria-pressed="false" data-i18n="Prova Grow">Prova Grow</button>
             </div>
             <p id="guide-example-result" role="status"></p>
             <div class="panel-actions">
-                <button class="button button-primary" type="button" data-action="guide-begin">Starta guidad botduell</button>
-                <button class="button button-secondary" type="button" data-action="guide-bypass">Hoppa över guiden</button>
+                <button class="button button-primary" type="button" data-action="guide-begin" data-i18n="Starta guidad botduell">Starta guidad botduell</button>
+                <button class="button button-secondary" type="button" data-action="guide-bypass" data-i18n="Hoppa över guiden">Hoppa över guiden</button>
             </div>
             <p id="guide-start-error" class="form-error" role="alert" hidden></p>
         </div>
@@ -521,8 +576,8 @@
 
     <dialog id="leagues-dialog" class="game-dialog leagues-dialog" aria-labelledby="leagues-title">
         <div class="dialog-header">
-            <h2 id="leagues-title" class="card-title">Ranker</h2>
-            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng ranklistan">×</button>
+            <h2 id="leagues-title" class="card-title" data-i18n="Ranker">Ranker</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng ranklistan" data-i18n-aria-label="Stäng ranklistan">×</button>
         </div>
         <table>
             <thead><tr><th scope="col">Rank</th><th scope="col">Elo</th></tr></thead>
@@ -547,20 +602,20 @@
 
     <dialog id="ranking-dialog" class="game-dialog" aria-labelledby="ranking-title">
         <div class="dialog-header">
-            <h2 id="ranking-title" class="card-title">Ranking</h2>
-            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng ranking">×</button>
+            <h2 id="ranking-title" class="card-title" data-i18n="Ranking">Ranking</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng ranking" data-i18n-aria-label="Stäng ranking">×</button>
         </div>
         <label class="mode-picker">
-            <span>Spelläge</span>
+            <span data-i18n="Spelläge">Spelläge</span>
             <select id="ranking-mode" class="setting-select">
-                <option value="ranked">Handelsduell</option>
-                <option value="prediction">Ritduell</option>
+                <option value="ranked" data-i18n="Handelsduell">Handelsduell</option>
+                <option value="prediction" data-i18n="Ritduell">Ritduell</option>
             </select>
         </label>
         <p id="ranking-status" class="dialog-status" role="status" hidden></p>
-        <div class="table-wrap" tabindex="0" aria-label="Rankingtavla">
+        <div class="table-wrap" tabindex="0" aria-label="Rankingtavla" data-i18n-aria-label="Rankingtavla">
             <table>
-                <thead><tr><th scope="col">#</th><th scope="col">Spelare</th><th scope="col">Elo</th><th scope="col">Liga</th><th scope="col">Vinster</th><th scope="col">Matcher</th></tr></thead>
+                <thead><tr><th scope="col">#</th><th scope="col" data-i18n="Spelare">Spelare</th><th scope="col">Elo</th><th scope="col" data-i18n="Liga">Liga</th><th scope="col" data-i18n="Vinster">Vinster</th><th scope="col" data-i18n="Matcher">Matcher</th></tr></thead>
                 <tbody id="ranking-list"></tbody>
             </table>
         </div>
@@ -568,14 +623,14 @@
 
     <dialog id="profile-dialog" class="game-dialog" aria-labelledby="profile-title">
         <div class="dialog-header">
-            <h2 id="profile-title" class="card-title">Profil</h2>
-            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng profil">×</button>
+            <h2 id="profile-title" class="card-title" data-i18n="Profil">Profil</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng profil" data-i18n-aria-label="Stäng profil">×</button>
         </div>
         <label class="mode-picker">
-            <span>Spelläge</span>
+            <span data-i18n="Spelläge">Spelläge</span>
             <select id="profile-mode" class="setting-select">
-                <option value="ranked">Handelsduell</option>
-                <option value="prediction">Ritduell</option>
+                <option value="ranked" data-i18n="Handelsduell">Handelsduell</option>
+                <option value="prediction" data-i18n="Ritduell">Ritduell</option>
             </select>
         </label>
         <div class="profile-player">
@@ -584,17 +639,17 @@
         </div>
         <dl class="profile-stats">
             <div><dt>Elo</dt><dd id="profile-elo" class="mono">—</dd></div>
-            <div><dt>Matcher</dt><dd id="profile-matches" class="mono">—</dd></div>
-            <div><dt>Vinster</dt><dd id="profile-wins" class="mono">—</dd></div>
-            <div><dt>Förluster</dt><dd id="profile-losses" class="mono">—</dd></div>
-            <div><dt>Oavgjorda</dt><dd id="profile-draws" class="mono">—</dd></div>
-            <div><dt>Vinstprocent</dt><dd id="profile-win-rate" class="mono">—</dd></div>
+            <div><dt data-i18n="Matcher">Matcher</dt><dd id="profile-matches" class="mono">—</dd></div>
+            <div><dt data-i18n="Vinster">Vinster</dt><dd id="profile-wins" class="mono">—</dd></div>
+            <div><dt data-i18n="Förluster">Förluster</dt><dd id="profile-losses" class="mono">—</dd></div>
+            <div><dt data-i18n="Oavgjorda">Oavgjorda</dt><dd id="profile-draws" class="mono">—</dd></div>
+            <div><dt data-i18n="Vinstprocent">Vinstprocent</dt><dd id="profile-win-rate" class="mono">—</dd></div>
         </dl>
-        <h3 class="history-title">Matchhistorik</h3>
+        <h3 class="history-title" data-i18n="Matchhistorik">Matchhistorik</h3>
         <p id="profile-status" class="dialog-status" role="status" hidden></p>
-        <div class="table-wrap" tabindex="0" aria-label="Matchhistorik">
+        <div class="table-wrap" tabindex="0" aria-label="Matchhistorik" data-i18n-aria-label="Matchhistorik">
             <table>
-                <thead><tr><th scope="col">Motståndare</th><th scope="col">Utfall</th><th scope="col">Aktie</th><th scope="col">Elo</th><th scope="col">Datum</th></tr></thead>
+                <thead><tr><th scope="col" data-i18n="Motståndare">Motståndare</th><th scope="col" data-i18n="Utfall">Utfall</th><th scope="col" data-i18n="Aktie">Aktie</th><th scope="col">Elo</th><th scope="col" data-i18n="Datum">Datum</th></tr></thead>
                 <tbody id="profile-history"></tbody>
             </table>
         </div>
@@ -602,22 +657,22 @@
 
     <dialog id="settings-dialog" class="game-dialog settings-dialog" aria-labelledby="settings-title">
         <div class="dialog-header">
-            <h2 id="settings-title" class="card-title">Inställningar</h2>
-            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng inställningar">×</button>
+            <h2 id="settings-title" class="card-title" data-i18n="Inställningar">Inställningar</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng inställningar" data-i18n-aria-label="Stäng inställningar">×</button>
         </div>
         <label class="setting">
-            <strong>Graftyp</strong>
+            <strong data-i18n="Graftyp">Graftyp</strong>
             <select id="setting-chart-type" class="setting-select">
-                <option value="line">Linjegraf</option>
-                <option value="candlestick">Ljusstaplar</option>
+                <option value="line" data-i18n="Linjegraf">Linjegraf</option>
+                <option value="candlestick" data-i18n="Ljusstaplar">Ljusstaplar</option>
             </select>
         </label>
         <label class="setting">
-            <span><strong>Ljud</strong><small>Ljudeffekter vid attacker, Grow och matchslut.</small></span>
+            <span><strong data-i18n="Ljud">Ljud</strong><small data-i18n="Ljudeffekter vid attacker, Grow och matchslut.">Ljudeffekter vid attacker, Grow och matchslut.</small></span>
             <input id="setting-sound" class="setting-toggle" type="checkbox">
         </label>
         <label class="setting">
-            <span><strong>Kraftiga animationer</strong><small>Skärmeffekter vid bland annat skada och KO.</small></span>
+            <span><strong data-i18n="Kraftiga animationer">Kraftiga animationer</strong><small data-i18n="Skärmeffekter vid bland annat skada och KO.">Skärmeffekter vid bland annat skada och KO.</small></span>
             <input id="setting-effects" class="setting-toggle" type="checkbox" checked>
         </label>
     </dialog>
