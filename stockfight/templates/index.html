@@ -2,7 +2,7 @@
 <html lang="sv">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0c1119">
     <title>Stock Fight</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
@@ -42,7 +42,7 @@
                 </div>
             </div>
             <div class="auth-card">
-                <h2 id="auth-title" class="card-title">Spelarkonto</h2>
+                <h2 id="auth-title" class="card-title" tabindex="-1">Spelarkonto</h2>
                 <div class="auth-tabs" role="group" aria-label="Välj kontoåtgärd">
                     <button type="button" data-action="auth-login" aria-pressed="true">Logga in</button>
                     <button type="button" data-action="auth-register" aria-pressed="false">Registrera</button>
@@ -70,7 +70,7 @@
             <div class="menu-main">
                 <div class="menu-greeting">
                     <p class="eyebrow">Spelare</p>
-                    <h1 id="menu-name" class="screen-title">Stock Fight</h1>
+                    <h1 id="menu-name" class="screen-title" tabindex="-1">Stock Fight</h1>
                 </div>
                 <div class="play-panel">
                     <div class="play-decoration" aria-hidden="true">
@@ -152,7 +152,7 @@
         <section id="queue-screen" class="screen queue-screen" aria-labelledby="queue-title" hidden>
             <div class="queue-card panel">
                 <div class="queue-scan" aria-hidden="true"><i></i><i></i><b></b></div>
-                <h1 id="queue-title" class="screen-title">Söker motståndare</h1>
+                <h1 id="queue-title" class="screen-title" tabindex="-1">Söker motståndare</h1>
                 <dl class="queue-stats">
                     <div><dt>Väntetid</dt><dd id="queue-wait" class="mono">00:00</dd></div>
                     <div><dt>Elo-intervall</dt><dd id="queue-radius" class="mono">—</dd></div>
@@ -177,11 +177,15 @@
             </div>
         </section>
 
-        <section id="match-screen" class="screen match-screen" aria-label="Match" data-phase="countdown" data-storm="normal" hidden>
+        <section id="match-screen" class="screen match-screen" aria-label="Match" tabindex="-1" data-phase="countdown" data-storm="normal" hidden>
             <div id="match-hud" class="match-hud">
                 <div class="duelist duelist-self">
                     <div class="duelist-label"><strong id="self-name">Du</strong><span id="self-hp-label" class="mono">100</span></div>
                     <progress id="self-hp" class="meter health-meter" aria-label="Din hälsa" max="100" value="100"></progress>
+                    <div id="self-trade-details" class="duelist-details" hidden>
+                        <span>Kapital <strong id="self-capital" class="mono">—</strong></span>
+                        <span>Attackkraft <strong id="self-attack-power" class="mono">—</strong></span>
+                    </div>
                 </div>
                 <div class="match-clock">
                     <span id="match-phase">Startar</span>
@@ -191,7 +195,8 @@
                 <div class="duelist duelist-opponent">
                     <div class="duelist-label"><strong id="opponent-name">Motståndare</strong><span id="opponent-hp-label" class="mono">100</span></div>
                     <progress id="opponent-hp" class="meter health-meter" aria-label="Motståndarens hälsa" max="100" value="100"></progress>
-                    <div id="opponent-details" class="opponent-details" hidden>
+                    <div id="opponent-details" class="duelist-details" hidden>
+                        <span id="opponent-capital-stat" hidden>Kapital <strong id="opponent-capital" class="mono">—</strong></span>
                         <span id="opponent-elo" class="mono" hidden></span>
                         <span id="opponent-position" hidden>Öppen position</span>
                     </div>
@@ -219,7 +224,8 @@
                     </div>
                     <div class="chart-frame">
                         <div id="match-chart" class="chart" role="img" aria-label="Linjegraf över aktiekursen"></div>
-                        <canvas id="prediction-chart" class="prediction-chart" role="img" aria-label="Kurshistorik och nästa kurspunkt. Ange en prognos med procentfältet eller genom att dra på grafens högra sida." hidden></canvas>
+                        <canvas id="prediction-chart" class="prediction-chart" role="img" aria-label="Kurshistorik och nästa kurspunkt. Ange en prognos med procentfältet eller genom att dra i prognosfältet i grafen." hidden></canvas>
+                        <div id="prediction-draw-target" class="prediction-draw-target" aria-hidden="true" hidden></div>
                         <p id="match-chart-status" class="chart-status" role="status" hidden></p>
                         <div id="countdown-overlay" class="countdown-overlay" hidden>
                             <span>Matchstart</span>
@@ -236,14 +242,6 @@
                     </div>
                 </section>
                 <section id="trade-panel" class="trade-panel panel" aria-label="Position och handel">
-                    <dl class="trade-stats">
-                        <div><dt>Tillgängligt</dt><dd id="match-cash" class="mono">—</dd></div>
-                        <div><dt>Investerat</dt><dd id="match-invested" class="mono">—</dd></div>
-                        <div id="grow-stat" class="grow-stat"><dt>Grow-bonus</dt><dd id="match-grow" class="mono">—</dd></div>
-                        <div><dt>Position</dt><dd id="match-direction" class="mono">—</dd></div>
-                        <div><dt>Ingångskurs</dt><dd id="match-entry" class="mono">—</dd></div>
-                        <div><dt>Orealiserat resultat</dt><dd id="match-pnl" class="mono">—</dd></div>
-                    </dl>
                     <div id="open-order" class="trade-order">
                         <div class="percent-buttons" role="group" aria-label="Andel av tillgängliga krediter att satsa">
                             <button type="button" data-percent="25" aria-pressed="false">25 %</button>
@@ -279,15 +277,29 @@
                         <button id="pending-close" class="button button-secondary" type="button" data-action="confirm-close" hidden>STÄNG POSITION</button>
                     </div>
                     <p id="match-feedback" class="match-feedback" role="status" hidden></p>
+                    <dl class="trade-stats">
+                        <div><dt>Tillgängligt</dt><dd id="match-cash" class="mono">—</dd></div>
+                        <div><dt>Investerat</dt><dd id="match-invested" class="mono">—</dd></div>
+                        <div id="grow-stat" class="grow-stat"><dt>Grow-bonus</dt><dd id="match-grow" class="mono">—</dd></div>
+                        <div><dt>Position</dt><dd id="match-direction" class="mono">—</dd></div>
+                        <div><dt>Ingångskurs</dt><dd id="match-entry" class="mono">—</dd></div>
+                        <div><dt>Orealiserat resultat</dt><dd id="match-pnl" class="mono">—</dd></div>
+                    </dl>
                 </section>
                 <section id="prediction-panel" class="prediction-panel panel" aria-label="Ritduellens prognos" hidden>
-                    <p id="prediction-status" class="prediction-status" role="status"></p>
+                    <div id="prediction-verdict" class="prediction-verdict" role="status">
+                        <p id="prediction-status" class="prediction-status"></p>
+                        <p id="prediction-reason" class="prediction-reason" hidden></p>
+                    </div>
                     <form id="prediction-controls" class="prediction-controls" novalidate>
-                        <p id="prediction-instructions">Dra till höger om linjen eller ange hur många procent du tror att kursen ändras.</p>
-                        <label class="field" for="prediction-move">
-                            <span>Din prognos (%)</span>
-                            <input id="prediction-move" class="mono" type="text" autocomplete="off" spellcheck="false" maxlength="32" placeholder="t.ex. −1,25" aria-describedby="prediction-instructions prediction-feedback">
-                        </label>
+                        <p id="prediction-instructions">Dra uppåt eller nedåt i prognosfältet, eller skriv din gissning i procent.</p>
+                        <div class="field">
+                            <label for="prediction-move">Din prognos (%)</label>
+                            <div class="prediction-input">
+                                <input id="prediction-move" class="mono" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" maxlength="32" placeholder="t.ex. −1,25" aria-describedby="prediction-instructions prediction-feedback">
+                                <button id="prediction-sign" class="button button-secondary" type="button" data-action="prediction-sign" aria-label="Negativt tecken" aria-pressed="false">±</button>
+                            </div>
+                        </div>
                         <div class="prediction-actions">
                             <button class="button button-secondary" type="button" data-action="prediction-clear">Rensa</button>
                             <button class="button button-primary" id="prediction-lock" type="submit">Lås prognos</button>
@@ -296,8 +308,8 @@
                     </form>
                     <dl id="prediction-breakdown" class="prediction-breakdown" hidden>
                         <div><dt>Facit</dt><dd id="prediction-actual" class="mono">—</dd></div>
-                        <div><dt>Du</dt><dd id="prediction-self" class="mono">—</dd><dd id="prediction-self-error" class="prediction-error">—</dd></div>
-                        <div id="prediction-opponent-breakdown"><dt>Motståndaren</dt><dd id="prediction-opponent" class="mono">—</dd><dd id="prediction-opponent-error" class="prediction-error">—</dd></div>
+                        <div id="prediction-self-breakdown"><dt>Du</dt><dd id="prediction-self" class="mono">—</dd><dd id="prediction-self-error" class="prediction-error">—</dd></div>
+                        <div id="prediction-opponent-breakdown"><dt id="prediction-opponent-name">Motståndaren</dt><dd id="prediction-opponent" class="mono">—</dd><dd id="prediction-opponent-error" class="prediction-error">—</dd></div>
                     </dl>
                     <button id="practice-next" class="button button-primary" type="button" data-action="practice-next" hidden>Nästa runda</button>
                 </section>
@@ -337,7 +349,8 @@
                     <div><dt>Attackskada</dt><dd id="result-attack" class="mono">—</dd></div>
                     <div><dt>Grow-val</dt><dd id="result-grow" class="mono">—</dd></div>
                     <div><dt>Högsta kapital</dt><dd id="result-peak" class="mono">—</dd></div>
-                    <div><dt>Kapital vid slut</dt><dd id="result-capital" class="mono">—</dd></div>
+                    <div><dt>Ditt slutkapital</dt><dd id="result-capital" class="mono">—</dd></div>
+                    <div id="result-opponent-capital-stat" hidden><dt>Motståndarens slutkapital</dt><dd id="result-opponent-capital" class="mono">—</dd></div>
                     <div id="result-trade-hp-stat"><dt>Hälsa vid slut</dt><dd id="result-hp" class="mono">—</dd></div>
                     <div><dt>Matchlängd</dt><dd id="result-duration" class="mono">—</dd></div>
                 </dl>
@@ -360,7 +373,7 @@
                     <summary>Prognos och facit per runda</summary>
                     <div class="table-wrap" tabindex="0" aria-label="Prognos och facit per runda">
                         <table>
-                            <thead><tr><th scope="col">Runda</th><th scope="col">Facit</th><th scope="col">Du</th><th scope="col">Ditt fel</th><th id="round-opponent-header" scope="col">Motståndaren</th><th id="round-opponent-error-header" scope="col">Motståndarens fel</th><th id="round-impact-header" scope="col">HP-förändring</th></tr></thead>
+                            <thead><tr><th scope="col">Runda</th><th id="round-outcome-header" scope="col">Utfall</th><th scope="col">Facit</th><th scope="col">Du</th><th scope="col">Ditt fel</th><th id="round-opponent-header" scope="col">Motståndaren</th><th id="round-opponent-error-header" scope="col">Motståndarens fel</th></tr></thead>
                             <tbody id="result-round-list"></tbody>
                         </table>
                     </div>
@@ -385,9 +398,11 @@
             <h3>Handelsduell</h3>
             <p>Välj en insats. Tryck UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen för att avsluta affären.</p>
             <p>Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.</p>
+            <p>För varje 5 krediter över eller under startkapitalet på 1 000 ändras attackkraften med 1 procentenhet. Den kan gå från 75 till 125 %. Kapitalet består av dina tillgängliga krediter och det du har satsat i en öppen position.</p>
+            <p>Om båda slås ut samtidigt vinner den med högst kapital. Vid lika kapital avgör vem som gjort mest attackskada.</p>
             <button class="button button-primary" type="button" data-action="guide-start">Starta guidad botduell</button>
             <h3>Ritduell</h3>
-            <p>Dra på grafens högra sida eller skriv hur många procent nästa stängningskurs ändras. Lås din prognos. I en duell gör den närmaste prognosen skada.</p>
+            <p>Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.</p>
             <button class="button button-secondary" type="button" data-action="practice-prediction">Öva ritduell</button>
         </div>
     </dialog>
@@ -399,7 +414,7 @@
         </div>
         <div class="help-content">
             <p>Välj UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen när du vill avsluta affären.</p>
-            <p>Prova vad som händer om du stänger en affär med 10 krediter i vinst och ingen Grow-bonus.</p>
+            <p>Du har startkapitalet på 1 000 krediter. Prova att stänga en affär med 10 krediter i vinst.</p>
             <div class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till">
                 <button class="button button-attack" type="button" data-action="guide-example-attack" aria-pressed="false">Prova Attack</button>
                 <button class="button button-buy" type="button" data-action="guide-example-grow" aria-pressed="false">Prova Grow</button>

@@ -2,6 +2,8 @@ import csv
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
+from itertools import pairwise
+from statistics import median
 from threading import Barrier
 from types import SimpleNamespace
 
@@ -29,6 +31,7 @@ from stockfight.data import (
     save_match,
     seed_demo,
 )
+from stockfight.prediction import MAX_ROUNDS, price_move_bps
 
 
 FIRST_BAR = datetime(2020, 6, 1, 13, 30, tzinfo=UTC)
@@ -343,6 +346,26 @@ def test_provider_allows_calendar_closures_without_bridging_long_gaps(database, 
         provider.choose(required_bars=5, preview_count=1)
 
 
+def test_prediction_provider_prefers_moving_short_window_to_flat_long_window(database, tmp_path):
+    preview = 12
+    required = preview + MAX_ROUNDS
+    active_closes = ("92",) * 8 + ("94", "96", "98", "100", "102", "104", "106", "104", "102", "100", "98", "96")
+
+    def rows(symbol, closes):
+        for offset, close in enumerate(closes):
+            row = _csv_row(offset, symbol=symbol)
+            yield (*row[:3], close, close, close, close, *row[7:])
+
+    path = _write_csv(tmp_path / "prediction.csv", (
+        *rows("FLAT", ("100",) * (3 * (required - 1) + 1)), *rows("ACTIVE", active_closes),
+    ))
+    import_csv(path, source="prediction fixture")
+
+    scenario = DatabaseMarketProvider().choose_prediction(required_bars=required, preview_count=preview)
+    assert (scenario.symbol, scenario.interval, scenario.synthetic) == ("ACTIVE", "1m", False)
+    assert tuple(bar.close for bar in scenario.bars) == tuple(map(Decimal, active_closes))
+
+
 def test_demo_is_idempotent_and_all_bars_are_synthetic(database):
     seeded = seed_demo()
     assert seeded == _count(MarketData) > 0
@@ -354,3 +377,26 @@ def test_demo_is_idempotent_and_all_bars_are_synthetic(database):
     assert scenario.symbol.startswith("DEMO-")
     assert len(scenario.bars) == 136
     assert scenario.bars[-1].timestamp - scenario.bars[0].timestamp == timedelta(minutes=135)
+
+
+def test_demo_prediction_has_meaningful_changes_and_keeps_original_closes(database):
+    seed_demo()
+    preview = 12
+    scenario = DatabaseMarketProvider().choose_prediction(required_bars=preview + MAX_ROUNDS, preview_count=preview)
+    assert scenario.interval == "3m"
+    assert all(after.timestamp - before.timestamp == timedelta(minutes=3) for before, after in pairwise(scenario.bars))
+
+    original = dict(db.session.execute(select(MarketData.timestamp, MarketData.close).where(
+        MarketData.symbol == scenario.symbol, MarketData.source == scenario.source,
+        MarketData.timestamp.in_([bar.timestamp.replace(tzinfo=None) for bar in scenario.bars]),
+    )).all())
+    assert all(bar.close == original[bar.timestamp.replace(tzinfo=None)] for bar in scenario.bars)
+
+    moves = [price_move_bps(before.close, after.close) for before, after in pairwise(scenario.bars)]
+    actual_moves = moves[preview - 1:]
+    assert min(actual_moves[:4]) <= -75 and max(actual_moves[:4]) >= 75
+    assert sum(abs(move) >= 75 for move in actual_moves) >= 6
+    assert sum(
+        abs(median(moves[index - 3:index]) - moves[index]) < abs(moves[index])
+        for index in range(preview - 1, len(moves))
+    ) >= 5

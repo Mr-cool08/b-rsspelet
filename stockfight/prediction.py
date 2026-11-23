@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from math import ceil, isfinite
+from statistics import median
 
 from .engine import RuleError, Scenario
 from .ranking import K_FACTOR
 
 
 MAX_ROUNDS = 8
+PREDICTION_STEP = 3
+SIGNIFICANT_MOVE_BPS = 75
 PREDICT_SECONDS = 20
 REVEAL_SECONDS = 4
 MIN_MOVE_BPS = -10_000
@@ -24,6 +27,31 @@ def validate_move_bps(move_bps: object) -> int:
 def price_move_bps(previous_price: Decimal, price: Decimal) -> int:
     actual_move = (price - previous_price) * 10_000 / previous_price
     return int(actual_move.to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def prediction_window_quality(moves: tuple[int, ...], preview_moves: int) -> int:
+    """Prefer active windows where visible price momentum is useful."""
+    actual_moves = moves[preview_moves:]
+    opening = actual_moves[:4]
+    if not opening:
+        return 0
+    increases = sum(move >= SIGNIFICANT_MOVE_BPS for move in actual_moves)
+    decreases = sum(move <= -SIGNIFICANT_MOVE_BPS for move in actual_moves)
+
+    # Measure a forecast that only uses the moves already visible at each round.
+    trend_wins = []
+    for index in range(preview_moves, len(moves)):
+        history = moves[max(0, index - 3):index]
+        guess = median(history) if history else 0
+        actual = moves[index]
+        trend_wins.append(abs(guess - actual) < abs(actual))
+
+    return sum((
+        increases >= 2 and decreases >= 2,
+        (increases + decreases) * 4 >= len(actual_moves) * 3,
+        min(opening) <= -SIGNIFICANT_MOVE_BPS and max(opening) >= SIGNIFICANT_MOVE_BPS,
+        sum(trend_wins) * 2 > len(trend_wins) and sum(trend_wins[:4]) * 2 >= len(opening),
+    ))
 
 
 def revealed_prediction_bars(scenario: Scenario, revealed_count: int) -> list[dict]:
@@ -256,6 +284,7 @@ class PredictionMatch:
         return {
             "hp": player.hp,
             "opponentHp": opponent.hp,
+            "opponentName": opponent.name,
             "endReason": self.end_reason,
             "endActor": end_actor,
             "attackDamage": player.attack_damage,

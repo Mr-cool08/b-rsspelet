@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from math import ceil, floor, inf, isfinite
 from typing import Literal
 from uuid import uuid4
@@ -42,6 +42,8 @@ class GameMode:
     attack_multiplier: Decimal = Decimal("2")
     base_attack_cap: int = 35
     attack_cap: int = 50
+    attack_power_credits_per_point: int = 5
+    attack_power_limit: int = 25
     grow_multiplier: Decimal = Decimal("2.5")
     grow_bonus_cap: int = 25
     loss_damage_cap: int = 20
@@ -64,19 +66,25 @@ class GameMode:
             return "market"
         return "normal"
 
-    def resolve_knockout(self, players: dict[int, PlayerState]) -> tuple[bool, int | None]:
+    def attack_power(self, capital: Decimal) -> int:
+        adjustment = (capital - self.starting_cash) / self.attack_power_credits_per_point
+        return 100 + int(max(-self.attack_power_limit, min(self.attack_power_limit, adjustment)))
+
+    def resolve_knockout(self, players: dict[int, PlayerState]) -> tuple[bool, int | None, str | None]:
         (first_id, first), (second_id, second) = players.items()
         if first.hp and second.hp:
-            return False, None
+            return False, None, None
         if first.hp:
-            return True, first_id
+            return True, first_id, None
         if second.hp:
-            return True, second_id
-        if first.attack_damage > second.attack_damage:
-            return True, first_id
-        if second.attack_damage > first.attack_damage:
-            return True, second_id
-        return True, None
+            return True, second_id, None
+        first_cents = first.capital.scaleb(2).to_integral_value(rounding=ROUND_HALF_UP)
+        second_cents = second.capital.scaleb(2).to_integral_value(rounding=ROUND_HALF_UP)
+        if first_cents != second_cents:
+            return True, first_id if first_cents > second_cents else second_id, "capital"
+        if first.attack_damage != second.attack_damage:
+            return True, first_id if first.attack_damage > second.attack_damage else second_id, "attack_damage"
+        return True, None, None
 
 
 RANKED = GameMode(key="ranked")
@@ -164,6 +172,7 @@ class Match:
         self.status = "countdown" if countdown else "active"
         self.winner_id: int | None = None
         self.end_reason: str | None = None
+        self.tiebreak: str | None = None
         self.duration = 0.0
         self.trades: list[dict] = []
         self.revealed_count = scenario.preview_count
@@ -270,8 +279,10 @@ class Match:
         player.cash -= invested
 
     def _attack_damage(self, player: PlayerState, target: PlayerState, profit: Decimal) -> int:
-        base_damage = min(self.mode.base_attack_cap, floor(profit * self.mode.attack_multiplier))
-        return min(target.hp, self.mode.attack_cap, base_damage + player.grow_bonus)
+        base_damage = min(self.mode.base_attack_cap, profit * self.mode.attack_multiplier)
+        damage = min(self.mode.attack_cap, base_damage + player.grow_bonus)
+        power = Decimal(self.mode.attack_power(player.capital)) / 100
+        return min(target.hp, floor(damage * power))
 
     def _grow_bonus(self, player: PlayerState, profit: Decimal) -> int:
         return min(self.mode.grow_bonus_cap - player.grow_bonus, floor(profit * self.mode.grow_multiplier))
@@ -360,11 +371,12 @@ class Match:
     def _finish_if_knocked_out(
         self, actor_id: int | None, target_id: int | None, damage: int, reason: str | None
     ) -> bool:
-        finished, winner_id = self.mode.resolve_knockout(self.players)
+        finished, winner_id, tiebreak = self.mode.resolve_knockout(self.players)
         if not finished:
             return False
         self.winner_id = winner_id
         self.end_reason = reason
+        self.tiebreak = tiebreak
         if winner_id is not None and self.players[winner_id].hp:
             target_id, _ = self._opponent(winner_id)
         self.status = "finished"
@@ -450,6 +462,8 @@ class Match:
                 "name": player.name,
                 "hp": player.hp,
                 "cash": format(player.cash, "f"),
+                "capital": format(player.capital, "f"),
+                "attackPower": self.mode.attack_power(player.capital),
                 "growBonus": player.grow_bonus,
                 "attackDamage": player.attack_damage,
                 "position": public_position,
@@ -458,6 +472,7 @@ class Match:
                 "id": opponent_id,
                 "name": opponent.name,
                 "hp": opponent.hp,
+                "capital": format(opponent.capital, "f"),
                 "hasPosition": opponent.position is not None,
                 "growBonus": opponent.grow_bonus,
             },
@@ -474,7 +489,9 @@ class Match:
             "opponentHp": opponent.hp,
             "endReason": self.end_reason,
             "endActor": end_actor,
+            "tiebreak": self.tiebreak,
             "capital": format(player.capital, "f"),
+            "opponentCapital": format(opponent.capital, "f"),
             "attackDamage": player.attack_damage,
             "growCount": player.grow_count,
             "trades": player.trades,

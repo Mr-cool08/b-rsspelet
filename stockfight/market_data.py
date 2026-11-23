@@ -5,10 +5,11 @@ from __future__ import annotations
 import csv
 import re
 from collections import deque
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from itertools import groupby, islice
+from functools import lru_cache
+from itertools import groupby, islice, pairwise
 from operator import attrgetter
 from pathlib import Path
 from random import randrange
@@ -194,6 +195,30 @@ class DatabaseMarketProvider:
 
     def choose(self, *, required_bars: int, preview_count: int) -> Scenario:
         """Choose a window with the preview and no interruption beyond the interval policy."""
+        return self._choose(required_bars, preview_count, strides=(1,))
+
+    def choose_prediction(self, *, required_bars: int, preview_count: int) -> Scenario:
+        """Prefer active prediction windows with more time between each close."""
+        from .prediction import PREDICTION_STEP, prediction_window_quality, price_move_bps
+
+        preview_moves = min(3, preview_count - 1)
+        start = preview_count - 1 - preview_moves
+
+        # Adjacent candidate windows reuse most of the same price changes.
+        @lru_cache(maxsize=128)
+        def move(before: MarketData, after: MarketData) -> int:
+            return price_move_bps(before.close, after.close)
+
+        def score_window(rows: tuple[MarketData, ...]) -> int:
+            moves = tuple(move(before, after) for before, after in pairwise(rows[start:]))
+            return prediction_window_quality(moves, preview_moves)
+
+        return self._choose(required_bars, preview_count, strides=(PREDICTION_STEP, 1), score_window=score_window)
+
+    def _choose(
+        self, required_bars: int, preview_count: int, *, strides: tuple[int, ...],
+        score_window: Callable[[tuple[MarketData, ...]], int] | None = None,
+    ) -> Scenario:
         from .data import db
         from .engine import Bar, Scenario
 
@@ -203,38 +228,44 @@ class DatabaseMarketProvider:
             recent = self._recent.setdefault(db.engine, deque(maxlen=16))
             data_types = (False, True) if self.allow_synthetic else (False,)
             for synthetic in data_types:
-                chosen = self._choose_window(required_bars, synthetic, set(recent))
-                if chosen is not None:
-                    first = chosen[0]
-                    recent.append(first.id)
-                    return Scenario(
-                        symbol=first.symbol,
-                        market=first.market,
-                        interval=first.interval,
-                        source=first.source,
-                        synthetic=first.synthetic,
-                        bars=tuple(
-                            Bar(
-                                timestamp=row.timestamp.replace(tzinfo=UTC),
-                                open=row.open,
-                                high=row.high,
-                                low=row.low,
-                                close=row.close,
-                                volume=row.volume,
-                            )
-                            for row in chosen
-                        ),
-                        preview_count=preview_count,
-                        name=first.name or "",
-                    )
+                selection = self._choose_window(required_bars, synthetic, set(recent), strides, score_window)
+                if selection is None:
+                    continue
+                chosen, stride = selection
+                first = chosen[0]
+                interval = first.interval
+                if stride > 1:
+                    interval = f"{int(interval[:-1]) * stride}{interval[-1]}"
+                recent.append(first.id)
+                return Scenario(
+                    symbol=first.symbol,
+                    market=first.market,
+                    interval=interval,
+                    source=first.source,
+                    synthetic=first.synthetic,
+                    bars=tuple(
+                        Bar(
+                            timestamp=row.timestamp.replace(tzinfo=UTC),
+                            open=row.open,
+                            high=row.high,
+                            low=row.low,
+                            close=row.close,
+                            volume=row.volume,
+                        )
+                        for row in chosen
+                    ),
+                    preview_count=preview_count,
+                    name=first.name or "",
+                )
         raise MarketDataUnavailable(
             f"Marknadsdatan saknar en sammanhängande serie med {required_bars} kurspunkter."
         )
 
     @staticmethod
     def _choose_window(
-        required_bars: int, synthetic: bool, recent: set[int]
-    ) -> tuple[MarketData, ...] | None:
+        required_bars: int, synthetic: bool, recent: set[int], strides: tuple[int, ...],
+        score_window: Callable[[tuple[MarketData, ...]], int] | None,
+    ) -> tuple[tuple[MarketData, ...], int] | None:
         from .data import MarketData, db
 
         order = [getattr(MarketData, column) for column in _SERIES_COLUMNS]
@@ -247,28 +278,37 @@ class DatabaseMarketProvider:
         rows = db.session.scalars(query)
         selected = None
         eligible_count = 0
-        has_fresh = False
+        best_priority = (-1, 0, False)
+        window_sizes = tuple((stride, (required_bars - 1) * stride + 1) for stride in strides)
+        max_size = max(size for _, size in window_sizes)
         try:
             for (_, _, interval, _), series in groupby(rows, key=attrgetter(*_SERIES_COLUMNS)):
                 step = _interval_delta(interval)
                 calendar_interval = interval.endswith(("d", "w"))
-                window: deque[MarketData] = deque(maxlen=required_bars)
+                window: deque[MarketData] = deque(maxlen=max_size)
                 for row in series:
                     if window and not _consecutive(window[-1].timestamp, row.timestamp, step, calendar_interval):
                         window.clear()
                     window.append(row)
-                    if len(window) != required_bars:
-                        continue
-                    fresh = window[0].id not in recent
-                    if fresh and not has_fresh:
-                        has_fresh = True
-                        eligible_count = 0
-                    if has_fresh and not fresh:
-                        continue
-                    # Reservoir sampling gives each eligible start the same chance.
-                    eligible_count += 1
-                    if randrange(eligible_count) == 0:
-                        selected = tuple(window)
+                    for stride, size in window_sizes:
+                        start = len(window) - size
+                        if start < 0:
+                            continue
+                        sampled = None
+                        quality = 0
+                        if score_window is not None:
+                            sampled = tuple(islice(window, start, None, stride))
+                            quality = score_window(sampled)
+                        priority = (quality, stride, window[start].id not in recent)
+                        if priority > best_priority:
+                            best_priority = priority
+                            eligible_count = 0
+                        elif priority < best_priority:
+                            continue
+                        # Among equally suitable starts, give each one the same chance.
+                        eligible_count += 1
+                        if randrange(eligible_count) == 0:
+                            selected = (sampled if sampled is not None else tuple(window), stride)
         finally:
             rows.close()
         return selected

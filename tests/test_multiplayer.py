@@ -276,6 +276,35 @@ def test_two_clients_trade_concurrently_finish_and_persist_once(game):
         assert db.session.scalar(select(func.count()).select_from(TradeHistory)) == 4
 
 
+def test_capital_breaks_simultaneous_knockout_and_counts_for_ranked_elo(game):
+    first, second = join_both(game)
+    first.state()
+    second.state()
+    advance(game, 3)
+    assert first.trade(first.state(), "buy", percent=100)["ok"]
+    advance(game, 1)
+    assert settle(first, first.state(), "grow")["ok"]
+
+    grown = first.state()
+    assert Decimal(grown["self"]["capital"]) == 1020
+    assert grown["self"]["attackPower"] == 104
+    assert first.trade(grown, "buy", percent=100)["ok"]
+    open_position = first.state()
+    assert Decimal(open_position["self"]["cash"]) == 0
+    assert open_position["self"]["attackPower"] == 104
+    assert Decimal(second.state()["opponent"]["capital"]) == 1020
+
+    advance(game, 115)
+    winner, = first.events("match_result")
+    loser, = second.events("match_result")
+    assert winner["hp"] == loser["hp"] == 0
+    assert winner["tiebreak"] == loser["tiebreak"] == "capital"
+    assert Decimal(winner["opponentCapital"]) == 1000
+    assert Decimal(loser["opponentCapital"]) == 1020
+    assert winner["outcome"] == "win" and winner["eloAfter"] == 1016
+    assert loser["outcome"] == "lose" and loser["eloAfter"] == 984
+
+
 def test_short_trade_on_falling_price_can_attack_via_socket(game):
     app, _ = game
     first, second = join_both(game)

@@ -581,7 +581,10 @@ class MatchService:
         is_prediction = mode.key == PREDICTION.key
         remaining_bars = MAX_ROUNDS if is_prediction else ceil(mode.scenario_seconds / self.tick_seconds)
         required_bars = self.preview_count + remaining_bars
-        scenario = self.provider.choose(required_bars=required_bars, preview_count=self.preview_count)
+        choose = self.provider.choose
+        if is_prediction:
+            choose = getattr(self.provider, "choose_prediction", choose)
+        scenario = choose(required_bars=required_bars, preview_count=self.preview_count)
         match_id = uuid4().hex
         now = self.clock()
         if is_prediction:

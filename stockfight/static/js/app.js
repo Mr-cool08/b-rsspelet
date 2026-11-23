@@ -15,7 +15,10 @@
         hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC",
     });
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const primaryTouch = window.matchMedia("(pointer: coarse)");
     const screenIds = ["auth", "menu", "queue", "invite", "match", "result"];
+    const screenFocus = { auth: "auth-title", menu: "menu-name", queue: "queue-title",
+        invite: "invite-title", match: "match-screen", result: "result-outcome" };
     const phaseLabels = { normal: "Handel", market: "Marknadsstorm", final: "Slutstorm" };
     const outcomeLabels = { win: "WIN", lose: "LOSE", loss: "LOSE", draw: "DRAW" };
     const acknowledgements = 5000;
@@ -159,11 +162,12 @@
 
     function activate(name) {
         if (screen === name) return;
+        const previousScreen = screen;
         for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
         for (const id of screenIds) show(`${id}-screen`, id === name);
         screen = name;
         window.scrollTo(0, 0);
-        if (name === "invite") byId("invite-title").focus({ preventScroll: true });
+        if (previousScreen) byId(screenFocus[name]).focus({ preventScroll: true });
     }
 
     async function request(url, body) {
@@ -529,18 +533,23 @@
     function startPractice() {
         if (queueWanted) return;
         byId("help-dialog").close();
-        sendActivity("prediction_practice_start", undefined, (error) => toast(error, "error"), focusPracticeInput);
+        sendActivity("prediction_practice_start", undefined, (error) => toast(error, "error"), focusPracticeControls);
     }
 
     function practiceAction(event, payload) {
         if (match?.mode !== "prediction_practice" || !matchSynchronized) return;
-        sendActivity(event, { matchId: match.id, ...payload }, (error) => toast(error, "error"), focusPracticeInput);
+        sendActivity(event, { matchId: match.id, ...payload }, (error) => toast(error, "error"), focusPracticeControls);
     }
 
-    function focusPracticeInput() {
+    function focusPracticeControls() {
         const input = byId("prediction-move");
         if (screen === "match" && match?.mode === "prediction_practice" && !input.disabled) {
-            input.focus({ preventScroll: true });
+            if (primaryTouch.matches) {
+                window.scrollTo(0, 0);
+                byId("match-screen").focus({ preventScroll: true });
+            } else {
+                input.focus({ preventScroll: true });
+            }
         }
     }
 
@@ -755,7 +764,7 @@
         }
         const outcomes = {
             attack: "Attack gör upp till 20 HP skada och förbrukar vinsten.",
-            grow: "Grow ger 10 krediter och laddar nästa attack med 25 bonus-HP.",
+            grow: "Grow ger 10 krediter, höjer attackkraften till 102 % och laddar nästa attack med 25 bonus-HP.",
         };
         put("guide-example-result", outcomes[choice] ?? "");
     }
@@ -781,7 +790,7 @@
         const position = match?.self?.position;
         let step = "Välj en insats och tryck UPP eller NER beroende på vart du tror kursen går.";
         if (position) step = "Följ affärens resultat och tryck Stäng position när du vill avsluta.";
-        if (sellChoice?.kind === "profit") step = "Attack använder vinsten till skada. Grow sparar vinsten och laddar nästa attack.";
+        if (sellChoice?.kind === "profit") step = "Attack använder vinsten till skada. Grow sparar vinsten, bygger attackkraft och laddar nästa attack.";
         if (sellChoice?.kind === "flat" || sellChoice?.kind === "loss") {
             step = "Kursen har ändrats. Stäng positionen vid den nya kursen.";
         }
@@ -932,7 +941,8 @@
                 timeFormatter: (time) => `Kurspunkt ${time}`,
             },
             handleScale: { mouseWheel: false, pinch: true },
-            handleScroll: { mouseWheel: false, vertTouchDrag: false },
+            handleScroll: { mouseWheel: false, horzTouchDrag: false, vertTouchDrag: false },
+            trackingMode: { exitMode: library.TrackingModeExitMode.OnTouchEnd },
         });
         if (chartType === "candlestick") {
             const down = color("--chart-price-down", "#ff858a");
@@ -1043,6 +1053,27 @@
         return `${signed(bps / 100, amountFormat)} %`;
     }
 
+    function predictionVerdict(outcome, selfId, opponentName) {
+        if (outcome.winnerId == null) {
+            if (outcome.selfMoveBps == null && outcome.opponentMoveBps == null) {
+                return { side: "draw", title: "Inga prognoser", reason: "Tiden gick ut för båda spelarna. Ingen tog skada." };
+            }
+            return { side: "draw", title: "Oavgjord runda", reason: "Ni kom lika nära facit. Ingen tog skada." };
+        }
+
+        const won = String(outcome.winnerId) === String(selfId);
+        const winner = won ? "Du" : opponentName;
+        const side = won ? "self" : "opponent";
+        const title = `${winner} vann rundan`;
+        const otherError = won ? outcome.opponentErrorBps : outcome.selfErrorBps;
+        if (otherError == null) {
+            return { side, title, reason: `${winner} var ensam om att låsa en prognos.` };
+        }
+        const winnerError = won ? outcome.selfErrorBps : outcome.opponentErrorBps;
+        const margin = formatNumber((otherError - winnerError) / 100, amountFormat);
+        return { side, title, reason: `${winner} kom ${margin} procentenheter närmare facit.` };
+    }
+
     function predictionReady() {
         const round = match?.round;
         return Boolean(socket?.connected && matchSynchronized && isPrediction(match?.mode)
@@ -1086,9 +1117,12 @@
         const round = match.round;
         const outcome = round?.outcome;
         const input = byId("prediction-move");
+        const signButton = byId("prediction-sign");
         const editable = predictionReady();
         const guess = round?.selfLocked ? round.selfMoveBps : parsePrediction(input.value);
         input.disabled = !editable;
+        signButton.disabled = !editable;
+        signButton.setAttribute("aria-pressed", String(/^[-−]/.test(input.value.trimStart())));
         input.setAttribute("aria-invalid", String(editable && input.value.trim() !== "" && guess == null));
         byId("prediction-lock").disabled = !editable || guess == null;
         disable("prediction-clear", !editable || input.value === "");
@@ -1102,24 +1136,29 @@
             put("practice-next", round?.number === match.roundLimit ? "Se sammanfattning" : "Nästa runda");
         }
 
+        const opponentName = match.opponent?.name || "Motståndaren";
+        const verdict = outcome && !practice ? predictionVerdict(outcome, match.self?.id, opponentName) : null;
+        stateAttribute("prediction-verdict", "side", verdict?.side ?? "");
+        stateAttribute("prediction-self-breakdown", "winner", String(verdict?.side === "self"));
+        stateAttribute("prediction-opponent-breakdown", "winner", String(verdict?.side === "opponent"));
+        show("prediction-reason", Boolean(verdict));
         if (outcome) {
             put("prediction-actual", formatPrediction(outcome.actualMoveBps));
             put("prediction-self", formatPrediction(outcome.selfMoveBps));
+            put("prediction-opponent-name", opponentName);
             put("prediction-opponent", formatPrediction(outcome.opponentMoveBps));
             for (const [side, bps] of [["self", outcome.selfErrorBps], ["opponent", outcome.opponentErrorBps]]) {
-                put(`prediction-${side}-error`, bps == null ? "—" : `${formatNumber(bps / 100, amountFormat)} procentenheter fel`);
+                const id = `prediction-${side}-error`;
+                show(id, bps != null);
+                if (bps != null) put(id, `${formatNumber(bps / 100, amountFormat)} procentenheter fel`);
             }
-            if (practice) {
-                put("prediction-status", "Facit för rundan");
-            } else if (outcome.winnerId != null) {
-                const won = String(outcome.winnerId) === String(match.self?.id);
-                put("prediction-status", `${won ? "Du vann rundan" : "Motståndaren vann rundan"} · ${formatNumber(outcome.damage)} HP i skada`);
-            } else {
-                const noGuesses = outcome.selfMoveBps == null && outcome.opponentMoveBps == null;
-                put("prediction-status", noGuesses ? "Tiden gick ut för båda spelarna." : "Lika nära · 0 HP i skada");
+            put("prediction-status", verdict?.title ?? "Facit för rundan");
+            if (verdict) {
+                const damage = outcome.damage ? ` ${verdict.side === "self" ? opponentName : "Du"} förlorade ${formatNumber(outcome.damage)} HP.` : "";
+                put("prediction-reason", verdict.reason + damage);
             }
         } else if (match.status === "countdown") {
-            put("prediction-status", "Gör dig redo att gissa nästa stängningskurs.");
+            put("prediction-status", "Gör dig redo att gissa nästa kursrörelse.");
         } else if (round?.selfLocked) {
             put("prediction-status", "Prognosen är låst. Väntar på facit.");
         } else if (predictionCommand) {
@@ -1139,12 +1178,21 @@
         renderPrediction();
     }
 
-    function predictionInputChanged(event) {
-        const value = event.currentTarget.value.trim();
+    function predictionInputChanged() {
+        const value = byId("prediction-move").value.trim();
         const incomplete = /^[-+−]?[,.]?$/.test(value);
         const error = !incomplete && parsePrediction(value) == null;
         message("prediction-feedback", error ? "Ange minst −100 % med högst två decimaler." : "", "error");
         renderPrediction();
+    }
+
+    function togglePredictionSign() {
+        if (!predictionReady()) return;
+        const input = byId("prediction-move");
+        const value = input.value.trim();
+        const unsigned = value.replace(/^[-+−]/, "");
+        input.value = /^[-−]/.test(value) ? unsigned : `-${unsigned}`;
+        predictionInputChanged();
     }
 
     function submitPrediction(event) {
@@ -1221,7 +1269,9 @@
         if (botElo != null) put("opponent-elo", `${formatNumber(botElo)} Elo`);
         show("opponent-elo", botElo != null);
         show("opponent-position", opponentHasPosition);
-        show("opponent-details", botElo != null || opponentHasPosition);
+        show("self-trade-details", !prediction);
+        show("opponent-capital-stat", !prediction);
+        show("opponent-details", !prediction || botElo != null || opponentHasPosition);
         show("trade-panel", !prediction);
         show("match-chart", !prediction);
         show("chart-footer", !prediction);
@@ -1235,6 +1285,11 @@
             return;
         }
         const position = data.self?.position;
+        const attackPower = numeric(data.self?.attackPower);
+        put("self-capital", formatNumber(data.self?.capital, amountFormat));
+        put("opponent-capital", formatNumber(data.opponent?.capital, amountFormat));
+        put("self-attack-power", percentage(attackPower));
+        stateAttribute("self-attack-power", "sign", sign((attackPower ?? 100) - 100));
         put("match-cash", formatNumber(data.self?.cash, amountFormat));
         put("match-invested", formatNumber(position?.invested ?? 0, amountFormat));
         put("match-grow", formatNumber(data.self?.growBonus));
@@ -1404,8 +1459,10 @@
             case "final_storm": {
                 const storm = data.endReason === "market_storm" ? "marknadsstormen" : "slutstormen";
                 if (numeric(data.hp) === 0 && numeric(data.opponentHp) === 0) {
-                    const tiebreak = data.outcome === "draw" ? "Ni gjorde lika mycket attackskada."
-                        : "Flest HP i attackskada avgjorde.";
+                    const tiebreak = {
+                        capital: "Högst slutkapital avgjorde.",
+                        attack_damage: "Kapitalet var lika, så mest attackskada avgjorde.",
+                    }[data.tiebreak] ?? "Ni hade lika mycket kapital och gjorde lika mycket attackskada.";
                     return `Båda slogs ut i ${storm}. ${tiebreak}`;
                 }
                 return `Matchen avgjordes i ${storm}.`;
@@ -1416,8 +1473,25 @@
         }
     }
 
-    function renderResultDetails(data, practice) {
-        const explanation = matchExplanation(data);
+    function predictionMatchExplanation(data, opponentName) {
+        if (data.endReason === "knockout") {
+            const knockout = data.outcome === "win" ? `Du sänkte ${opponentName} till 0 HP.` : `${opponentName} sänkte dig till 0 HP.`;
+            const round = data.lastRound ?? data.rounds?.at(-1);
+            return round ? `${knockout} ${predictionVerdict(round, session.user.id, opponentName).reason}` : knockout;
+        }
+        if (data.endReason === "round_limit") {
+            if (data.outcome === "draw") return "Ni hade lika mycket HP kvar efter sista rundan.";
+            const winner = data.outcome === "win" ? "Du" : opponentName;
+            return `${winner} hade mest HP kvar efter sista rundan.`;
+        }
+        return matchExplanation(data);
+    }
+
+    function renderResultDetails(data, mode) {
+        const practice = mode === "prediction_practice";
+        const prediction = mode === "prediction";
+        const opponentName = data.opponentName || match?.opponent?.name || "Motståndaren";
+        const explanation = prediction ? predictionMatchExplanation(data, opponentName) : matchExplanation(data);
         const comparison = numeric(data.opponentHp) != null;
         show("result-explanation", comparison || Boolean(explanation));
         show("result-comparison", comparison);
@@ -1425,6 +1499,7 @@
         put("result-decisive", explanation);
         put("result-self-hp", formatNumber(data.hp));
         put("result-opponent-hp", formatNumber(data.opponentHp));
+        put("result-opponent-label", prediction ? `${opponentName} · slut-HP` : "Motståndarens slut-HP");
         show("result-trade-hp-stat", !comparison);
         show("result-prediction-hp-stat", !practice && !comparison);
 
@@ -1440,17 +1515,18 @@
         const forecast = (value) => value == null ? "Ingen prognos" : formatPrediction(value);
         const error = (value) => value == null ? "—" : `${formatNumber(value / 100, amountFormat)} procentenheter`;
         const rounds = (data.rounds ?? []).map((round) => {
-            const values = [round.number, formatPrediction(round.actualMoveBps), forecast(round.selfMoveBps), error(round.selfErrorBps)];
-            if (practice) return values;
-            const damaged = String(round.winnerId) === String(session.user.id) ? "Motståndaren" : "Du";
-            const impact = round.damage ? `${damaged} −${formatNumber(round.damage)} HP` : "0 HP";
-            return [...values, forecast(round.opponentMoveBps), error(round.opponentErrorBps), impact];
+            const values = [formatPrediction(round.actualMoveBps), forecast(round.selfMoveBps), error(round.selfErrorBps)];
+            if (practice) return [round.number, ...values];
+            const verdict = predictionVerdict(round, session.user.id, opponentName);
+            const impact = round.damage ? ` · ${formatNumber(round.damage)} HP i skada` : "";
+            return [round.number, verdict.title + impact, ...values, forecast(round.opponentMoveBps), error(round.opponentErrorBps)];
         });
-        byId("result-round-detail").open = practice;
+        byId("result-round-detail").open = rounds.length > 0;
         show("result-round-detail", rounds.length > 0);
+        put("round-opponent-header", opponentName);
         show("round-opponent-header", !practice);
         show("round-opponent-error-header", !practice);
-        show("round-impact-header", !practice);
+        show("round-outcome-header", !practice);
         fillTable("result-round-list", rounds);
     }
 
@@ -1467,7 +1543,9 @@
             bot: "Botduell · Orankad", private: "Vänduell · Orankad" };
         const label = labels[mode] ?? "Matchresultat";
         put("result-mode", label);
-        put("result-outcome", practice ? "Övning klar" : outcomeLabels[data.outcome] ?? "MATCH SLUT");
+        const predictionOutcomes = { win: "Du vann", lose: "Du förlorade", draw: "Oavgjort" };
+        const outcomes = prediction ? predictionOutcomes : outcomeLabels;
+        put("result-outcome", practice ? "Övning klar" : outcomes[data.outcome] ?? "MATCH SLUT");
         show("result-elo", rated);
         if (rated) {
             put("result-elo-before", formatNumber(data.eloBefore));
@@ -1489,6 +1567,8 @@
         } else {
             put("result-hp", formatNumber(data.hp));
             put("result-capital", formatNumber(data.capital, amountFormat));
+            show("result-opponent-capital-stat", numeric(data.opponentCapital) != null);
+            put("result-opponent-capital", formatNumber(data.opponentCapital, amountFormat));
             put("result-attack", formatNumber(data.attackDamage));
             put("result-grow", formatNumber(data.growCount));
             put("result-trades", formatNumber(data.trades));
@@ -1501,10 +1581,9 @@
         if (data.synthetic) instrument.push("Syntetisk");
         put("result-symbol", instrument.join(" · "));
         put("result-period", period(data.periodStart, data.periodEnd));
-        renderResultDetails(data, practice);
+        renderResultDetails(data, mode);
         renderPlayAgain();
         activate("result");
-        if (practice) byId("result-outcome").focus({ preventScroll: true });
         if (!practice) playSound(data.outcome);
         if (mode === "ranked") void refreshProfile();
     }
@@ -1536,6 +1615,7 @@
             case "practice-next": practiceAction("prediction_practice_next", { round: match.round.number }); break;
             case "practice-leave": practiceAction("prediction_practice_leave", {}); break;
             case "prediction-clear": setPredictionDraft(null); break;
+            case "prediction-sign": togglePredictionSign(); break;
             case "friend-create": privateCreate(); break;
             case "friend-cancel": privateCancel(); break;
             case "friend-copy": void copyInvite(); break;
@@ -1575,8 +1655,14 @@
         byId("ranking-mode")?.addEventListener("change", refreshRanking);
         byId("profile-mode")?.addEventListener("change", () => void refreshProfile(true));
         byId("prediction-controls")?.addEventListener("submit", submitPrediction);
-        byId("prediction-move")?.addEventListener("input", predictionInputChanged);
-        drawPredictionChart = window.createPredictionChart?.(byId("prediction-chart"), setPredictionDraft);
+        const predictionInput = byId("prediction-move");
+        predictionInput.addEventListener("input", predictionInputChanged);
+        byId("prediction-sign").addEventListener("mousedown", (event) => {
+            if (document.activeElement === predictionInput) event.preventDefault();
+        });
+        drawPredictionChart = window.createPredictionChart?.(
+            byId("prediction-chart"), byId("prediction-draw-target"), setPredictionDraft,
+        );
         const chartSetting = byId("setting-chart-type");
         if (chartSetting) {
             chartSetting.value = chartType;

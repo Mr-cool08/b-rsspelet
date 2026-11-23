@@ -68,6 +68,9 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(initial["opponent"]["id"], 2)
         self.assertEqual(initial["self"]["hp"], 100)
         self.assertEqual(initial["self"]["cash"], "1000")
+        self.assertEqual(initial["self"]["capital"], "1000")
+        self.assertEqual(initial["self"]["attackPower"], 100)
+        self.assertEqual(initial["opponent"]["capital"], "1000")
         self.assertEqual([bar["close"] for bar in initial["bars"]], ["90", "100"])
         for public_bar, source_bar in zip(initial["bars"], scenario.bars, strict=False):
             self.assertEqual(set(public_bar), {"time", "open", "high", "low", "close"})
@@ -245,11 +248,11 @@ class MatchTests(unittest.TestCase):
         state = match.public(1, START + 4)
         self.assertEqual(state["self"]["growBonus"], 0)
         self.assertEqual(Decimal(state["self"]["cash"]), Decimal("1012.04505"))
-        self.assertEqual(state["self"]["attackDamage"], 50)
-        self.assertEqual(state["opponent"]["hp"], 50)
+        self.assertEqual(state["self"]["attackDamage"], 51)
+        self.assertEqual(state["opponent"]["hp"], 49)
         stats = match.summary(1)
         self.assertEqual(stats["hp"], 100)
-        self.assertEqual(stats["attackDamage"], 50)
+        self.assertEqual(stats["attackDamage"], 51)
         self.assertEqual(stats["growCount"], 3)
         self.assertEqual(stats["trades"], 4)
         self.assertEqual(stats["winningTrades"], 4)
@@ -257,6 +260,40 @@ class MatchTests(unittest.TestCase):
         self.assertIsInstance(stats["capital"], str)
         self.assertEqual(Decimal(stats["capital"]), Decimal("1012.04505"))
         self.assertGreaterEqual(Decimal(stats["peakCapital"]), Decimal(stats["capital"]))
+
+    def test_realized_capital_scales_attack_preview_and_damage_with_all_cash_invested(self):
+        match = make_match("100", "105", "107.1")
+        act(match, "buy", 0, {"percent": 100})
+        act(match, "short", 0, {"percent": 100}, user_id=2)
+        sale = request_sale(match, 1)
+        confirm_sale(match, 1, "grow", sale["positionId"])
+        request_sale(match, 1, user_id=2)
+        act(match, "buy", 1, {"percent": 100})
+        act(match, "buy", 1, {"percent": 100}, user_id=2)
+
+        for user_id, capital, attack_power, preview_damage in ((1, 1050, 110, 55), (2, 950, 90, 31)):
+            with self.subTest(user_id=user_id):
+                sale = request_sale(match, 2, user_id=user_id)
+                state = match.public(user_id, START + 2)
+                self.assertEqual(Decimal(state["self"]["cash"]), 0)
+                self.assertEqual(Decimal(state["self"]["capital"]), capital)
+                self.assertEqual(state["self"]["attackPower"], attack_power)
+                self.assertEqual(state["self"]["position"]["closePreview"]["attackDamage"], preview_damage)
+                confirm_sale(match, 2, "attack", sale["positionId"], user_id=user_id)
+                self.assertEqual(match.trades[-1]["damage"], preview_damage)
+                self.assertEqual(Decimal(match.public(user_id, START + 2)["self"]["cash"]), capital)
+
+    def test_attack_power_changes_at_whole_steps_and_is_bounded(self):
+        for price, stronger, weaker in (("100.499", 100, 100), ("100.5", 101, 99), ("130", 125, 75)):
+            with self.subTest(price=price):
+                match = make_match("100", price)
+                act(match, "buy", 0, {"percent": 100})
+                act(match, "short", 0, {"percent": 100}, user_id=2)
+                sale = request_sale(match, 1)
+                confirm_sale(match, 1, "grow", sale["positionId"])
+                request_sale(match, 1, user_id=2)
+                self.assertEqual(match.public(1, START + 1)["self"]["attackPower"], stronger)
+                self.assertEqual(match.public(2, START + 1)["self"]["attackPower"], weaker)
 
     def test_pending_close_preview_follows_price_and_is_private(self):
         match = make_match("100", "102.4", "106", "100", "101", "95")
@@ -318,6 +355,7 @@ class MatchTests(unittest.TestCase):
         winner = match.summary(1)
         loser = match.summary(2)
         self.assertEqual(winner["endReason"], "attack")
+        self.assertIsNone(winner["tiebreak"])
         self.assertEqual((winner["endActor"], loser["endActor"]), ("self", "opponent"))
         self.assertEqual((winner["opponentHp"], loser["opponentHp"]), (0, 100))
         self.assertEqual([trade["time"] for trade in winner["tradeDetails"]], [1, 3, 5])
@@ -462,6 +500,7 @@ class MatchTests(unittest.TestCase):
         summary = fast.summary(1)
         self.assertEqual(summary["endReason"], "final_storm")
         self.assertIsNone(summary["endActor"])
+        self.assertIsNone(summary["tiebreak"])
         self.assertEqual((summary["hp"], summary["opponentHp"]), (0, 0))
         state = fast.public(1, START + 150)
         self.assertEqual(state["self"]["hp"], 0)
@@ -476,7 +515,7 @@ class MatchTests(unittest.TestCase):
         self.assertFalse(fast.advance(START + 200))
         self.assertEqual(state, fast.public(1, START + 200))
 
-    def test_simultaneous_storm_knockout_favors_more_attack_damage(self):
+    def test_simultaneous_storm_knockout_favors_higher_capital_over_attack_damage(self):
         match = make_match("100", "100.8", "99.1872")
         act(match, "buy", 0, {"percent": 25})
         sale = request_sale(match, 1)
@@ -494,7 +533,38 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(state["opponent"]["hp"], 0)
         self.assertEqual(match.status, "finished")
         self.assertEqual(match.duration, 113.0)
+        self.assertEqual(match.winner_id, 2)
+        for user_id, capital, opponent_capital in ((1, 996, 1000), (2, 1000, 996)):
+            summary = match.summary(user_id)
+            self.assertEqual(Decimal(summary["capital"]), capital)
+            self.assertEqual(Decimal(summary["opponentCapital"]), opponent_capital)
+            self.assertEqual(summary["tiebreak"], "capital")
+
+    def test_simultaneous_storm_knockout_uses_attack_damage_when_capital_ties(self):
+        match = make_match("100", "100.2")
+        act(match, "buy", 0, {"percent": 25})
+        sale = request_sale(match, 1)
+        confirm_sale(match, 1, "attack", sale["positionId"])
+        self.assertEqual(match.trades[-1]["damage"], 1)
+
+        match.advance(START + 150)
+        summary = match.summary(1)
+        self.assertEqual((summary["hp"], summary["opponentHp"]), (0, 0))
         self.assertEqual(match.winner_id, 1)
+        self.assertEqual(summary["tiebreak"], "attack_damage")
+
+    def test_simultaneous_storm_knockout_rounds_capital_to_cents_without_open_pnl(self):
+        for price, winner, tiebreak in (("100.0004", None, None), ("100.0005", 1, "capital")):
+            with self.subTest(price=price):
+                match = make_match("100", price, "110")
+                act(match, "buy", 0, {"percent": 100})
+                sale = request_sale(match, 1)
+                confirm_sale(match, 1, "grow", sale["positionId"])
+                act(match, "buy", 1, {"percent": 100})
+
+                match.advance(START + 150)
+                self.assertEqual(match.winner_id, winner)
+                self.assertEqual(match.summary(1)["tiebreak"], tiebreak)
 
 
 if __name__ == "__main__":
