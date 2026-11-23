@@ -1,129 +1,66 @@
-"""Fictional quotes, market depth, and milestones for the trading firm campaign."""
+"""Fictional market quotes and unlocks for the trading firm."""
 
-STARTING_CASH = 1_800
-CAPACITY = 46
-OVERHEAD = 120
+STARTING_CASH = 500
 
-PRODUCTS = ("AUR", "DIM", "LIN")
-TIER_IDS = ("low", "regular", "premium")
-_NAMES = {
-    "AUR": {"sv": "Aurora Kraft", "en": "Aurora Power"},
-    "DIM": {"sv": "Dimma Data", "en": "Dimma Data"},
-    "LIN": {"sv": "Lindhälsa", "en": "Lind Health"},
-}
-_SALE_PRICES = {
-    "AUR": (53, 66, 84),
-    "DIM": (40, 52, 69),
-    "LIN": (46, 61, 79),
+ASSETS = {
+    "AUR": {"name": {"sv": "Aurora Kraft", "en": "Aurora Power"}, "unlockLevel": 1},
+    "DIM": {"name": {"sv": "Dimma Data", "en": "Dimma Data"}, "unlockLevel": 2},
+    "LIN": {"name": {"sv": "Lindhälsa", "en": "Lind Health"}, "unlockLevel": 3},
+    "NSK": {"name": {"sv": "Norrsken Infrastruktur", "en": "Northern Infrastructure"}, "unlockLevel": 4},
+    "KOB": {"name": {"sv": "Kobolt Teknik", "en": "Cobalt Technology"}, "unlockLevel": 5},
 }
 
-
-def _week(
-    sv: str,
-    en: str,
-    offers: tuple[tuple[int, int, tuple[int, int, int]], ...],
-    contract: tuple[str, int, int, str, str] | None = None,
-    *,
-    sale_offsets: tuple[int, int, int] = (0, 0, 0),
-) -> dict:
-    products = [
-        {
-            "id": product,
-            "name": _NAMES[product],
-            "buyPrice": cost,
-            "supply": supply,
-            "tiers": [
-                {"id": tier, "price": price + offset, "demand": demand}
-                for tier, price, demand in zip(TIER_IDS, _SALE_PRICES[product], demands, strict=True)
-            ],
-        }
-        for product, (cost, supply, demands), offset in zip(PRODUCTS, offers, sale_offsets, strict=True)
-    ]
-    order = None
-    if contract is not None:
-        product, units, price, customer_sv, customer_en = contract
-        order = {"productId": product, "units": units, "price": price,
-                 "customer": {"sv": customer_sv, "en": customer_en}}
-    return {"note": {"sv": sv, "en": en}, "products": products, "contract": order}
-
-
-CHAPTERS = (
-    {
-        "name": {"sv": "Starta handelsfirman", "en": "Open the trading firm"},
-        "description": {
-            "sv": "Bygg upp firmans handel i tre aktier. Välj en säljkurs som ger marginal och lockar tillräckligt många köpare.",
-            "en": "Build the firm's trading business across three stocks. Pick a sell price that earns a margin and attracts enough buyers.",
-        },
-        "goals": [{"type": "profit", "target": 3_400}, {"type": "units", "target": 145}],
-        # Each offer gives the buy quote, available shares, and demand at three sell prices.
-        "weeks": [
-            _week("Aurora Kraft lockar många köpare inför sin rapport. En större säljorder ger en låg inköpskurs i Dimma Data.",
-                  "Aurora Power is attracting buyers ahead of earnings. A large sell order makes Dimma Data cheap to buy.",
-                  ((34, 27, (25, 18, 8)), (23, 27, (24, 12, 4)), (30, 23, (18, 12, 6)))),
-            _week("En ägarförsäljning pressar inköpskursen i Lindhälsa. Flest köpare finns vid den lägsta säljkursen.",
-                  "A major shareholder's sale pushes down the price of Lind Health. Most buyers are at the lowest sell price.",
-                  ((31, 35, (26, 16, 7)), (25, 21, (21, 12, 5)), (22, 34, (34, 10, 4))),
-                  sale_offsets=(0, 0, -1)),
-            _week("Färre vill sälja Aurora Kraft efter rapporten och inköpskursen stiger. En ny stororder till Dimma Data lockar köpare.",
-                  "Fewer holders are selling Aurora Power after earnings and the buy quote has risen. A new customer deal draws buyers to Dimma Data.",
-                  ((55, 9, (28, 21, 12)), (24, 27, (29, 21, 12)), (34, 18, (16, 10, 4))),
-                  sale_offsets=(2, 1, 0)),
-            _week("Lovande studieresultat för Lindhälsa lockar köpare även vid den högsta säljkursen.",
-                  "Promising trial results for Lind Health draw buyers even at the highest sell price.",
-                  ((40, 23, (25, 15, 6)), (27, 24, (21, 14, 6)), (31, 28, (29, 23, 17))),
-                  sale_offsets=(0, 0, 2)),
-        ],
-    },
-    {
-        "name": {"sv": "Gör blockaffärer", "en": "Trade in blocks"},
-        "description": {
-            "sv": "Fonder och förvaltare vill köpa större poster. Blockordern fylls före övriga köpares order. Välj vilka affärer som ger bäst utfall.",
-            "en": "Funds and asset managers want to buy larger positions. A block order fills before other buyers' orders. Decide which trades are worth taking.",
-        },
-        "goals": [{"type": "profit", "target": 4_300}, {"type": "contracts", "target": 2}],
-        "weeks": [
-            _week("En indexfond vill köpa ett block i Aurora Kraft. Utbudet är stort och efterfrågan från övriga köpare är måttlig.",
-                  "An index fund wants a block of Aurora Power. Supply is abundant and demand from other buyers is moderate.",
-                  ((33, 35, (21, 14, 6)), (25, 24, (26, 15, 8)), (32, 23, (21, 15, 7))),
-                  ("AUR", 20, 53, "Indexfonden", "Index fund")),
-            _week("Efterfrågan på Dimma Data är hög. Pensionsfondens blockbud ligger under den mellersta säljkursen.",
-                  "Demand for Dimma Data is high. The pension fund's block bid is below the middle sell price.",
-                  ((39, 22, (24, 15, 7)), (30, 29, (36, 27, 16)), (33, 23, (19, 11, 6))),
-                  ("DIM", 22, 41, "Pensionsfonden", "Pension fund"), sale_offsets=(0, 2, 0)),
-            _week("En förvaltare vill köpa Lindhälsa. En stor säljpost räcker till både blockaffären och de övriga köparna.",
-                  "An asset manager wants a block of Lind Health. A large sell order provides enough shares for both the block trade and other buyers.",
-                  ((42, 23, (22, 16, 9)), (26, 25, (25, 18, 8)), (26, 36, (20, 14, 7))),
-                  ("LIN", 18, 55, "Hälsovårdsfonden", "Healthcare fund"), sale_offsets=(0, 0, -1)),
-            _week("Inköpskursen i Aurora Kraft stiger. En fond vill öka sitt innehav snabbt och lägger ett högre blockbud.",
-                  "The buy quote for Aurora Power is rising. A fund wants to increase its position quickly and offers a higher block bid.",
-                  ((49, 17, (21, 17, 10)), (25, 27, (28, 19, 9)), (34, 22, (21, 16, 6))),
-                  ("AUR", 15, 67, "Infrastrukturfonden", "Infrastructure fund"), sale_offsets=(2, 0, 0)),
-        ],
-    },
-    {
-        "name": {"sv": "Bygg upp likviditeten", "en": "Build up liquidity"},
-        "description": {
-            "sv": "Handelsfirman behöver pengar redo för nästa satsning. Tjäna pengar när inköpskurserna svänger och frigör kassa före periodens slut.",
-            "en": "The trading firm needs cash for its next investment. Stay profitable as buy quotes change and free up cash before the period ends.",
-        },
-        "goals": [{"type": "profit", "target": 5_000}, {"type": "cash", "target": 14_600}],
-        "weeks": [
-            _week("En fond minskar sitt innehav i Aurora Kraft och säljer en stor post till låg kurs. Lindhälsa har gott om köpare.",
-                  "A fund is reducing its stake in Aurora Power and selling a large position at a low price. Lind Health has plenty of buyers.",
-                  ((29, 38, (22, 16, 6)), (35, 20, (25, 14, 7)), (29, 28, (26, 21, 11))),
-                  sale_offsets=(0, -1, 1)),
-            _week("Aurora Kraft blir dyrare och färre aktier finns att köpa. Omställningsfondens blockorder är större än veckans utbud.",
-                  "Aurora Power is more expensive and fewer shares are available. The transition fund's block order exceeds this week's supply.",
-                  ((52, 10, (32, 25, 15)), (31, 24, (23, 18, 7)), (33, 22, (23, 17, 7))),
-                  ("AUR", 17, 62, "Omställningsfonden", "Energy transition fund"), sale_offsets=(3, 0, 0)),
-            _week("En större ägare säljer av Dimma Data till låg kurs. Både övriga marknaden och en teknikfond söker aktien.",
-                  "A major holder is selling Dimma Data at a low price. Both the wider market and a technology fund want shares.",
-                  ((46, 20, (26, 17, 8)), (21, 40, (32, 23, 12)), (37, 21, (25, 15, 7))),
-                  ("DIM", 21, 43, "Teknikfonden", "Technology fund"), sale_offsets=(0, -1, 0)),
-            _week("Efterfrågan på Lindhälsa stiger inför kvartalets sista handelsvecka. Kassamålet mäts efter veckans försäljning.",
-                  "Demand for Lind Health is rising in the quarter's final trading week. The cash target is measured after this week's sales.",
-                  ((37, 23, (29, 19, 8)), (26, 26, (27, 18, 7)), (32, 27, (30, 24, 17))),
-                  ("LIN", 16, 58, "Småbolagsfonden", "Small-cap fund"), sale_offsets=(0, 0, 2)),
-        ],
-    },
+LEVELS = (
+    {"number": 1, "name": {"sv": "Nystartad", "en": "Starter"}, "target": 0, "capacity": 4, "unlock": "AUR"},
+    {"number": 2, "name": {"sv": "Handlare", "en": "Trader"}, "target": 60, "capacity": 6, "unlock": "DIM"},
+    {"number": 3, "name": {"sv": "Etablerad", "en": "Established"}, "target": 180, "capacity": 8, "unlock": "LIN"},
+    {"number": 4, "name": {"sv": "Storhandlare", "en": "Market Maker"}, "target": 420, "capacity": 10, "unlock": "NSK"},
+    {"number": 5, "name": {"sv": "Börsledare", "en": "Market Leader"}, "target": 800, "capacity": 12, "unlock": "KOB"},
 )
+
+UPGRADES = (
+    {"price": 85, "bonus": 2},
+    {"price": 170, "bonus": 3},
+    {"price": 300, "bonus": 5},
+)
+
+# Buy quote, committed resale quote, and number of shares available. All firms
+# see the same price cycle, with liquidity and margins shifting independently.
+_QUOTES = {
+    "AUR": (
+        (36, 44, 8), (39, 46, 7), (34, 44, 9), (42, 49, 5),
+        (38, 47, 11), (37, 44, 13), (41, 52, 7), (43, 52, 10),
+        (40, 47, 15), (37, 48, 9), (44, 52, 14), (38, 46, 12),
+    ),
+    "DIM": (
+        (58, 72, 6), (64, 75, 8), (53, 64, 5), (49, 65, 9),
+        (55, 67, 10), (61, 69, 14), (65, 80, 6), (56, 69, 13),
+        (62, 73, 14), (49, 66, 7), (68, 81, 9), (54, 63, 13),
+    ),
+    "LIN": (
+        (31, 38, 18), (29, 37, 16), (35, 44, 13), (34, 43, 18),
+        (30, 46, 9), (32, 45, 13), (37, 47, 14), (36, 44, 20),
+        (33, 45, 18), (31, 41, 20), (39, 47, 15), (30, 44, 12),
+    ),
+    "NSK": (
+        (48, 59, 17), (45, 60, 13), (52, 61, 22), (53, 65, 15),
+        (56, 66, 20), (46, 59, 20), (51, 62, 18), (55, 68, 15),
+        (43, 56, 24), (50, 59, 19), (47, 63, 16), (48, 60, 21),
+    ),
+    "KOB": (
+        (90, 112, 10), (96, 113, 12), (84, 111, 9), (103, 125, 7),
+        (87, 103, 17), (91, 108, 11), (106, 133, 8), (85, 102, 18),
+        (90, 109, 14), (99, 126, 6), (86, 101, 19), (83, 108, 10),
+    ),
+}
+
+TRADE_RESERVE = max(buy_price for buy_price, _, _ in _QUOTES["AUR"])
+
+
+def market_on_day(day: int) -> dict[str, dict[str, int]]:
+    """Give each stock's public offer for the current 1-based trading day."""
+    market = {}
+    for symbol, quotes in _QUOTES.items():
+        buy_price, sell_price, supply = quotes[(day - 1) % len(quotes)]
+        market[symbol] = {"buyPrice": buy_price, "sellPrice": sell_price, "supply": supply}
+    return market

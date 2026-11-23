@@ -7,11 +7,19 @@
 }
 
 .company-standings-heading { padding: 20px 22px 16px; }
-.company-standings-heading h2 { font-size: 1.2rem; margin: 0 0 6px; }
+.company-standings-heading h2 { font-size: 1.2rem; margin: 0; }
+.company-exchange-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.company-exchange-status { padding: 3px 7px; border: 1px solid var(--company-edge); border-radius: 5px; color: var(--company-fade); font-size: .7rem; }
+.company-exchange-connected { color: var(--company-teal); border-color: var(--company-teal); }
 .company-standings-heading p,
 .company-standings-message { color: var(--company-fade); font-size: .84rem; line-height: 1.5; }
 .company-standings-heading p { margin: 0; }
 .company-standings-message { padding: 12px 22px 20px; margin: 0; }
+.company-exchange-warning { color: #ffbdab; }
+.company-exchange-summary { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 0 22px 14px; margin: 0; }
+.company-exchange-summary div { display: flex; align-items: baseline; gap: 8px; }
+.company-exchange-summary dt { color: var(--company-fade); font-size: .78rem; }
+.company-exchange-summary dd { margin: 0; font: 700 .85rem var(--mono); }
 
 .company-standings-table {
     border-collapse: collapse;
@@ -27,16 +35,21 @@
 }
 
 .company-standings-table thead th { color: var(--company-fade); font-size: .76rem; }
-.company-standings-table th:nth-child(n+3),
-.company-standings-table td:nth-child(n+3) { text-align: right; }
-.company-standings-table tbody th { width: 55%; overflow-wrap: anywhere; }
+.company-standings-table th:not(:first-child),
+.company-standings-table td { text-align: right; }
+.company-standings-table tbody th { width: 48%; overflow-wrap: anywhere; }
 .company-standings-table tbody small { display: block; margin-top: 3px; color: var(--company-fade); font-weight: 400; }
+.company-exchange-quote { color: var(--company-teal); font: 700 .9rem var(--mono); white-space: nowrap; }
+.company-exchange-controls { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+.company-body .company-exchange-button { padding: 5px 9px; min-height: 35px; min-width: 53px; font-size: .78rem; }
+.company-exchange-button:disabled { cursor: default; }
 .company-standing-own { background: rgba(118, 230, 198, .07); }
 .company-standing-own th > span { color: var(--company-teal); }
 
 @media (max-width: 520px) {
     .company-standings-heading { padding: 15px 13px 11px; }
-    .company-standings-message { padding-inline: 13px; }
+    .company-standings-message, .company-exchange-summary { padding-inline: 13px; }
     .company-standings-table th, .company-standings-table td { padding: 8px 9px; }
     .company-standings-table tbody th { width: auto; }
+    .company-exchange-controls { flex-direction: column; }
 }

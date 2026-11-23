@@ -28,7 +28,7 @@ python3 -m venv .venv
 - **Spela med en vän** skapar en länk till en orankad Handelsduell. Länken fungerar en gång inom 15 minuter. Värden behöver vara ansluten när gästen bekräftar. Efter matchen kan båda tacka ja till revansch inom 15 minuter. Spela från samma lokalnätsadress eller publika adress om ni använder olika enheter.
 - **Spela ritduell** öppnar en separat rankad kö med egen Elo. Dra uppåt eller nedåt i det skuggade prognosfältet eller skriv din gissning i procent. Lås prognosen för att tävla om vem som kommer närmast facit.
 - **Öva ritduell** går igenom tre rundor på en kurva med syntetiska priser. Lås prognosen för att se facit och din avvikelse. Gå vidare när du är redo.
-- **Börsföretag** går ut på att driva en handelsfirma. Köp poster i fiktiva börsbolag, välj säljkurser och ta emot blockorder från institutioner. Planera med nästa veckas marknadsbesked och se andra spelares firmor på börslistan. Kampanjen spelas i egen takt och sparas på kontot. Äldre portföljsparningar går att öppna på `/campaign/portfolio`.
+- **Börsföretag** börjar med små aktieaffärer som låser upp fler aktier och större order. Anställ handlare, välj deras risknivå och låt dem bli bättre genom att handla. På livemarknaden kan du köpa och sälja aktier i andra spelares firmor. Kurserna följer firmornas handelsresultat och uppdateras när någon handlar. Spelläget sparas på kontot. Äldre portföljsparningar går att öppna på `/campaign/portfolio`.
 
 För att spela från två mobiler på samma nätverk, sätt `STOCK_FIGHT_DEV_HOST=0.0.0.0` i `.env` före start. Öppna datorns lokala IP-adress med port 8080 från båda mobilerna.
 

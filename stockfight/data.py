@@ -247,11 +247,16 @@ def initialize_database(schema_url: URL | None = None) -> None:
             )
 
 
-def save_campaign(user_id: int, revision: int, state: dict, *, model=CampaignSave) -> bool:
+def save_campaign(user_id: int, revision: int, state: dict, *, model=CampaignSave, condition=None) -> bool:
     dialect = db.session.get_bind().dialect.name
     if revision == 0:
         insert = _insert_for_dialect(dialect)
-        command = insert(model).values(user_id=user_id, revision=1, state=state)
+        command = insert(model)
+        if condition is None:
+            command = command.values(user_id=user_id, revision=1, state=state)
+        else:
+            values = db.select(literal(user_id), literal(1), literal(state, type_=model.state.type))
+            command = command.from_select(["user_id", "revision", "state"], values.where(condition))
         command = command.on_conflict_do_nothing(index_elements=[model.user_id])
     else:
         command = (
@@ -260,6 +265,8 @@ def save_campaign(user_id: int, revision: int, state: dict, *, model=CampaignSav
             .values(revision=revision + 1, state=state)
             .execution_options(synchronize_session=False)
         )
+        if condition is not None:
+            command = command.where(condition)
     if dialect == "postgresql":
         written = db.session.scalar(command.returning(model.revision)) is not None
     else:

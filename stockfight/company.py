@@ -1,8 +1,24 @@
-"""Rules and account state for the deterministic company campaign."""
+"""Firm progression, automatic traders, and one-click trades."""
 
 from copy import deepcopy
 
-from .company_catalog import CAPACITY, CHAPTERS, OVERHEAD, PRODUCTS, STARTING_CASH, TIER_IDS
+from .company_catalog import ASSETS, LEVELS, STARTING_CASH, TRADE_RESERVE, UPGRADES, market_on_day
+
+
+_SAVE_VERSION = 2
+LEGACY_PROFIT_PER_WEEK = 40
+_HIRES = (
+    ("Alex", 1, 100),
+    ("Kim", 3, 230),
+    ("Sam", 5, 400),
+)
+_TRAINING_RETURNS = (-42, -28, 7, -20, 11, -10, 13, 7, 16, -4)
+_STRATEGIES = {
+    "careful": (15, 75),
+    "balanced": (25, 100),
+    "aggressive": (35, 130),
+}
+_DEFAULT_STRATEGY = "balanced"
 
 
 class CompanyError(ValueError):
@@ -12,197 +28,250 @@ class CompanyError(ValueError):
 
 
 def default_state() -> dict:
-    lots = {product: [] for product in PRODUCTS}
     return {
-        "status": "planning",
-        "chapter": 0,
-        "week": 0,
-        "cash": STARTING_CASH,
-        "lots": lots,
-        "checkpoint": {"cash": STARTING_CASH, "lots": deepcopy(lots)},
-        "history": [],
-        "chapterOutcome": None,
+        "version": _SAVE_VERSION, "day": 1, "cash": STARTING_CASH, "profit": 0, "peakProfit": 0,
+        "trades": 0, "upgrades": 0, "employees": [], "peerShares": {},
+        "lastTrade": None, "lastEmployeeTrades": [],
     }
 
 
-def _inventory(lots: dict) -> dict[str, int]:
-    return {product: sum(quantity for quantity, _ in items) for product, items in lots.items()}
+def normalize_state(state: dict) -> dict:
+    """Convert an old chapter save while preserving the original privately."""
+    if state.get("version") == _SAVE_VERSION:
+        return state
 
-
-def _stock_value(lots: dict) -> int:
-    return sum(quantity * price for items in lots.values() for quantity, price in items)
-
-
-def _goals(chapter_index: int, history: list[dict], cash: int) -> list[dict]:
-    reports = [report for report in history if report["chapter"] == chapter_index + 1]
-    values = {
-        "profit": sum(report["profit"] for report in reports),
-        "cash": cash,
-        "contracts": sum(report["contractFulfilled"] for report in reports),
-        "units": sum(product["sold"] for report in reports for product in report["products"]),
+    weeks = len(state["history"])
+    profit = weeks * LEGACY_PROFIT_PER_WEEK
+    return {
+        **default_state(), "day": weeks + 1, "cash": STARTING_CASH + profit,
+        "profit": profit, "peakProfit": profit, "previousCampaign": state.copy(),
     }
+
+
+def _level(profit: int) -> dict:
+    return next(level for level in reversed(LEVELS) if profit >= level["target"])
+
+
+def level_for_profit(profit: int) -> int:
+    return _level(profit)["number"]
+
+
+def _capacity(state: dict, level: dict) -> int:
+    return level["capacity"] + sum(upgrade["bonus"] for upgrade in UPGRADES[:state["upgrades"]])
+
+
+def _can_spend(cash: int, price: int) -> bool:
+    return cash - price >= TRADE_RESERVE
+
+
+def _upgrade_offer(state: dict) -> dict | None:
+    index = state["upgrades"]
+    if index >= len(UPGRADES):
+        return None
+    next_upgrade = UPGRADES[index]
+    return {"number": index + 1, **next_upgrade, "available": _can_spend(state["cash"], next_upgrade["price"])}
+
+
+def _hire_offer(state: dict, level: dict) -> dict | None:
+    index = len(state["employees"])
+    if index >= len(_HIRES):
+        return None
+    name, unlock_level, price = _HIRES[index]
+    return {
+        "name": name, "price": price, "unlockLevel": unlock_level,
+        "available": level["number"] >= unlock_level and _can_spend(state["cash"], price),
+    }
+
+
+def _trade_offer(quote: dict, cash: int, capacity: int) -> dict:
+    quantity = min(quote["supply"], cash // quote["buyPrice"], capacity)
+    cost = quantity * quote["buyPrice"]
+    revenue = quantity * quote["sellPrice"]
+    return {"quantity": quantity, "cost": cost, "revenue": revenue, "profit": revenue - cost}
+
+
+def _worker_budget(cash: int, stake_percent: int) -> int:
+    return min(cash * stake_percent // 100, cash - TRADE_RESERVE)
+
+
+def _worker_symbols(market: dict, level: dict, budget: int) -> list[str]:
     return [
-        {**goal, "actual": values[goal["type"]], "met": values[goal["type"]] >= goal["target"]}
-        for goal in CHAPTERS[chapter_index]["goals"]
+        symbol for symbol, asset in ASSETS.items()
+        if (asset["unlockLevel"] <= level["number"] and market[symbol]["buyPrice"] <= budget
+            and market[symbol]["supply"] > 0)
     ]
 
 
-def _week_number(chapter_index: int, week_index: int) -> int:
-    return sum(len(chapter["weeks"]) for chapter in CHAPTERS[:chapter_index]) + week_index + 1
+def _worker_return(employee: dict, day: int) -> int:
+    trades = employee["trades"]
+    if trades < len(_TRAINING_RETURNS):
+        return _TRAINING_RETURNS[trades]
+
+    variation = (day + 2 * employee["id"] + trades) % 12
+    return -4 if variation in (0, 9) else 8 + variation
 
 
-def _sell(lots: list[list[int]], units: int) -> tuple[list[list[int]], int]:
-    """Sell oldest stock first and deduct what the company paid for those units."""
-    remaining_lots = []
-    cost = 0
-    for quantity, price in lots:
-        sold = min(units, quantity)
-        units -= sold
-        cost += sold * price
-        if quantity > sold:
-            remaining_lots.append([quantity - sold, price])
-    return remaining_lots, cost
+def _worker_name(employee: dict) -> str:
+    return _HIRES[employee["id"] - 1][0]
 
 
-def _settle(state: dict, command: dict) -> None:
-    chapter_index, week_index = state["chapter"], state["week"]
-    chapter = CHAPTERS[chapter_index]
-    market = chapter["weeks"][week_index]
-    products = market["products"]
-    inventory = _inventory(state["lots"])
-    purchases = command.get("purchases", {})
-    if (not isinstance(purchases, dict) or any(product not in inventory for product in purchases)
-            or any(type(units) is not int or units < 0 for units in purchases.values())
-            or any(purchases.get(product["id"], 0) > product["supply"] for product in products)):
-        raise CompanyError("invalid_purchase")
+def _worker_trades(state: dict, cash: int, level: dict, market: dict) -> list[dict]:
+    results = []
+    day = state["day"]
+    capacity = _capacity(state, level)
+    for employee in state["employees"]:
+        if not employee["active"]:
+            continue
 
-    purchase_cost = sum(purchases.get(product["id"], 0) * product["buyPrice"] for product in products)
-    if purchase_cost > state["cash"]:
-        raise CompanyError("insufficient_cash")
-    if sum(inventory.values()) + sum(purchases.values()) > CAPACITY:
-        raise CompanyError("storage_limit")
+        strategy = employee.get("strategy", _DEFAULT_STRATEGY)
+        stake_percent, return_multiplier = _STRATEGIES[strategy]
+        budget = _worker_budget(cash, stake_percent)
+        symbols = _worker_symbols(market, level, budget)
+        if not symbols:
+            continue
 
-    tiers = command.get("tiers", {})
-    if (not isinstance(tiers, dict) or any(product not in inventory for product in tiers)
-            or any(not isinstance(tier, str) or tier not in TIER_IDS for tier in tiers.values())):
-        raise CompanyError("invalid_tier")
-
-    accept_contract = command.get("acceptContract", False)
-    contract = market["contract"] if accept_contract is True else None
-    if type(accept_contract) is not bool or (accept_contract and contract is None):
-        raise CompanyError("invalid_contract")
-    if contract:
-        product = contract["productId"]
-        if inventory[product] + purchases.get(product, 0) < contract["units"]:
-            raise CompanyError("insufficient_contract_stock")
-
-    lots = {}
-    lines = []
-    cost_of_goods = 0
-    for product in products:
-        product_id = product["id"]
-        quantity = purchases.get(product_id, 0)
-        available = inventory[product_id] + quantity
-        price_tier = next(tier for tier in product["tiers"] if tier["id"] == tiers.get(product_id, "regular"))
-        contract_units = contract["units"] if contract and contract["productId"] == product_id else 0
-        contract_revenue = contract_units * contract["price"] if contract else 0
-        retail_units = min(available - contract_units, price_tier["demand"])
-        sold = contract_units + retail_units
-        existing_lots = state["lots"][product_id]
-        if quantity:
-            existing_lots = [*existing_lots, [quantity, product["buyPrice"]]]
-        lots[product_id], cost = _sell(existing_lots, sold)
-        cost_of_goods += cost
-        lines.append({
-            "id": product_id, "purchased": quantity, "sold": sold, "stock": available - sold,
-            "revenue": contract_revenue + retail_units * price_tier["price"],
-            "contractUnits": contract_units, "retailSold": retail_units,
+        choice = (day + employee["id"] + employee["trades"] - 2) % len(symbols)
+        symbol = symbols[choice]
+        quote = market[symbol]
+        quantity = min(capacity, quote["supply"], budget // quote["buyPrice"])
+        stake = quantity * quote["buyPrice"]
+        profit = stake * _worker_return(employee, day) * return_multiplier // 10_000
+        cash += profit
+        employee["trades"] += 1
+        employee["profit"] += profit
+        results.append({
+            "employeeId": employee["id"], "name": _worker_name(employee), "symbol": symbol,
+            "quantity": quantity, "profit": profit,
         })
+    return results
 
-    revenue = sum(line["revenue"] for line in lines)
-    cash = state["cash"] - purchase_cost + revenue - OVERHEAD
-    report = {
-        "week": _week_number(chapter_index, week_index), "chapter": chapter_index + 1,
-        "weekInChapter": week_index + 1, "revenue": revenue, "purchaseCost": purchase_cost,
-        "costOfGoods": cost_of_goods, "overhead": OVERHEAD, "profit": revenue - cost_of_goods - OVERHEAD,
-        "cash": cash, "contractFulfilled": accept_contract, "products": lines,
-    }
-    state.update(cash=cash, lots=lots, history=[*state["history"], report], chapterOutcome=None)
 
-    end_of_chapter = week_index + 1 == len(chapter["weeks"])
-    if not end_of_chapter and cash >= 0:
-        state["week"] += 1
-        return
+def _play_day(state: dict, command: dict, level: dict) -> None:
+    market = market_on_day(state["day"])
+    cash = state["cash"]
+    player_trade = None
+    if command["action"] == "trade":
+        symbol = command.get("symbol")
+        if not isinstance(symbol, str) or symbol not in ASSETS:
+            raise CompanyError("invalid_asset")
+        if ASSETS[symbol]["unlockLevel"] > level["number"]:
+            raise CompanyError("locked_asset")
 
-    goals = _goals(chapter_index, state["history"], cash)
-    passed = cash >= 0 and all(goal["met"] for goal in goals)
-    reason = None if passed else "cash" if cash < 0 else "goals"
-    state["chapterOutcome"] = {
-        "chapter": chapter_index + 1, "name": chapter["name"], "status": "passed" if passed else "failed",
-        "reason": reason, "goals": goals,
-    }
-    if not passed:
-        state["status"] = "failed"
-    elif chapter_index + 1 == len(CHAPTERS):
-        state["status"] = "won"
-    else:
-        state.update(chapter=chapter_index + 1, week=0, checkpoint={"cash": cash, "lots": deepcopy(lots)})
+        player_trade = {"symbol": symbol, **_trade_offer(market[symbol], cash, _capacity(state, level))}
+        if not player_trade["quantity"]:
+            raise CompanyError("insufficient_cash")
+        cash += player_trade["profit"]
+    elif not any(employee["active"] for employee in state["employees"]):
+        raise CompanyError("no_active_employee")
+
+    workers = _worker_trades(state, cash, level, market)
+    if player_trade is None and not workers:
+        raise CompanyError("insufficient_cash")
+
+    profit = (player_trade["profit"] if player_trade else 0) + sum(result["profit"] for result in workers)
+    state["cash"] += profit
+    state["profit"] += profit
+    state["peakProfit"] = max(state["peakProfit"], state["profit"])
+    state["trades"] += int(player_trade is not None)
+    state["day"] += 1
+    state["lastTrade"] = player_trade
+    state["lastEmployeeTrades"] = workers
 
 
 def apply_command(state: dict, command: object) -> None:
-    """Resolve one submitted plan or change campaign status."""
+    """Apply one validated command and convert an older save on its first successful write."""
     if not isinstance(command, dict):
         raise CompanyError("invalid_command")
-    action = command.get("action")
-    allowed = {"settle": ("planning",), "retry": ("failed",), "restart": ("won", "failed")}
-    if not isinstance(action, str) or action not in allowed:
-        raise CompanyError("invalid_command")
-    if state["status"] not in allowed[action]:
-        raise CompanyError("invalid_status")
 
-    if action == "settle":
-        _settle(state, command)
-    elif action == "retry":
-        checkpoint = state["checkpoint"]
-        history = [report for report in state["history"] if report["chapter"] <= state["chapter"]]
-        state.update(status="planning", week=0, cash=checkpoint["cash"], lots=deepcopy(checkpoint["lots"]),
-                     history=history, chapterOutcome=None)
+    action = command.get("action")
+    current = normalize_state(state)
+    level = _level(current["peakProfit"])
+    if action in ("trade", "advance"):
+        _play_day(current, command, level)
+    elif action == "upgrade":
+        upgrade = _upgrade_offer(current)
+        if upgrade is None or not upgrade["available"]:
+            raise CompanyError("upgrade_unavailable")
+        current["cash"] -= upgrade["price"]
+        current["upgrades"] += 1
+    elif action == "hire":
+        hire = _hire_offer(current, level)
+        if hire is None or not hire["available"]:
+            raise CompanyError("hire_unavailable")
+        current["cash"] -= hire["price"]
+        current["employees"].append({
+            "id": len(current["employees"]) + 1, "active": True, "trades": 0, "profit": 0, "strategy": _DEFAULT_STRATEGY,
+        })
+    elif action in ("toggle_employee", "set_employee_strategy"):
+        employee_id = command.get("employeeId")
+        if type(employee_id) is not int or not 1 <= employee_id <= len(current["employees"]):
+            raise CompanyError("invalid_employee")
+        employee = current["employees"][employee_id - 1]
+        if action == "toggle_employee":
+            employee["active"] = not employee["active"]
+        else:
+            strategy = command.get("strategy")
+            if not isinstance(strategy, str) or strategy not in _STRATEGIES:
+                raise CompanyError("invalid_strategy")
+            employee["strategy"] = strategy
     else:
+        raise CompanyError("invalid_command")
+
+    if current is not state:
         state.clear()
-        state.update(default_state())
+        state.update(current)
 
 
 def public_state(state: dict) -> dict:
-    """Expose the current market and a one-week outlook for planning stock purchases."""
-    chapter_index, week_index = state["chapter"], state["week"]
-    chapter = CHAPTERS[chapter_index]
-    weeks = chapter["weeks"]
-    market = next_market = None
-    if state["status"] == "planning":
-        market = weeks[week_index]
-        if week_index + 1 < len(weeks):
-            next_market = weeks[week_index + 1]
-        elif chapter_index + 1 < len(CHAPTERS):
-            next_market = CHAPTERS[chapter_index + 1]["weeks"][0]
-    history = state["history"]
+    """Expose the current day's trading choices and show what the next rank unlocks."""
+    state = normalize_state(state)
+    level = _level(state["peakProfit"])
+    market = market_on_day(state["day"])
+    cash = state["cash"]
+    capacity = _capacity(state, level)
+    next_level = None
+    if level["number"] < len(LEVELS):
+        following = LEVELS[level["number"]]
+        symbol = following["unlock"]
+        next_level = {
+            "number": following["number"], "name": following["name"], "target": following["target"],
+            "unlock": {"symbol": symbol, "name": ASSETS[symbol]["name"]} if symbol else None,
+        }
+
+    assets = []
+    for symbol, asset in ASSETS.items():
+        unlocked = asset["unlockLevel"] <= level["number"]
+        quote = market[symbol]
+        offer = _trade_offer(quote, cash, capacity if unlocked else 0)
+        assets.append({
+            "symbol": symbol, **asset, **quote, "quantity": offer["quantity"], "cost": offer["cost"],
+            "profit": offer["profit"], "unlocked": unlocked,
+        })
+
+    workers = [
+        {**employee, "name": _worker_name(employee),
+         "strategy": employee.get("strategy", _DEFAULT_STRATEGY),
+         "skill": min(100, employee["trades"] * 100 // len(_TRAINING_RETURNS))}
+        for employee in state["employees"]
+    ]
+    can_advance = any(
+        employee["active"] and _worker_symbols(market, level, _worker_budget(cash, _STRATEGIES[employee["strategy"]][0]))
+        for employee in workers
+    )
     return deepcopy({
-        "status": state["status"],
-        "chapter": {
-            "number": chapter_index + 1, "total": len(CHAPTERS), "name": chapter["name"],
-            "description": chapter["description"], "goals": _goals(chapter_index, history, state["cash"]),
-        },
-        "week": _week_number(chapter_index, week_index), "weekInChapter": week_index + 1,
-        "weeksInChapter": len(weeks), "cash": state["cash"], "inventory": _inventory(state["lots"]),
-        "inventoryValue": _stock_value(state["lots"]),
-        "capacity": CAPACITY, "overhead": OVERHEAD, "market": market, "nextMarket": next_market,
-        "history": history, "lastReport": history[-1] if history else None, "chapterOutcome": state["chapterOutcome"],
+        "day": state["day"], "cash": cash, "profit": state["profit"], "peakProfit": state["peakProfit"],
+        "trades": state["trades"], "level": {"number": level["number"], "name": level["name"]},
+        "nextLevel": next_level, "capacity": capacity, "upgrade": _upgrade_offer(state), "assets": assets,
+        "lastTrade": state["lastTrade"], "employees": workers, "hire": _hire_offer(state, level),
+        "lastEmployeeTrades": state["lastEmployeeTrades"],
+        "canAdvance": can_advance,
     })
 
 
 def public_standing(state: dict) -> dict:
-    """Summarize company progress for other players without revealing individual trades."""
-    cash = state["cash"]
+    """Summarize firm progress for the multiplayer standings."""
+    state = normalize_state(state)
     return {
-        "status": state["status"], "chapter": state["chapter"] + 1, "week": len(state["history"]),
-        "equity": cash + _stock_value(state["lots"]), "cash": cash,
+        "level": level_for_profit(state["peakProfit"]), "profit": state["profit"], "day": state["day"],
+        "cash": state["cash"], "trades": state["trades"],
     }

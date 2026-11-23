@@ -48,7 +48,7 @@
         "Wall Street-marknaden": "Wall Street Market",
         "Strategi · Flerspelare": "Strategy · Multiplayer",
         "Börsföretag": "Trading Firms",
-        "Handla aktieposter, bygg upp din firma och jämför resultat med andra spelare.": "Trade blocks of shares, build your firm, and compare results with other players.",
+        "Bygg din firma, träna handlare och köp aktier i andra spelares företag på livemarknaden.": "Build your firm, train traders, and buy shares in other players' companies on the live market.",
         "Öppna handelsfirman": "Open your trading firm",
         "Inloggad som": "Logged in as",
         "Rankad · 1 mot 1": "Ranked · 1 vs 1",

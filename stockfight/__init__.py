@@ -11,7 +11,7 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .campaign_http import register_campaign
+from .campaign_http import install_company_socket, register_campaign
 from .data import User, db, get_rating, initialize_database, leaderboard, profile
 from .engine import RANKED
 from .market_data import DatabaseMarketProvider, import_csv, seed_demo, seed_historical
@@ -21,6 +21,7 @@ from .ranking import LEAGUES
 
 socketio = SocketIO(async_mode="threading", max_http_buffer_size=16_384)
 install_handlers(socketio)
+install_company_socket(socketio)
 
 
 def env_flag(name, default=False):
@@ -81,7 +82,7 @@ def create_app(config=None):
     service = MatchService(app, socketio, provider)
     app.extensions["match_service"] = service
     register_http(app, service)
-    register_campaign(app)
+    register_campaign(app, socketio)
     register_cli(app, schema_url)
     with app.app_context():
         initialize_database(schema_url)
