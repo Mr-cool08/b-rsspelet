@@ -111,9 +111,92 @@
             </div>
         </section>
 
+        <section id="tutorial-screen" class="screen tutorial-screen" aria-labelledby="tutorial-title" hidden>
+            <div class="tutorial-card panel">
+                <header class="tutorial-heading">
+                    <h1 id="tutorial-title" class="screen-title" tabindex="-1" data-i18n="Din första 1 mot 1-duell">Din första 1 mot 1-duell</h1>
+                    <p id="tutorial-progress" class="eyebrow"></p>
+                </header>
+
+                <section id="tutorial-page-1" class="tutorial-page" aria-labelledby="tutorial-step-1">
+                    <h2 id="tutorial-step-1" class="card-title" tabindex="-1" data-i18n="Så vinner du en handelsduell">Så vinner du en handelsduell</h2>
+                    <p data-i18n="Ni handlar på samma aktiekurs. Du vinner genom att få ner motståndaren till 0 HP.">Ni handlar på samma aktiekurs. Du vinner genom att få ner motståndaren till 0 HP.</p>
+                    <div class="tutorial-duel">
+                        <div class="tutorial-player">
+                            <h3 data-i18n="Du">Du</h3>
+                            <p class="mono">100 HP</p>
+                            <progress class="meter" max="100" value="100" aria-hidden="true"></progress>
+                            <p data-i18n="1 000 krediter">1 000 krediter</p>
+                        </div>
+                        <div class="tutorial-player">
+                            <h3 data-i18n="Motståndare">Motståndare</h3>
+                            <p class="mono">100 HP</p>
+                            <progress class="meter" max="100" value="100" aria-hidden="true"></progress>
+                            <p data-i18n="1 000 krediter">1 000 krediter</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tutorial-page-2" class="tutorial-page" aria-labelledby="tutorial-step-2" hidden>
+                    <h2 id="tutorial-step-2" class="card-title" tabindex="-1" data-i18n="Öppna en position">Öppna en position</h2>
+                    <p data-i18n="I en duell kan du satsa 25, 50, 75 eller 100 % av dina tillgängliga krediter. I övningen satsar du 25 % och väljer en riktning.">I en duell kan du satsa 25, 50, 75 eller 100 % av dina tillgängliga krediter. I övningen satsar du 25 % och väljer en riktning.</p>
+                    <dl class="tutorial-stake">
+                        <dt data-i18n="Vald insats">Vald insats</dt>
+                        <dd class="mono" data-i18n="25 % · 250 krediter">25 % · 250 krediter</dd>
+                    </dl>
+                    <div class="panel-actions" role="group" aria-label="Välj riktning för din position" data-i18n-aria-label="Välj riktning för din position">
+                        <button class="button button-buy direction-button" type="button" data-action="tutorial-up" aria-pressed="false">
+                            <span data-i18n="UPP">UPP</span>
+                            <small data-i18n="Vinst vid uppgång">Vinst vid uppgång</small>
+                        </button>
+                        <button class="button button-short direction-button" type="button" data-action="tutorial-down" aria-pressed="false">
+                            <span data-i18n="NER">NER</span>
+                            <small data-i18n="Vinst vid nedgång">Vinst vid nedgång</small>
+                        </button>
+                    </div>
+                    <p id="tutorial-direction-feedback" class="tutorial-feedback" role="status"></p>
+                </section>
+
+                <section id="tutorial-page-3" class="tutorial-page" aria-labelledby="tutorial-step-3" hidden>
+                    <h2 id="tutorial-step-3" class="card-title" tabindex="-1" data-i18n="Använd vinsten">Använd vinsten</h2>
+                    <p data-i18n="Din exempelposition ligger 10 krediter plus. Stäng den och välj vad du vill göra med vinsten.">Din exempelposition ligger 10 krediter plus. Stäng den och välj vad du vill göra med vinsten.</p>
+                    <button class="button button-secondary tutorial-close-position" type="button" data-action="tutorial-close-position" aria-controls="tutorial-profit-options" data-i18n="STÄNG POSITION">STÄNG POSITION</button>
+                    <div id="tutorial-profit-options" class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till" hidden>
+                        <button class="button button-attack direction-button" type="button" data-action="tutorial-attack" aria-pressed="false">
+                            <span>Attack</span>
+                            <small data-i18n="Gör skada">Gör skada</small>
+                        </button>
+                        <button class="button button-buy direction-button" type="button" data-action="tutorial-grow" aria-pressed="false">
+                            <span>Grow</span>
+                            <small data-i18n="Bygg kapital och bonus">Bygg kapital och bonus</small>
+                        </button>
+                    </div>
+                    <p id="tutorial-profit-feedback" class="tutorial-feedback" role="status"></p>
+                    <p data-i18n="Stänger du en position med förlust kostar det krediter och kan kosta HP.">Stänger du en position med förlust kostar det krediter och kan kosta HP.</p>
+                </section>
+
+                <section id="tutorial-page-4" class="tutorial-page" aria-labelledby="tutorial-step-4" hidden>
+                    <h2 id="tutorial-step-4" class="card-title" tabindex="-1" data-i18n="När duellen avgörs">När duellen avgörs</h2>
+                    <p data-i18n="Efter 75 sekunder börjar marknadsstormen dra HP från båda. Om ni slås ut samtidigt avgör först kapitalet och sedan vem som gjort mest attackskada. Om även attackskadan är lika blir det oavgjort.">Efter 75 sekunder börjar marknadsstormen dra HP från båda. Om ni slås ut samtidigt avgör först kapitalet och sedan vem som gjort mest attackskada. Om även attackskadan är lika blir det oavgjort.</p>
+                    <p data-i18n="I en rankad handelsduell möter du spelare med liknande Elo. Ditt resultat påverkar ditt Elo. Välj Botduell om du vill öva utan att påverka det.">I en rankad handelsduell möter du spelare med liknande Elo. Ditt resultat påverkar ditt Elo. Välj Botduell om du vill öva utan att påverka det.</p>
+                    <p data-i18n="I Ritduell förutspår ni nästa kursrörelse. Den som kommer närmast gör skada.">I Ritduell förutspår ni nästa kursrörelse. Den som kommer närmast gör skada.</p>
+                </section>
+
+                <footer class="tutorial-footer">
+                    <p id="tutorial-error" class="form-error" role="alert" hidden></p>
+                    <div class="panel-actions">
+                        <button class="button button-secondary" type="button" data-action="tutorial-back" disabled data-i18n="Tillbaka">Tillbaka</button>
+                        <button class="button button-primary" type="button" data-action="tutorial-next" data-i18n="Nästa">Nästa</button>
+                        <button class="button button-primary" type="button" data-action="tutorial-finish" hidden data-i18n="Slutför introduktionen">Slutför introduktionen</button>
+                    </div>
+                    <button id="tutorial-exit" class="header-button" type="button" data-action="tutorial-exit" hidden data-i18n="Till huvudmenyn">Till huvudmenyn</button>
+                </footer>
+            </div>
+        </section>
+
         <section id="menu-screen" class="screen menu-screen" aria-labelledby="menu-title" hidden>
             <header class="menu-greeting">
-                <h1 id="menu-title" class="screen-title" tabindex="-1" data-i18n="Handelsgolvet">Handelsgolvet</h1>
+                <h1 id="menu-title" class="screen-title" tabindex="-1" data-i18n="Wall Street-marknaden">Wall Street-marknaden</h1>
                 <p><span data-i18n="Inloggad som">Inloggad som</span> <strong id="menu-name">—</strong></p>
             </header>
             <div class="menu-main">
@@ -546,7 +629,10 @@
             <p data-i18n="Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.">Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.</p>
             <p data-i18n="För varje 5 krediter över eller under startkapitalet på 1 000 ändras attackkraften med 1 procentenhet. Den kan gå från 75 till 125 %. Kapitalet består av dina tillgängliga krediter och det du har satsat i en öppen position.">För varje 5 krediter över eller under startkapitalet på 1 000 ändras attackkraften med 1 procentenhet. Den kan gå från 75 till 125 %. Kapitalet består av dina tillgängliga krediter och det du har satsat i en öppen position.</p>
             <p data-i18n="Om båda slås ut samtidigt vinner den med högst kapital. Vid lika kapital avgör vem som gjort mest attackskada.">Om båda slås ut samtidigt vinner den med högst kapital. Vid lika kapital avgör vem som gjort mest attackskada.</p>
-            <button class="button button-primary" type="button" data-action="guide-start" data-i18n="Starta guidad botduell">Starta guidad botduell</button>
+            <div class="panel-actions">
+                <button class="button button-secondary" type="button" data-action="tutorial-replay" data-i18n="Spela introduktionen igen">Spela introduktionen igen</button>
+                <button class="button button-primary" type="button" data-action="guide-start" data-i18n="Starta guidad botduell">Starta guidad botduell</button>
+            </div>
             <h3 data-i18n="Ritduell">Ritduell</h3>
             <p data-i18n="Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.">Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.</p>
             <button class="button button-secondary" type="button" data-action="practice-prediction" data-i18n="Öva ritduell">Öva ritduell</button>

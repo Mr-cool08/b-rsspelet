@@ -383,6 +383,76 @@ a { color: inherit; }
 .auth-submit { width: 100%; margin-top: 5px; }
 .form-error { color: var(--danger); font-size: .9rem; line-height: 1.45; overflow-wrap: anywhere; }
 
+.tutorial-screen { width: min(100%, 680px); margin-inline: auto; }
+
+.tutorial-card {
+    display: grid;
+    gap: clamp(16px, 3vw, 24px);
+    padding: clamp(16px, 4vw, 34px);
+    background: radial-gradient(ellipse at 100% 0, #263c32, transparent 65%), var(--panel);
+}
+
+.tutorial-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 16px;
+}
+
+.tutorial-heading .screen-title { font-size: clamp(1.9rem, 5.3vw, 2.8rem); }
+.tutorial-heading .eyebrow { color: var(--buy); }
+
+.tutorial-page { display: grid; gap: 12px; }
+.tutorial-page > p { max-width: 58ch; color: var(--muted); line-height: 1.5; }
+.tutorial-page .card-title { font-size: clamp(1.3rem, 4.2vw, 1.7rem); }
+
+.tutorial-duel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+.tutorial-player, .tutorial-stake {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--background);
+}
+
+.tutorial-player {
+    --meter-fill: var(--buy);
+    display: grid;
+    gap: 6px;
+}
+
+.tutorial-player:nth-child(2) { --meter-fill: var(--danger); }
+.tutorial-player h3 { font-size: .9rem; overflow-wrap: anywhere; }
+.tutorial-player p:last-child { color: var(--muted); font-size: .85rem; }
+.tutorial-player .mono { color: var(--meter-fill); font-weight: 700; }
+
+.tutorial-stake {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 10px;
+}
+
+.tutorial-stake dt { color: var(--muted); }
+.tutorial-stake dd { font-weight: 700; }
+.tutorial-page .direction-button { flex-direction: column; gap: 2px; }
+.tutorial-page .direction-button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
+.tutorial-close-position { justify-self: start; }
+.tutorial-page .tutorial-feedback { color: var(--text); font-weight: 700; }
+.tutorial-card .button:disabled { opacity: .55; }
+
+.tutorial-footer {
+    display: grid;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+}
+
+.tutorial-footer .panel-actions { justify-content: space-between; }
+.tutorial-footer .header-button { justify-self: start; }
+
 .menu-screen { display: grid; align-items: start; gap: 18px; max-width: 1152px; margin: 0 auto; }
 .menu-main, .menu-side, .menu-modes, .menu-mode-grid, .menu-nav { display: grid; gap: 12px; min-width: 0; }
 .menu-main { gap: clamp(18px, 3vw, 28px); }

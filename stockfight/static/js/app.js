@@ -7,8 +7,8 @@
     const positionDirection = (position) => position.side === "short" ? t("Ner") : t("Upp");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const primaryTouch = window.matchMedia("(pointer: coarse)");
-    const screenIds = ["auth", "menu", "queue", "invite", "match", "result", "spectate", "spectate-live"];
-    const screenFocus = { auth: "auth-title", menu: "menu-title", queue: "queue-title",
+    const screenIds = ["auth", "tutorial", "menu", "queue", "invite", "match", "result", "spectate", "spectate-live"];
+    const screenFocus = { auth: "auth-title", tutorial: "tutorial-title", menu: "menu-title", queue: "queue-title",
         invite: "invite-title", match: "match-screen", result: "result-outcome",
         spectate: "spectate-title", "spectate-live": "spectate-mode" };
     const phaseLabels = { normal: "Handel", market: "Marknadsstorm", final: "Slutstorm" };
@@ -17,8 +17,17 @@
     const acknowledgements = 5000;
     const chartRightPadding = 24;
     const chartZoomFactor = 1.5;
-    const activityActions = ["play", "play-bot", "play-prediction", "practice-prediction", "guide-start",
+    const activityActions = ["play", "play-bot", "play-prediction", "practice-prediction", "guide-start", "tutorial-replay",
         "guide-begin", "guide-bypass", "friend-create", "main-menu", "spectate"];
+    const tutorialSteps = 4;
+    const tutorialDirectionFeedback = {
+        up: "Kursen stiger från 100 till 104. Din position visar +10 krediter.",
+        down: "Kursen faller från 100 till 96. Din position visar +10 krediter.",
+    };
+    const tutorialProfitFeedback = {
+        attack: "Attack gör 20 HP skada. Motståndaren har 80 HP kvar och du har kvar 1 000 krediter.",
+        grow: "Grow sparar vinsten. Du har 1 010 krediter, 102 % attackkraft och 25 bonus-HP till nästa attack.",
+    };
     const localizedValues = new Map();
 
     let amountFormat, integerFormat, percentFormat, predictionPercentFormat, dateFormat, marketDateFormat, marketTimeFormat;
@@ -33,6 +42,7 @@
     let sessionVersion = 0;
     let authMode = "login";
     let authPending = false;
+    let tutorial;
     let profileVersion = 0;
     let menuProfileVersion = 0;
     let rankingVersion = 0;
@@ -288,6 +298,7 @@
         put("header-name", user?.username);
         if (!user) {
             sessionVersion += 1;
+            tutorial = undefined;
             setActivityCommand(undefined);
             window.clearTimeout(privateStateTimer);
             invitation = undefined;
@@ -328,10 +339,85 @@
         put("menu-progress-label", "—");
         put("menu-next", "");
         progress("menu-progress", 0);
+        if (session.duelTutorialPending) openTutorial();
+        else enterLobby();
+        void refreshProfile();
+    }
+
+    function enterLobby() {
+        tutorial = undefined;
         activate(inviteCode ? "invite" : "menu");
         renderPrivate();
-        connect();
-        void refreshProfile();
+        if (!socket) connect();
+    }
+
+    function openTutorial() {
+        tutorial = { step: 1, direction: null, closed: false, profit: null, saving: false };
+        message("tutorial-error", "");
+        renderTutorial();
+        activate("tutorial");
+    }
+
+    function renderTutorial() {
+        const { step, direction, closed, profit, saving } = tutorial;
+        const last = step === tutorialSteps;
+        const canAdvance = (step !== 2 || Boolean(direction)) && (step !== 3 || Boolean(profit));
+        put("tutorial-progress", t("Steg {step} av {total}", { step, total: tutorialSteps }));
+        for (let page = 1; page <= tutorialSteps; page += 1) show(`tutorial-page-${page}`, page === step);
+        for (const [action, selected] of [["up", direction], ["down", direction], ["attack", profit], ["grow", profit]]) {
+            for (const button of buttons(`tutorial-${action}`)) {
+                button.setAttribute("aria-pressed", String(action === selected));
+            }
+        }
+        putLocalized("tutorial-direction-feedback", tutorialDirectionFeedback[direction] ?? "");
+        putLocalized("tutorial-profit-feedback", tutorialProfitFeedback[profit] ?? "");
+        disable("tutorial-close-position", closed);
+        show("tutorial-profit-options", closed);
+        show("tutorial-exit", !session.duelTutorialPending);
+        disable("tutorial-back", step === 1 || saving);
+        for (const button of buttons("tutorial-next")) button.hidden = last;
+        disable("tutorial-next", !canAdvance);
+        for (const button of buttons("tutorial-finish")) button.hidden = !last;
+        disable("tutorial-finish", saving);
+    }
+
+    function moveTutorial(increment) {
+        tutorial.step += increment;
+        message("tutorial-error", "");
+        renderTutorial();
+        byId(`tutorial-step-${tutorial.step}`).focus();
+    }
+
+    function chooseTutorialDirection(direction) {
+        if (tutorial.direction !== direction) {
+            tutorial.direction = direction;
+            tutorial.closed = false;
+            tutorial.profit = null;
+            renderTutorial();
+        }
+    }
+
+    async function finishTutorial() {
+        if (!session.duelTutorialPending) {
+            enterLobby();
+            return;
+        }
+        const version = sessionVersion;
+        tutorial.saving = true;
+        message("tutorial-error", "");
+        renderTutorial();
+        try {
+            const data = await request("/api/duel-tutorial/complete", {});
+            if (version !== sessionVersion) return;
+            session = data;
+            enterLobby();
+        } catch (error) {
+            if (version !== sessionVersion) return;
+            message("tutorial-error", error.message, "error");
+            tutorial.saving = false;
+            renderTutorial();
+            buttons("tutorial-finish")[0]?.focus();
+        }
     }
 
     async function submitAuth(event) {
@@ -2015,6 +2101,7 @@
         if (menuProfileData) renderMenuProfile(menuProfileData);
         if (profileData) renderProfile(profileData);
         if (rankingData) renderRanking(rankingData);
+        if (screen === "tutorial") renderTutorial();
         if (screen === "queue" && queueData) renderQueue(queueData);
         if (screen === "spectate" && spectateListData) renderSpectateList(spectateListData);
         if (screen === "spectate-live" && spectateState) {
@@ -2043,6 +2130,25 @@
         switch (button.dataset.action) {
             case "auth-login": setAuthMode("login"); break;
             case "auth-register": setAuthMode("register"); break;
+            case "tutorial-replay":
+                if (screen === "menu") openTutorial();
+                break;
+            case "tutorial-exit": enterLobby(); break;
+            case "tutorial-back": moveTutorial(-1); break;
+            case "tutorial-next": moveTutorial(1); break;
+            case "tutorial-up": chooseTutorialDirection("up"); break;
+            case "tutorial-down": chooseTutorialDirection("down"); break;
+            case "tutorial-close-position":
+                tutorial.closed = true;
+                renderTutorial();
+                buttons("tutorial-attack")[0]?.focus();
+                break;
+            case "tutorial-attack":
+            case "tutorial-grow":
+                tutorial.profit = button.dataset.action === "tutorial-attack" ? "attack" : "grow";
+                renderTutorial();
+                break;
+            case "tutorial-finish": void finishTutorial(); break;
             case "play": newQueue(); break;
             case "play-bot":
                 if (guideSeen) startBotMatch();

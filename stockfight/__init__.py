@@ -96,6 +96,7 @@ def register_http(app, service):
             session["csrf"] = secrets.token_urlsafe(32)
         return {
             "user": {"id": user.id, "username": user.username} if user else None,
+            "duelTutorialPending": bool(user and user.duel_tutorial_pending),
             "inviteRequired": bool(app.config["INVITE_CODE"]),
             "csrfToken": session["csrf"],
         }
@@ -170,7 +171,12 @@ def register_http(app, service):
             return error("Lösenordet behöver vara 8–128 tecken.", 400)
         if app.config["INVITE_CODE"] and not token_matches(app.config["INVITE_CODE"], invite):
             return error("Inbjudningskoden är fel.", 403)
-        user = User(username=username, username_key=username.casefold(), password_hash=generate_password_hash(password))
+        user = User(
+            username=username,
+            username_key=username.casefold(),
+            password_hash=generate_password_hash(password),
+            duel_tutorial_pending=True,
+        )
         db.session.add(user)
         try:
             db.session.flush()
@@ -196,6 +202,17 @@ def register_http(app, service):
         service.disconnect_session(session.get("csrf"))
         session.clear()
         return account_state(None)
+
+    @app.post("/api/duel-tutorial/complete")
+    def complete_duel_tutorial():
+        user_id = session.get("user_id")
+        user = db.session.get(User, user_id) if user_id is not None else None
+        if user is None:
+            return error("Logga in för att slutföra duellguiden.", 401)
+        if user.duel_tutorial_pending:
+            user.duel_tutorial_pending = False
+            db.session.commit()
+        return account_state(user)
 
     @app.get("/api/profile")
     def player_profile():

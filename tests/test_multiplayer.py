@@ -171,6 +171,32 @@ def test_private_registration_and_login(game):
     assert login.get_json()["user"]["username"] == "SwedishBull"
 
 
+def test_new_account_duel_tutorial_persists_until_completed(game):
+    app, _ = game
+    first_browser = app.test_client()
+    complete = "/api/duel-tutorial/complete"
+    credentials = {"username": "NewTrader", "password": PASSWORD}
+
+    assert first_browser.get("/api/me").get_json()["duelTutorialPending"] is False
+    assert post(first_browser, complete, {}).status_code == 401
+    registration = post(first_browser, "/api/register", {**credentials, "inviteCode": INVITE})
+    assert registration.status_code == 201
+    assert registration.get_json()["duelTutorialPending"] is True
+    assert first_browser.get("/api/me").get_json()["duelTutorialPending"] is True
+    assert first_browser.post(complete, json={}).status_code == 403
+
+    second_browser = app.test_client()
+    assert post(second_browser, "/api/login", credentials).get_json()["duelTutorialPending"] is True
+    for _ in range(2):
+        response = post(second_browser, complete, {})
+        assert response.status_code == 200
+        assert response.get_json()["duelTutorialPending"] is False
+        assert response.get_json()["user"] == registration.get_json()["user"]
+
+    assert first_browser.get("/api/me").get_json()["duelTutorialPending"] is False
+    assert post(app.test_client(), "/api/login", credentials).get_json()["duelTutorialPending"] is False
+
+
 def test_online_count_tracks_connected_accounts(game):
     app, _ = game
     guest = app.test_client()

@@ -220,6 +220,18 @@ def test_database_upgrade_preserves_old_trades_and_stores_short_side(database, p
     assert short_trade.side == "short"
 
 
+def test_database_upgrade_leaves_existing_users_out_of_duel_tutorial(players):
+    with db.engine.begin() as connection:
+        connection.exec_driver_sql("ALTER TABLE users DROP COLUMN duel_tutorial_pending")
+
+    initialize_database()
+    initialize_database()
+
+    users = db.session.scalars(select(User).order_by(User.id)).all()
+    assert [user.id for user in users] == list(players)
+    assert all(user.duel_tutorial_pending is False for user in users)
+
+
 def test_active_match_cannot_create_saved_results(players):
     match = _completed_match("active", players)
     match.status = "active"

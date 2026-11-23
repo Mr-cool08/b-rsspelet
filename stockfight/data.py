@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import and_, create_engine, func, inspect, literal
+from sqlalchemy import and_, create_engine, false, func, inspect, literal
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import URL
@@ -102,6 +102,7 @@ class User(db.Model):
     username_key = db.Column(db.String(160), nullable=False, unique=True)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: _utc_naive(datetime.now(UTC)))
+    duel_tutorial_pending = db.Column(db.Boolean, nullable=False, server_default=false())
 
 
 class PlayerRating(db.Model):
@@ -214,10 +215,16 @@ def initialize_database(schema_url: URL | None = None) -> None:
         else:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
         db.metadata.create_all(connection)
-        columns = inspect(connection).get_columns(TradeHistory.__tablename__)
-        if not any(column["name"] == "side" for column in columns):
+        inspector = inspect(connection)
+        trade_columns = inspector.get_columns(TradeHistory.__tablename__)
+        if not any(column["name"] == "side" for column in trade_columns):
             connection.exec_driver_sql(
                 "ALTER TABLE trade_history ADD COLUMN side VARCHAR(8) NOT NULL DEFAULT 'long'"
+            )
+        user_columns = inspector.get_columns(User.__tablename__)
+        if not any(column["name"] == "duel_tutorial_pending" for column in user_columns):
+            connection.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN duel_tutorial_pending BOOLEAN NOT NULL DEFAULT FALSE"
             )
 
 
