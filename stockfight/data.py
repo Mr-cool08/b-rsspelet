@@ -1,0 +1,370 @@
+"""SQLite models, rating reads, and completed-match persistence."""
+
+from datetime import UTC, datetime
+from decimal import Decimal
+from typing import TYPE_CHECKING
+
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import and_, func, inspect
+from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.orm import Session, aliased
+from sqlalchemy.types import Text, TypeDecorator
+
+from .market_data import (
+    DatabaseMarketProvider,
+    MarketDataUnavailable,
+    MarketProvider,
+    import_csv,
+    seed_demo,
+)
+from .prediction import PREDICTION
+from .ranking import STARTING_ELO, league_progress, rating_changes
+
+if TYPE_CHECKING:
+    from .engine import Match as EngineMatch
+    from .prediction import PredictionMatch
+
+
+__all__ = [
+    "db",
+    "User",
+    "PlayerRating",
+    "Match",
+    "MatchResult",
+    "TradeHistory",
+    "MarketData",
+    "initialize_database",
+    "get_rating",
+    "leaderboard",
+    "profile",
+    "save_match",
+    "import_csv",
+    "seed_demo",
+    "MarketProvider",
+    "DatabaseMarketProvider",
+    "MarketDataUnavailable",
+]
+
+
+db = SQLAlchemy()
+
+
+class ExactDecimal(TypeDecorator[Decimal]):
+    """Use SQLite TEXT affinity to round-trip decimal values exactly."""
+
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        decimal = Decimal(str(value))
+        if not decimal.is_finite():
+            raise ValueError("Expected a finite decimal")
+        return str(decimal)
+
+    def process_result_value(self, value, dialect):
+        return Decimal(value) if value is not None else None
+
+
+def _utc_naive(timestamp: datetime) -> datetime:
+    if timestamp.utcoffset() is not None:
+        return timestamp.astimezone(UTC).replace(tzinfo=None)
+    return timestamp
+
+
+class User(db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), nullable=False)
+    username_key = db.Column(db.String(160), nullable=False, unique=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: _utc_naive(datetime.now(UTC)))
+
+
+class PlayerRating(db.Model):
+    __tablename__ = "player_ratings"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    mode = db.Column(db.String(32), primary_key=True)
+    elo = db.Column(db.Integer, nullable=False, default=STARTING_ELO)
+    matches = db.Column(db.Integer, nullable=False, default=0)
+    wins = db.Column(db.Integer, nullable=False, default=0)
+    losses = db.Column(db.Integer, nullable=False, default=0)
+    draws = db.Column(db.Integer, nullable=False, default=0)
+
+
+class Match(db.Model):
+    __tablename__ = "matches"
+
+    id = db.Column(db.String(64), primary_key=True)
+    mode = db.Column(db.String(32), nullable=False)
+    player1_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    player2_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    status = db.Column(db.String(16), nullable=False)
+    symbol = db.Column(db.String(32), nullable=False)
+    market = db.Column(db.String(32), nullable=False)
+    interval = db.Column(db.String(16), nullable=False)
+    source = db.Column(db.String(255), nullable=False)
+    synthetic = db.Column(db.Boolean, nullable=False)
+    period_start = db.Column(db.DateTime, nullable=False)
+    period_end = db.Column(db.DateTime, nullable=False)
+    started_at = db.Column(db.DateTime, nullable=False)
+    ended_at = db.Column(db.DateTime, nullable=False)
+    duration = db.Column(db.Float, nullable=False)
+    winner_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+
+class MatchResult(db.Model):
+    __tablename__ = "match_results"
+
+    match_id = db.Column(db.String(64), db.ForeignKey("matches.id"), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True, index=True)
+    outcome = db.Column(db.String(8), nullable=False)
+    hp = db.Column(db.Integer, nullable=False)
+    capital = db.Column(ExactDecimal, nullable=False)
+    attack_damage = db.Column(db.Integer, nullable=False)
+    grow_count = db.Column(db.Integer, nullable=False)
+    trades = db.Column(db.Integer, nullable=False)
+    winning_trades = db.Column(db.Integer, nullable=False)
+    losing_trades = db.Column(db.Integer, nullable=False)
+    peak_capital = db.Column(ExactDecimal, nullable=False)
+    elo_before = db.Column(db.Integer, nullable=False)
+    elo_after = db.Column(db.Integer, nullable=False)
+
+
+class TradeHistory(db.Model):
+    __tablename__ = "trade_history"
+
+    id = db.Column(db.Integer, primary_key=True)
+    match_id = db.Column(db.String(64), nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
+    side = db.Column(db.String(8), nullable=False, server_default="long")
+    # These legacy field names record the opening and closing fills for either side.
+    bought_at = db.Column(db.Float, nullable=False)
+    sold_at = db.Column(db.Float, nullable=False)
+    buy_price = db.Column(ExactDecimal, nullable=False)
+    sell_price = db.Column(ExactDecimal, nullable=False)
+    invested = db.Column(ExactDecimal, nullable=False)
+    profit = db.Column(ExactDecimal, nullable=False)
+    choice = db.Column(db.String(16), nullable=False)
+    damage = db.Column(db.Integer, nullable=False)
+
+    __table_args__ = (
+        db.ForeignKeyConstraint(["match_id", "user_id"], ["match_results.match_id", "match_results.user_id"]),
+        db.Index("ix_trade_history_match_user", "match_id", "user_id"),
+    )
+
+
+class MarketData(db.Model):
+    __tablename__ = "market_data"
+
+    id = db.Column(db.Integer, primary_key=True)
+    symbol = db.Column(db.String(32), nullable=False)
+    market = db.Column(db.String(32), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    open = db.Column(ExactDecimal, nullable=False)
+    high = db.Column(ExactDecimal, nullable=False)
+    low = db.Column(ExactDecimal, nullable=False)
+    close = db.Column(ExactDecimal, nullable=False)
+    volume = db.Column(db.BigInteger, nullable=False)
+    name = db.Column(db.String(160), nullable=False, default="")
+    interval = db.Column(db.String(16), nullable=False)
+    source = db.Column(db.String(255), nullable=False)
+    synthetic = db.Column(db.Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "symbol", "market", "interval", "source", "synthetic", "timestamp",
+            name="uq_market_data_series_timestamp",
+        ),
+    )
+
+
+def initialize_database() -> None:
+    with db.engine.begin() as connection:
+        # SQLite must acquire the write lock before inspecting the schema.
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+        db.metadata.create_all(connection)
+        columns = inspect(connection).get_columns(TradeHistory.__tablename__)
+        if not any(column["name"] == "side" for column in columns):
+            connection.exec_driver_sql(
+                "ALTER TABLE trade_history ADD COLUMN side VARCHAR(8) NOT NULL DEFAULT 'long'"
+            )
+
+
+def _new_rating(user_id: int, mode: str) -> PlayerRating:
+    return PlayerRating(
+        user_id=user_id, mode=mode, elo=STARTING_ELO, matches=0, wins=0, losses=0, draws=0,
+    )
+
+
+def get_rating(user_id: int, mode: str = "ranked") -> PlayerRating:
+    """A missing rating is returned as a transient starting rating."""
+    rating = db.session.get(PlayerRating, (user_id, mode), populate_existing=True)
+    return rating if rating is not None else _new_rating(user_id, mode)
+
+
+def leaderboard(mode: str = "ranked", limit: int = 50) -> list[dict]:
+    elo = func.coalesce(PlayerRating.elo, STARTING_ELO)
+    wins = func.coalesce(PlayerRating.wins, 0)
+    matches = func.coalesce(PlayerRating.matches, 0)
+    rows = db.session.execute(
+        db.select(User.username, elo, wins, matches)
+        .outerjoin(PlayerRating, and_(PlayerRating.user_id == User.id, PlayerRating.mode == mode))
+        .order_by(elo.desc(), wins.desc(), User.username_key, User.id)
+        .limit(max(0, limit))
+    )
+    return [
+        {"username": username, "elo": points, "league": league_progress(points)["league"],
+         "wins": win_count, "matches": match_count}
+        for username, points, win_count, match_count in rows
+    ]
+
+
+def profile(user_id: int, mode: str = "ranked") -> dict:
+    opponent_result = aliased(MatchResult)
+    opponent = aliased(User)
+    history = (
+        db.select(
+            MatchResult.user_id, Match.id.label("match_id"), opponent.username.label("opponent"),
+            MatchResult.outcome, Match.symbol,
+            MatchResult.elo_before, MatchResult.elo_after, Match.ended_at,
+        )
+        .join_from(MatchResult, Match, MatchResult.match_id == Match.id)
+        .join(opponent_result, and_(opponent_result.match_id == Match.id, opponent_result.user_id != user_id))
+        .join(opponent, opponent.id == opponent_result.user_id)
+        .where(MatchResult.user_id == user_id, Match.mode == mode)
+        .subquery()
+    )
+    # Read Elo and history from the same SQLite snapshot.
+    rows = db.session.execute(
+        db.select(PlayerRating, history)
+        .select_from(User)
+        .outerjoin(PlayerRating, and_(PlayerRating.user_id == User.id, PlayerRating.mode == mode))
+        .outerjoin(history, history.c.user_id == User.id)
+        .where(User.id == user_id)
+        .order_by(history.c.ended_at.desc(), history.c.match_id.desc())
+        .execution_options(populate_existing=True)
+    ).all()
+    rating = rows[0][0] if rows else None
+    if rating is None:
+        rating = _new_rating(user_id, mode)
+    return {
+        "elo": rating.elo,
+        **league_progress(rating.elo),
+        "matches": rating.matches,
+        "wins": rating.wins,
+        "losses": rating.losses,
+        "draws": rating.draws,
+        "winRate": round(rating.wins * 100 / rating.matches, 1) if rating.matches else 0,
+        "history": [
+            {
+                "id": row.match_id,
+                "opponent": row.opponent,
+                "outcome": row.outcome,
+                "symbol": row.symbol,
+                "eloBefore": row.elo_before,
+                "eloAfter": row.elo_after,
+                "endedAt": row.ended_at.replace(tzinfo=UTC).isoformat(),
+            }
+            for row in rows
+            if row.match_id is not None
+        ],
+    }
+
+
+def save_match(
+    engine_match: "EngineMatch | PredictionMatch", started_at: datetime, ended_at: datetime,
+) -> dict[int, dict[str, int]]:
+    """Persist a completed match once, returning its original Elo on retries."""
+    if engine_match.status != "finished":
+        raise ValueError("Only finished matches can be saved")
+    scenario = engine_match.scenario
+    mode = engine_match.mode.key
+    winner_id = engine_match.winner_id
+    first_id, second_id = engine_match.players
+    if winner_id is not None and winner_id not in (first_id, second_id):
+        raise ValueError("Winner must be a match participant")
+    if not 1 <= engine_match.revealed_count <= len(scenario.bars):
+        raise ValueError("A completed match must have a valid revealed market period")
+
+    claim = insert(Match).values(
+        id=engine_match.id,
+        mode=mode,
+        player1_id=first_id,
+        player2_id=second_id,
+        status=engine_match.status,
+        symbol=scenario.symbol,
+        market=scenario.market,
+        interval=scenario.interval,
+        source=scenario.source,
+        synthetic=scenario.synthetic,
+        period_start=_utc_naive(scenario.bars[0].timestamp),
+        period_end=_utc_naive(scenario.bars[engine_match.revealed_count - 1].timestamp),
+        started_at=_utc_naive(started_at),
+        ended_at=_utc_naive(ended_at),
+        duration=engine_match.duration,
+        winner_id=winner_id,
+    ).on_conflict_do_nothing(index_elements=[Match.id])
+
+    with Session(db.engine) as session, session.begin():
+        # Claim this ID before any read. SQLite serializes writers, which also
+        # protects rating updates when different matches share a participant.
+        if session.execute(claim).rowcount == 0:
+            saved = session.scalars(db.select(MatchResult).where(MatchResult.match_id == engine_match.id))
+            return {row.user_id: {"eloBefore": row.elo_before, "eloAfter": row.elo_after} for row in saved}
+
+        ratings = []
+        for user_id in (first_id, second_id):
+            if session.get(User, user_id) is None:
+                raise ValueError("Match participants must be registered users")
+            rating = session.get(PlayerRating, (user_id, mode))
+            if rating is None:
+                rating = _new_rating(user_id, mode)
+                session.add(rating)
+            ratings.append(rating)
+
+        first, second = ratings
+        first_score = 0.5 if winner_id is None else int(winner_id == first_id)
+        new_ratings = rating_changes(first.elo, second.elo, first_score, k=engine_match.mode.rating_k)
+        changes = {}
+        for rating, new_elo in zip(ratings, new_ratings, strict=True):
+            user_id = rating.user_id
+            changes[user_id] = {"eloBefore": rating.elo, "eloAfter": new_elo}
+            summary = engine_match.summary(user_id)
+            if mode == PREDICTION.key:
+                summary.update(capital=0, peakCapital=0, growCount=0, trades=0, winningTrades=0, losingTrades=0)
+            outcome = "draw"
+            if winner_id is not None:
+                outcome = "win" if winner_id == user_id else "lose"
+            session.add(MatchResult(
+                match_id=engine_match.id,
+                user_id=user_id,
+                outcome=outcome,
+                hp=summary["hp"],
+                capital=summary["capital"],
+                attack_damage=summary["attackDamage"],
+                grow_count=summary["growCount"],
+                trades=summary["trades"],
+                winning_trades=summary["winningTrades"],
+                losing_trades=summary["losingTrades"],
+                peak_capital=summary["peakCapital"],
+                elo_before=rating.elo,
+                elo_after=new_elo,
+            ))
+            rating.elo = new_elo
+            rating.matches += 1
+            rating.wins += outcome == "win"
+            rating.losses += outcome == "lose"
+            rating.draws += outcome == "draw"
+
+        # Flush the participant results before writing the referencing trades.
+        session.flush()
+        trades = () if mode == PREDICTION.key else engine_match.trades
+        for trade in trades:
+            if trade["user_id"] not in changes:
+                raise ValueError("Trade must belong to a match participant")
+            session.add(TradeHistory(match_id=engine_match.id, **trade))
+        return changes

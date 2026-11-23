@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="sv">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c1119">
+    <title>Stock Fight</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <script defer src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='vendor/lightweight-charts.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/prediction-chart.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand">
+                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="brand-name">STOCK <strong>FIGHT</strong></span>
+            </div>
+            <div class="topbar-tools">
+                <span id="connection-status" class="connection" role="status" hidden></span>
+                <div id="header-account" class="header-account" hidden>
+                    <span id="header-name" class="header-name"></span>
+                    <button id="header-logout" class="header-button" type="button" data-action="logout" hidden>Logga ut</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="stage" id="main">
+        <section id="auth-screen" class="screen auth-screen" aria-label="Stock Fight">
+            <div class="auth-intro">
+                <div class="intro-copy">
+                    <h1>Börsduell<br><em>i realtid.</em></h1>
+                    <p>Handla med virtuella pengar mot en annan spelare eller en bot.</p>
+                </div>
+                <div class="intro-chart" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+            <div class="auth-card">
+                <h2 id="auth-title" class="card-title">Spelarkonto</h2>
+                <div class="auth-tabs" role="group" aria-label="Välj kontoåtgärd">
+                    <button type="button" data-action="auth-login" aria-pressed="true">Logga in</button>
+                    <button type="button" data-action="auth-register" aria-pressed="false">Registrera</button>
+                </div>
+                <form id="auth-form" method="post" aria-labelledby="auth-title">
+                    <label class="field">
+                        <span>Spelarnamn</span>
+                        <input name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+                    </label>
+                    <label class="field">
+                        <span>Lösenord</span>
+                        <input name="password" type="password" autocomplete="current-password" required>
+                    </label>
+                    <label class="field" id="invite-field" hidden>
+                        <span>Inbjudningskod</span>
+                        <input name="inviteCode" type="text" spellcheck="false" autocapitalize="none" autocomplete="off">
+                    </label>
+                    <p id="auth-error" class="form-error" role="alert" hidden></p>
+                    <button id="auth-submit" class="button button-primary auth-submit" type="submit" disabled>Logga in</button>
+                </form>
+            </div>
+        </section>
+
+        <section id="menu-screen" class="screen menu-screen" aria-label="Huvudmeny" hidden>
+            <div class="menu-main">
+                <div class="menu-greeting">
+                    <p class="eyebrow">Spelare</p>
+                    <h1 id="menu-name" class="screen-title">Stock Fight</h1>
+                </div>
+                <div class="play-panel">
+                    <div class="play-decoration" aria-hidden="true">
+                        <i></i><i></i><i></i>
+                    </div>
+                    <div class="play-copy">
+                        <h2>Rankad<br>duell</h2>
+                        <p>Spela 1 mot 1 om Elo.</p>
+                    </div>
+                    <button class="button button-primary play-button" type="button" data-action="play">
+                        PLAY <span class="arrow-right" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="bot-panel panel prediction-menu">
+                    <div>
+                        <h2>Ritduell</h2>
+                        <p id="prediction-description">Rita nästa kursrörelse. Den som kommer närmast gör skada.</p>
+                    </div>
+                    <div class="panel-actions">
+                        <button class="button button-secondary" type="button" data-action="play-prediction" aria-describedby="prediction-description">
+                            Spela ritduell <span class="arrow-right" aria-hidden="true"></span>
+                        </button>
+                        <button class="button button-secondary" type="button" data-action="practice-prediction">Öva ritduell</button>
+                    </div>
+                </div>
+                <div class="bot-panel panel">
+                    <div>
+                        <h2>Botduell</h2>
+                        <p id="bot-description">Orankad duell med svårighetsgrad anpassad till ditt Elo.</p>
+                    </div>
+                    <div class="panel-actions">
+                        <button class="button button-secondary" type="button" data-action="play-bot" aria-describedby="bot-description">
+                            <span id="bot-start-label">Spela mot bot</span><span class="arrow-right" aria-hidden="true"></span>
+                        </button>
+                        <button class="button button-secondary" type="button" data-action="help">Så spelar du</button>
+                    </div>
+                </div>
+                <div class="bot-panel panel">
+                    <div>
+                        <h2>Vänduell</h2>
+                        <p>Spela en orankad handelsduell mot en vän.</p>
+                    </div>
+                    <button class="button button-secondary" type="button" data-action="friend-create">Spela med en vän</button>
+                </div>
+            </div>
+            <aside class="menu-side">
+                <div class="rating-panel panel">
+                    <div class="rating-top">
+                        <div>
+                            <p class="eyebrow">Handelsduell</p>
+                            <h2 id="menu-level" class="league">—</h2>
+                        </div>
+                        <span class="league-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                    </div>
+                    <div class="rating-value mono"><strong id="menu-elo">—</strong><span>ELO</span></div>
+                    <div class="progress-labels">
+                        <span id="menu-next">Nästa nivå</span>
+                        <span id="menu-progress-label" class="mono">0 %</span>
+                    </div>
+                    <progress id="menu-progress" class="meter league-meter" aria-label="Mot nästa nivå" max="100" value="0"></progress>
+                </div>
+                <nav class="menu-nav" aria-label="Spelarmeny">
+                    <button class="menu-link" type="button" data-action="ranking">
+                        <span class="menu-icon icon-ranking" aria-hidden="true"><i></i><i></i><i></i></span>
+                        <span>Ranking</span><span class="chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-link" type="button" data-action="profile">
+                        <span class="menu-icon icon-profile" aria-hidden="true"></span>
+                        <span>Profil</span><span class="chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-link" type="button" data-action="settings">
+                        <span class="menu-icon icon-settings" aria-hidden="true"><i></i><i></i></span>
+                        <span>Inställningar</span><span class="chevron" aria-hidden="true"></span>
+                    </button>
+                </nav>
+            </aside>
+        </section>
+
+        <section id="queue-screen" class="screen queue-screen" aria-labelledby="queue-title" hidden>
+            <div class="queue-card panel">
+                <div class="queue-scan" aria-hidden="true"><i></i><i></i><b></b></div>
+                <h1 id="queue-title" class="screen-title">Söker motståndare</h1>
+                <dl class="queue-stats">
+                    <div><dt>Väntetid</dt><dd id="queue-wait" class="mono">00:00</dd></div>
+                    <div><dt>Elo-intervall</dt><dd id="queue-radius" class="mono">—</dd></div>
+                </dl>
+                <button class="button button-secondary" type="button" data-action="leave-queue">Lämna kön</button>
+            </div>
+        </section>
+
+        <section id="invite-screen" class="screen queue-screen" aria-labelledby="invite-title" hidden>
+            <div class="queue-card invite-card panel">
+                <h1 id="invite-title" class="screen-title">Vänduell</h1>
+                <p id="invite-status" class="invite-status" role="status"></p>
+                <label id="invite-share" class="field" hidden>
+                    <span>Inbjudningslänk</span>
+                    <input id="invite-link" type="url" readonly>
+                </label>
+                <div class="panel-actions">
+                    <button id="invite-copy" class="button button-secondary" type="button" data-action="friend-copy" hidden>Kopiera länk</button>
+                    <button id="invite-join" class="button button-primary" type="button" data-action="friend-join" hidden>Gå med i duellen</button>
+                    <button id="invite-cancel" class="button button-secondary" type="button" data-action="friend-cancel">Avbryt</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="match-screen" class="screen match-screen" aria-label="Match" data-phase="countdown" data-storm="normal" hidden>
+            <div id="match-hud" class="match-hud">
+                <div class="duelist duelist-self">
+                    <div class="duelist-label"><strong id="self-name">Du</strong><span id="self-hp-label" class="mono">100</span></div>
+                    <progress id="self-hp" class="meter health-meter" aria-label="Din hälsa" max="100" value="100"></progress>
+                </div>
+                <div class="match-clock">
+                    <span id="match-phase">Startar</span>
+                    <strong id="match-time" class="mono">00:00</strong>
+                    <small id="match-clock-detail" hidden></small>
+                </div>
+                <div class="duelist duelist-opponent">
+                    <div class="duelist-label"><strong id="opponent-name">Motståndare</strong><span id="opponent-hp-label" class="mono">100</span></div>
+                    <progress id="opponent-hp" class="meter health-meter" aria-label="Motståndarens hälsa" max="100" value="100"></progress>
+                    <div id="opponent-details" class="opponent-details" hidden>
+                        <span id="opponent-elo" class="mono" hidden></span>
+                        <span id="opponent-position" hidden>Öppen position</span>
+                    </div>
+                </div>
+            </div>
+            <div id="practice-header" class="practice-header" hidden>
+                <div><h1>Öva ritduell</h1><p id="practice-round" class="mono"></p></div>
+                <button class="button button-secondary" type="button" data-action="practice-leave">Avsluta övning</button>
+            </div>
+            <div id="bot-guide" class="bot-guide panel" hidden>
+                <p id="bot-guide-step" role="status"></p>
+                <button class="button button-secondary" type="button" data-action="guide-skip">Hoppa över guiden</button>
+            </div>
+            <div class="match-layout">
+                <section class="market-panel panel" aria-label="Marknad och kursgraf">
+                    <div class="ticker">
+                        <div class="ticker-instrument">
+                            <div class="ticker-label"><strong id="match-symbol" class="mono">—</strong><span id="match-synthetic" class="market-badge" hidden>Syntetisk</span></div>
+                            <div class="ticker-details"><span id="match-name"></span><span id="match-market"></span></div>
+                        </div>
+                        <div class="ticker-quote">
+                            <span class="eyebrow">Kurs</span>
+                            <strong id="match-price" class="mono">—</strong>
+                        </div>
+                    </div>
+                    <div class="chart-frame">
+                        <div id="match-chart" class="chart" role="img" aria-label="Linjegraf över aktiekursen"></div>
+                        <canvas id="prediction-chart" class="prediction-chart" role="img" aria-label="Kurshistorik och nästa kurspunkt. Ange en prognos med procentfältet eller genom att dra på grafens högra sida." hidden></canvas>
+                        <p id="match-chart-status" class="chart-status" role="status" hidden></p>
+                        <div id="countdown-overlay" class="countdown-overlay" hidden>
+                            <span>Matchstart</span>
+                            <strong id="countdown-number" class="mono">3</strong>
+                        </div>
+                        <div id="match-event" class="match-event" role="status" hidden></div>
+                    </div>
+                    <div id="chart-footer" class="chart-footer">
+                        <div id="chart-controls" class="chart-controls" role="group" aria-label="Zoom för kursgrafen" hidden>
+                            <button class="button button-secondary" type="button" data-action="chart-zoom-out" aria-label="Zooma ut" title="Zooma ut">−</button>
+                            <button class="button button-secondary" type="button" data-action="chart-zoom-in" aria-label="Zooma in" title="Zooma in">+</button>
+                        </div>
+                        <div class="chart-credit"><a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView Lightweight Charts™</a> · © 2025 TradingView, Inc.</div>
+                    </div>
+                </section>
+                <section id="trade-panel" class="trade-panel panel" aria-label="Position och handel">
+                    <dl class="trade-stats">
+                        <div><dt>Tillgängligt</dt><dd id="match-cash" class="mono">—</dd></div>
+                        <div><dt>Investerat</dt><dd id="match-invested" class="mono">—</dd></div>
+                        <div id="grow-stat" class="grow-stat"><dt>Grow-bonus</dt><dd id="match-grow" class="mono">—</dd></div>
+                        <div><dt>Position</dt><dd id="match-direction" class="mono">—</dd></div>
+                        <div><dt>Ingångskurs</dt><dd id="match-entry" class="mono">—</dd></div>
+                        <div><dt>Orealiserat resultat</dt><dd id="match-pnl" class="mono">—</dd></div>
+                    </dl>
+                    <div id="open-order" class="trade-order">
+                        <div class="percent-buttons" role="group" aria-label="Andel av tillgängliga krediter att satsa">
+                            <button type="button" data-percent="25" aria-pressed="false">25 %</button>
+                            <button type="button" data-percent="50" aria-pressed="false">50 %</button>
+                            <button type="button" data-percent="75" aria-pressed="false">75 %</button>
+                            <button type="button" data-percent="100" aria-pressed="true">100 %</button>
+                        </div>
+                        <p id="stake-preview" class="trade-detail">Vald insats <strong id="stake-amount" class="mono">—</strong> krediter</p>
+                        <div class="order-buttons" role="group" aria-label="Välj riktning för din position">
+                            <button class="button button-buy direction-button" type="button" data-action="buy" disabled>
+                                <span>UPP <span aria-hidden="true">↗</span></span>
+                                <small>Vinst vid uppgång</small>
+                            </button>
+                            <button class="button button-short direction-button" type="button" data-action="short" disabled>
+                                <span>NER <span aria-hidden="true">↘</span></span>
+                                <small>Vinst vid nedgång</small>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="close-order" class="order-buttons" hidden>
+                        <button class="button button-secondary" type="button" data-action="sell" disabled>STÄNG POSITION</button>
+                    </div>
+                    <div id="sell-choice" class="sell-choice" hidden>
+                        <p id="sell-choice-hint">Uppskattning vid aktuell kurs. Kursen kan ändras före avslut.</p>
+                        <div id="profit-actions" class="order-buttons">
+                            <button class="button button-attack direction-button" type="button" data-action="attack">
+                                <span>ATTACK</span><small id="attack-preview">Gör skada</small>
+                            </button>
+                            <button class="button button-buy direction-button" type="button" data-action="grow">
+                                <span>GROW</span><small id="grow-preview">Bygg kapital och bonus</small>
+                            </button>
+                        </div>
+                        <button id="pending-close" class="button button-secondary" type="button" data-action="confirm-close" hidden>STÄNG POSITION</button>
+                    </div>
+                    <p id="match-feedback" class="match-feedback" role="status" hidden></p>
+                </section>
+                <section id="prediction-panel" class="prediction-panel panel" aria-label="Ritduellens prognos" hidden>
+                    <p id="prediction-status" class="prediction-status" role="status"></p>
+                    <form id="prediction-controls" class="prediction-controls" novalidate>
+                        <p id="prediction-instructions">Dra till höger om linjen eller ange hur många procent du tror att kursen ändras.</p>
+                        <label class="field" for="prediction-move">
+                            <span>Din prognos (%)</span>
+                            <input id="prediction-move" class="mono" type="text" autocomplete="off" spellcheck="false" maxlength="32" placeholder="t.ex. −1,25" aria-describedby="prediction-instructions prediction-feedback">
+                        </label>
+                        <div class="prediction-actions">
+                            <button class="button button-secondary" type="button" data-action="prediction-clear">Rensa</button>
+                            <button class="button button-primary" id="prediction-lock" type="submit">Lås prognos</button>
+                        </div>
+                        <p id="prediction-feedback" class="match-feedback" role="status" hidden></p>
+                    </form>
+                    <dl id="prediction-breakdown" class="prediction-breakdown" hidden>
+                        <div><dt>Facit</dt><dd id="prediction-actual" class="mono">—</dd></div>
+                        <div><dt>Du</dt><dd id="prediction-self" class="mono">—</dd><dd id="prediction-self-error" class="prediction-error">—</dd></div>
+                        <div id="prediction-opponent-breakdown"><dt>Motståndaren</dt><dd id="prediction-opponent" class="mono">—</dd><dd id="prediction-opponent-error" class="prediction-error">—</dd></div>
+                    </dl>
+                    <button id="practice-next" class="button button-primary" type="button" data-action="practice-next" hidden>Nästa runda</button>
+                </section>
+            </div>
+        </section>
+
+        <section id="result-screen" class="screen result-screen" aria-label="Matchresultat" hidden>
+            <div class="result-card panel">
+                <div class="result-hero">
+                    <div>
+                        <p id="result-mode" class="eyebrow">Matchresultat</p>
+                        <h1 id="result-outcome" class="result-title">—</h1>
+                    </div>
+                    <div id="result-elo" class="elo-summary">
+                        <span class="eyebrow">Elo</span>
+                        <strong id="result-elo-delta" class="elo-delta mono">—</strong>
+                        <span class="elo-route mono">
+                            <span class="sr-only">Elo före </span><span id="result-elo-before">—</span><span aria-hidden="true"> → </span><span class="sr-only">Elo efter </span><span id="result-elo-after">—</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="result-instrument">
+                    <strong id="result-symbol">—</strong>
+                    <span id="result-period">—</span>
+                </div>
+                <div id="result-explanation" class="result-detail" hidden>
+                    <p id="result-decisive"></p>
+                    <dl id="result-comparison" class="result-stats result-comparison">
+                        <div><dt>Dina slut-HP</dt><dd id="result-self-hp" class="mono">—</dd></div>
+                        <div><dt id="result-opponent-label">Motståndarens slut-HP</dt><dd id="result-opponent-hp" class="mono">—</dd></div>
+                    </dl>
+                </div>
+                <dl id="result-trade-stats" class="result-stats">
+                    <div><dt>Affärer</dt><dd id="result-trades" class="mono">—</dd></div>
+                    <div><dt>Vinstaffärer</dt><dd id="result-wins" class="mono">—</dd></div>
+                    <div><dt>Förlustaffärer</dt><dd id="result-losses" class="mono">—</dd></div>
+                    <div><dt>Attackskada</dt><dd id="result-attack" class="mono">—</dd></div>
+                    <div><dt>Grow-val</dt><dd id="result-grow" class="mono">—</dd></div>
+                    <div><dt>Högsta kapital</dt><dd id="result-peak" class="mono">—</dd></div>
+                    <div><dt>Kapital vid slut</dt><dd id="result-capital" class="mono">—</dd></div>
+                    <div id="result-trade-hp-stat"><dt>Hälsa vid slut</dt><dd id="result-hp" class="mono">—</dd></div>
+                    <div><dt>Matchlängd</dt><dd id="result-duration" class="mono">—</dd></div>
+                </dl>
+                <dl id="result-prediction-stats" class="result-stats" hidden>
+                    <div><dt>Rundor</dt><dd id="result-rounds" class="mono">—</dd></div>
+                    <div id="result-prediction-attack-stat"><dt>Attackskada</dt><dd id="result-prediction-attack" class="mono">—</dd></div>
+                    <div id="result-prediction-hp-stat"><dt>Hälsa vid slut</dt><dd id="result-prediction-hp" class="mono">—</dd></div>
+                    <div><dt>Matchlängd</dt><dd id="result-prediction-duration" class="mono">—</dd></div>
+                </dl>
+                <details id="result-trade-detail" class="result-detail" hidden>
+                    <summary>Dina affärer</summary>
+                    <div class="table-wrap" tabindex="0" aria-label="Dina affärer">
+                        <table>
+                            <thead><tr><th scope="col">Tid</th><th scope="col">Position</th><th scope="col">Avslut</th><th scope="col">Resultat</th><th scope="col">Skada</th></tr></thead>
+                            <tbody id="result-trade-list"></tbody>
+                        </table>
+                    </div>
+                </details>
+                <details id="result-round-detail" class="result-detail" hidden>
+                    <summary>Prognos och facit per runda</summary>
+                    <div class="table-wrap" tabindex="0" aria-label="Prognos och facit per runda">
+                        <table>
+                            <thead><tr><th scope="col">Runda</th><th scope="col">Facit</th><th scope="col">Du</th><th scope="col">Ditt fel</th><th id="round-opponent-header" scope="col">Motståndaren</th><th id="round-opponent-error-header" scope="col">Motståndarens fel</th><th id="round-impact-header" scope="col">HP-förändring</th></tr></thead>
+                            <tbody id="result-round-list"></tbody>
+                        </table>
+                    </div>
+                </details>
+                <div class="result-actions">
+                    <button id="result-rematch" class="button button-primary" type="button" data-action="play-again">PLAY AGAIN</button>
+                    <button class="button button-secondary" type="button" data-action="main-menu">MAIN MENU</button>
+                    <p id="result-revenge-status" class="match-feedback" role="status" hidden></p>
+                </div>
+            </div>
+        </section>
+
+        <noscript><p class="form-error">Aktivera JavaScript för att spela Stock Fight.</p></noscript>
+    </main>
+
+    <dialog id="help-dialog" class="game-dialog" aria-labelledby="help-title">
+        <div class="dialog-header">
+            <h2 id="help-title" class="card-title">Så spelar du</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng spelguiden">×</button>
+        </div>
+        <div class="help-content">
+            <h3>Handelsduell</h3>
+            <p>Välj en insats. Tryck UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen för att avsluta affären.</p>
+            <p>Med vinst kan du välja Attack för att byta vinsten mot skada eller Grow för att behålla vinsten och ladda nästa attack. En förlust kostar krediter och kan kosta HP.</p>
+            <button class="button button-primary" type="button" data-action="guide-start">Starta guidad botduell</button>
+            <h3>Ritduell</h3>
+            <p>Dra på grafens högra sida eller skriv hur många procent nästa stängningskurs ändras. Lås din prognos. I en duell gör den närmaste prognosen skada.</p>
+            <button class="button button-secondary" type="button" data-action="practice-prediction">Öva ritduell</button>
+        </div>
+    </dialog>
+
+    <dialog id="bot-guide-dialog" class="game-dialog" aria-labelledby="bot-guide-title">
+        <div class="dialog-header">
+            <h2 id="bot-guide-title" class="card-title">Din första handelsduell</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng introduktionen">×</button>
+        </div>
+        <div class="help-content">
+            <p>Välj UPP om du tror att kursen stiger eller NER om du tror att den faller. Stäng positionen när du vill avsluta affären.</p>
+            <p>Prova vad som händer om du stänger en affär med 10 krediter i vinst och ingen Grow-bonus.</p>
+            <div class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till">
+                <button class="button button-attack" type="button" data-action="guide-example-attack" aria-pressed="false">Prova Attack</button>
+                <button class="button button-buy" type="button" data-action="guide-example-grow" aria-pressed="false">Prova Grow</button>
+            </div>
+            <p id="guide-example-result" role="status"></p>
+            <div class="panel-actions">
+                <button class="button button-primary" type="button" data-action="guide-begin">Starta guidad botduell</button>
+                <button class="button button-secondary" type="button" data-action="guide-bypass">Hoppa över guiden</button>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="ranking-dialog" class="game-dialog" aria-labelledby="ranking-title">
+        <div class="dialog-header">
+            <h2 id="ranking-title" class="card-title">Ranking</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng ranking">×</button>
+        </div>
+        <label class="mode-picker">
+            <span>Spelläge</span>
+            <select id="ranking-mode" class="setting-select">
+                <option value="ranked">Handelsduell</option>
+                <option value="prediction">Ritduell</option>
+            </select>
+        </label>
+        <p id="ranking-status" class="dialog-status" role="status" hidden></p>
+        <div class="table-wrap" tabindex="0" aria-label="Rankingtavla">
+            <table>
+                <thead><tr><th scope="col">#</th><th scope="col">Spelare</th><th scope="col">Elo</th><th scope="col">Liga</th><th scope="col">Vinster</th><th scope="col">Matcher</th></tr></thead>
+                <tbody id="ranking-list"></tbody>
+            </table>
+        </div>
+    </dialog>
+
+    <dialog id="profile-dialog" class="game-dialog" aria-labelledby="profile-title">
+        <div class="dialog-header">
+            <h2 id="profile-title" class="card-title">Profil</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng profil">×</button>
+        </div>
+        <label class="mode-picker">
+            <span>Spelläge</span>
+            <select id="profile-mode" class="setting-select">
+                <option value="ranked">Handelsduell</option>
+                <option value="prediction">Ritduell</option>
+            </select>
+        </label>
+        <div class="profile-player">
+            <strong id="profile-name">—</strong>
+            <span id="profile-league">—</span>
+        </div>
+        <dl class="profile-stats">
+            <div><dt>Elo</dt><dd id="profile-elo" class="mono">—</dd></div>
+            <div><dt>Matcher</dt><dd id="profile-matches" class="mono">—</dd></div>
+            <div><dt>Vinster</dt><dd id="profile-wins" class="mono">—</dd></div>
+            <div><dt>Förluster</dt><dd id="profile-losses" class="mono">—</dd></div>
+            <div><dt>Oavgjorda</dt><dd id="profile-draws" class="mono">—</dd></div>
+            <div><dt>Vinstprocent</dt><dd id="profile-win-rate" class="mono">—</dd></div>
+        </dl>
+        <h3 class="history-title">Matchhistorik</h3>
+        <p id="profile-status" class="dialog-status" role="status" hidden></p>
+        <div class="table-wrap" tabindex="0" aria-label="Matchhistorik">
+            <table>
+                <thead><tr><th scope="col">Motståndare</th><th scope="col">Utfall</th><th scope="col">Aktie</th><th scope="col">Elo</th><th scope="col">Datum</th></tr></thead>
+                <tbody id="profile-history"></tbody>
+            </table>
+        </div>
+    </dialog>
+
+    <dialog id="settings-dialog" class="game-dialog settings-dialog" aria-labelledby="settings-title">
+        <div class="dialog-header">
+            <h2 id="settings-title" class="card-title">Inställningar</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng inställningar">×</button>
+        </div>
+        <label class="setting">
+            <strong>Graftyp</strong>
+            <select id="setting-chart-type" class="setting-select">
+                <option value="line">Linjegraf</option>
+                <option value="candlestick">Ljusstaplar</option>
+            </select>
+        </label>
+        <label class="setting">
+            <span><strong>Ljud</strong><small>Ljudeffekter vid attacker, Grow och matchslut.</small></span>
+            <input id="setting-sound" class="setting-toggle" type="checkbox">
+        </label>
+        <label class="setting">
+            <span><strong>Kraftiga animationer</strong><small>Skärmeffekter vid bland annat skada och KO.</small></span>
+            <input id="setting-effects" class="setting-toggle" type="checkbox" checked>
+        </label>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

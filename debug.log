@@ -1,0 +1,10 @@
+[1123/093515.896:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/093606.038:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/093645.410:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/093703.229:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/093732.055:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/093737.068:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/093756.574:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/093801.592:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/103225.869:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1123/103225.890:ERROR:ui\gl\direct_composition_support.cc:252] GetGpuDriverOverlayInfo: Failed to retrieve video device
