@@ -61,7 +61,7 @@ def create_app(config=None):
         app.config.update(config)
     app.config.setdefault("COMPANY_MARKET_BACKGROUND", not app.testing)
     if "COMPANY_MARKET_PROVIDER" not in app.config:
-        app.config["COMPANY_MARKET_PROVIDER"] = None if app.testing else configured_provider()
+        app.config["COMPANY_MARKET_PROVIDER"] = None if app.testing else configured_provider(app.instance_path)
     app.config.setdefault("AUTO_SEED_HISTORICAL", not app.testing and env_flag("AUTO_SEED_HISTORICAL", True))
     if not 0.25 <= app.config["MARKET_TICK_SECONDS"] <= 60:
         raise ValueError("MARKET_TICK_SECONDS måste vara mellan 0,25 och 60.")

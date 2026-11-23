@@ -335,7 +335,6 @@
         }
         sessionVersion += 1;
         guideSeen = preference(`guide.seen.${user.id}`, "false") === "true";
-        put("menu-name", user.username);
         put("menu-level", "—");
         put("menu-elo", "—");
         put("menu-progress-label", "—");
@@ -364,7 +363,13 @@
         const { step, direction, closed, profit, saving } = tutorial;
         const last = step === tutorialSteps;
         const canAdvance = (step !== 2 || Boolean(direction)) && (step !== 3 || Boolean(profit));
-        put("tutorial-progress", t("Steg {step} av {total}", { step, total: tutorialSteps }));
+        const indicator = byId("tutorial-progress");
+        indicator.setAttribute("aria-valuenow", String(step));
+        indicator.setAttribute("aria-valuetext", t("Steg {step} av {total}", { step, total: tutorialSteps }));
+        for (const [index, segment] of Array.from(indicator.children).entries()) {
+            segment.classList.toggle("is-complete", index < step - 1);
+            segment.classList.toggle("is-current", index === step - 1);
+        }
         for (let page = 1; page <= tutorialSteps; page += 1) show(`tutorial-page-${page}`, page === step);
         for (const [action, selected] of [["up", direction], ["down", direction], ["attack", profit], ["grow", profit]]) {
             for (const button of buttons(`tutorial-${action}`)) {
@@ -375,7 +380,7 @@
         putLocalized("tutorial-profit-feedback", tutorialProfitFeedback[profit] ?? "");
         show("tutorial-direction-feedback", Boolean(direction));
         show("tutorial-profit-feedback", Boolean(profit));
-        disable("tutorial-close-position", closed);
+        show("tutorial-close-position", !closed);
         show("tutorial-profit-options", closed);
         show("tutorial-exit", !session.duelTutorialPending);
         disable("tutorial-back", step === 1 || saving);
@@ -922,7 +927,7 @@
     function setActivityCommand(command) {
         activityCommand = command;
         for (const action of activityActions) disable(action, Boolean(command));
-        putLocalized("bot-start-label", command?.event === "bot_start" ? "Startar …" : "Spela mot bot");
+        putLocalized("bot-start-label", command?.event === "bot_start" ? "Startar …" : "Spela");
         renderQueueActions();
         renderPrivate();
         renderPrediction();
@@ -1030,11 +1035,11 @@
         show("invite-join", Boolean(inviteCode) && !hosting);
         disable("friend-join", !socket?.connected || Boolean(activityCommand));
         disable("friend-cancel", Boolean(activityCommand) || (hosting && !socket?.connected));
-        putLocalized("invite-cancel", hosting || inviteCode ? "Avbryt" : "Till huvudmenyn");
+        putLocalized("invite-cancel", hosting || inviteCode ? "Avbryt" : "Huvudmeny");
         let status = "Inbjudan är inte längre aktiv.";
         if (activityCommand?.event === "private_create") status = "Skapar inbjudan …";
-        else if (hosting) status = "Dela länken och vänta på att din vän går med.";
-        else if (inviteCode) status = "Du har fått en inbjudan till en orankad handelsduell.";
+        else if (hosting) status = "Dela länken med din vän.";
+        else if (inviteCode) status = "Orankad handelsduell";
         putLocalized("invite-status", status);
     }
 
@@ -1244,9 +1249,9 @@
         show("bot-guide", guideActive);
         if (!guideActive) return;
         const preview = visibleSellChoice();
-        let step = "Välj insats och tryck UPP eller NER.";
-        if (match?.self?.position) step = "Följ affären och stäng när du vill.";
-        if (preview) step = preview.kind === "profit" ? "Attack gör skada. Grow sparar vinsten." : "Stäng till aktuell kurs eller fortsätt hålla.";
+        let step = "Insats → Upp eller Ner";
+        if (match?.self?.position) step = "Stäng när du vill.";
+        if (preview) step = preview.kind === "profit" ? "Attack gör skada. Grow sparar vinsten." : "Stäng eller behåll.";
         putLocalized("bot-guide-step", step);
     }
 
@@ -1658,15 +1663,15 @@
                 put("prediction-reason", [verdict.reason, damage].filter(Boolean).join(" "));
             }
         } else if (match.status === "countdown") {
-            putLocalized("prediction-status", "Gör dig redo att gissa nästa kursrörelse.");
+            putLocalized("prediction-status", "Gör dig redo");
         } else if (round?.selfLocked) {
-            putLocalized("prediction-status", "Prognosen är låst. Väntar på facit.");
+            putLocalized("prediction-status", "Prognos låst");
         } else if (predictionCommand) {
             putLocalized("prediction-status", "Låser prognosen …");
         } else if (!socket?.connected || !matchSynchronized) {
             putLocalized("prediction-status", "Väntar på anslutning …");
         } else {
-            putLocalized("prediction-status", round?.opponentLocked ? "Motståndaren har låst sin prognos." : "Hur rör sig kursen härnäst?");
+            putLocalized("prediction-status", round?.opponentLocked ? "Motståndaren har låst sin prognos." : "");
         }
         drawPredictionChart?.({ bars: match.bars, guess, outcome, editable });
     }
@@ -1863,14 +1868,6 @@
         const choosing = ready && Boolean(preview);
         const profitable = preview?.kind === "profit";
         const canOpen = ready && !position && numeric(match?.self?.cash) > 0;
-        const step = preview ? "exit" : position ? "hold" : "entry";
-        for (const item of byId("trade-steps").children) {
-            const current = item.dataset.tradeStep === step;
-            if (current !== item.hasAttribute("aria-current")) {
-                if (current) item.setAttribute("aria-current", "step");
-                else item.removeAttribute("aria-current");
-            }
-        }
         const focusedAction = tradeFocus ?? document.activeElement?.dataset.action;
         if (choosing && profitable && focusedAction === "confirm-close") tradeFocus = "attack";
         if (choosing && !profitable && ["attack", "grow"].includes(focusedAction)) tradeFocus = "confirm-close";
@@ -1886,11 +1883,12 @@
         show("close-order", Boolean(position) && !preview);
         show("sell-choice", Boolean(preview));
         show("profit-actions", profitable);
+        show("sell-choice-hint", Boolean(preview) && !profitable);
         show("pending-close", Boolean(preview) && !profitable);
         renderStake();
         if (preview) {
             putLocalized("sell-choice-title", profitable ? "Använd vinsten" : "Avsluta affären");
-            let hint = t("Vid aktuell kurs");
+            let hint = "";
             if (profitable) {
                 put("attack-preview", t("{damage} HP skada", { damage: formatNumber(preview.attackDamage) }));
                 put("grow-preview", t("{credits} krediter · {bonus} bonus-HP", {
@@ -1995,14 +1993,14 @@
             return;
         }
         const offer = rematchOffer?.matchId === result.id ? rematchOffer : null;
-        putLocalized("result-rematch", "Revansch mot samma spelare");
+        putLocalized("result-rematch", "Revansch");
         disable("play-again", !socket?.connected || Boolean(activityCommand) || !offer?.available || offer.selfAccepted);
         let status = "Revansch är inte tillgänglig.";
         if (activityCommand?.event === "private_rematch") status = "Skickar ditt svar …";
         else if (offer && !offer.available) status = "Motståndaren är inte ansluten.";
         else if (offer?.selfAccepted) status = "Väntar på att motståndaren accepterar.";
         else if (offer?.opponentAccepted) status = "Motståndaren vill ha revansch.";
-        else if (offer) status = "Revanschen startar när båda accepterar.";
+        else if (offer) status = "";
         message("result-revenge-status", status);
     }
 
@@ -2010,47 +2008,31 @@
         const self = data.endActor === "self";
         const opponent = data.endActor === "opponent";
         switch (data.endReason) {
-            case "attack": return t(self ? "Din attack avgjorde matchen." : opponent ? "Motståndarens attack avgjorde matchen." : "Matchen avgjordes av en attack.");
-            case "trade_loss": return t(self ? "Din förlustaffär avslutade matchen." : "Motståndarens förlustaffär avslutade matchen.");
+            case "attack": return t(self ? "Din attack gav KO" : opponent ? "Motståndarens attack gav KO" : "KO genom attack");
+            case "trade_loss": return t(self ? "KO efter din förlustaffär" : "KO efter motståndarens förlustaffär");
             case "market_storm":
             case "final_storm": {
-                const storm = data.endReason === "market_storm" ? "marknadsstormen" : "slutstormen";
+                const storm = data.endReason === "market_storm" ? "Marknadsstorm" : "Slutstorm";
                 if (numeric(data.hp) === 0 && numeric(data.opponentHp) === 0) {
                     const tiebreak = {
-                        capital: "Högst slutkapital avgjorde.",
-                        attack_damage: "Kapitalet var lika, så mest attackskada avgjorde.",
-                    }[data.tiebreak] ?? "Ni hade lika mycket kapital och gjorde lika mycket attackskada.";
-                    return t("Båda slogs ut i {storm}. {tiebreak}", { storm: t(storm), tiebreak: t(tiebreak) });
+                        capital: "Kapital avgjorde",
+                        attack_damage: "Attackskada avgjorde",
+                    }[data.tiebreak] ?? "Lika kapital och skada";
+                    return [t(storm), t("Dubbel KO"), t(tiebreak)].join(" · ");
                 }
-                return t("Matchen avgjordes i {storm}.", { storm: t(storm) });
+                return t(storm);
             }
-            case "knockout": return t("Matchen avgjordes genom knockout.");
-            case "round_limit": return t("Matchen avgjordes av slut-HP efter sista rundan.");
+            case "knockout": return "KO";
+            case "round_limit": return t("Slut-HP avgjorde");
             default: return "";
         }
     }
 
-    function predictionMatchExplanation(data, opponentName) {
-        if (data.endReason === "knockout") {
-            const knockout = t(data.outcome === "win" ? "Du sänkte {opponent} till 0 HP." : "{opponent} sänkte dig till 0 HP.", {
-                opponent: opponentName,
-            });
-            const round = data.lastRound ?? data.rounds?.at(-1);
-            return round ? `${knockout} ${predictionVerdict(round, session.user.id, opponentName).reason}` : knockout;
-        }
-        if (data.endReason === "round_limit") {
-            if (data.outcome === "draw") return t("Ni hade lika mycket HP kvar efter sista rundan.");
-            const winner = data.outcome === "win" ? t("Du") : opponentName;
-            return t("{winner} hade mest HP kvar efter sista rundan.", { winner });
-        }
-        return matchExplanation(data);
-    }
-
     function renderResultDetails(data, mode, preserveDetails) {
         const practice = mode === "prediction_practice";
-        const prediction = mode === "prediction";
         const opponentName = data.opponentName || match?.opponent?.name || t("Motståndaren");
-        const explanation = prediction ? predictionMatchExplanation(data, opponentName) : matchExplanation(data);
+        const explanation = practice ? "" : data.endReason === "round_limit" && data.outcome === "draw"
+            ? t("Lika slut-HP") : matchExplanation(data);
         const comparison = numeric(data.opponentHp) != null;
         show("result-explanation", comparison || Boolean(explanation));
         show("result-comparison", comparison);
@@ -2058,10 +2040,12 @@
         put("result-decisive", explanation);
         put("result-self-hp", formatNumber(data.hp));
         put("result-opponent-hp", formatNumber(data.opponentHp));
-        put("result-opponent-label", prediction ? t("{opponent} · slut-HP", { opponent: opponentName })
-            : t("Motståndarens slut-HP"));
+        put("result-opponent-label", opponentName);
+        progress("result-self-meter", data.hp);
+        progress("result-opponent-meter", data.opponentHp);
         show("result-trade-hp-stat", !comparison);
         show("result-prediction-hp-stat", !practice && !comparison);
+        if (!preserveDetails) byId("result-statistics").open = false;
 
         const tradeLabels = { attack: "Attack", grow: "Grow", loss: "Förlust", flat: "Ingen vinst eller förlust" };
         const trades = (data.tradeDetails ?? []).map((trade) => [
@@ -2083,7 +2067,7 @@
             const impact = round.damage ? " · " + t("{damage} HP i skada", { damage: formatNumber(round.damage) }) : "";
             return [round.number, verdict.title + impact, ...values, forecast(round.opponentMoveBps), error(round.opponentErrorBps)];
         });
-        if (!preserveDetails) byId("result-round-detail").open = rounds.length > 0;
+        if (!preserveDetails) byId("result-round-detail").open = practice && rounds.length > 0;
         show("result-round-detail", rounds.length > 0);
         put("round-opponent-header", opponentName);
         show("round-opponent-header", !practice);
@@ -2146,6 +2130,7 @@
             put("result-peak", formatNumber(data.peakCapital, amountFormat));
             put("result-duration", clock(data.duration));
         }
+        show("result-instrument", !practice);
         const instrument = [instrumentSymbol(data, practice), instrumentName(data, practice), data.market, data.interval].filter(Boolean);
         if (data.synthetic) instrument.push(t("Syntetisk"));
         put("result-symbol", instrument.join(" · "));

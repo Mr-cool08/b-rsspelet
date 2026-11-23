@@ -3,31 +3,30 @@
 
     const content = document.getElementById("company-content");
     const workspace = document.getElementById("company-workspace");
-    const desk = document.getElementById("company-desk");
-    const operations = document.getElementById("company-operations");
-    const tradeHistory = document.getElementById("company-trade-history");
+    const operations = document.getElementById("company-admin");
+    const tradeHistory = document.getElementById("company-reports");
+    const views = [...workspace.querySelectorAll("[data-company-view]")];
     const notice = document.getElementById("company-notice");
     const copy = {
         title: ["Börsföretag", "Trading Firms"],
-        home: ["Till huvudmenyn", "Main menu"],
-        liveMarket: ["Livebörsen", "Live exchange"],
-        administration: ["Firmastyrning", "Firm management"],
-        otherFirms: ["Andra firmor", "Other firms"],
-        sections: ["Kampanjens avdelningar", "Campaign sections"],
-        loading: ["Laddar börsföretaget …", "Loading your trading firm …"],
+        home: ["Huvudmeny", "Main menu"],
+        liveMarket: ["Börs", "Market"],
+        administration: ["Firma", "Firm"],
+        otherFirms: ["Spelarbörs", "Player exchange"],
+        sections: ["Börsföretagets vyer", "Trading firm views"],
+        loading: ["Laddar …", "Loading …"],
         level: ["Nivå {level}", "Level {level}"],
-        day: ["Handelsdag {day}", "Trading day {day}"],
+        day: ["Dag {day}", "Day {day}"],
         cash: ["Kassa", "Cash"],
-        profit: ["Handelsresultat", "Trading profit"],
-        capacity: ["Aktier per order", "Shares per order"],
-        progress: ["Vägen till nästa nivå", "Progress to the next level"],
-        nextLevel: ["{name} på nivå {level}", "{name} at level {level}"],
+        profit: ["Resultat", "Profit"],
+        capacity: ["Max per order", "Max per order"],
+        progress: ["Nästa nivå", "Next level"],
         progressAmount: ["Vinstrekord {actual} av {target}", "Best profit {actual} of {target}"],
-        unlock: ["Låser upp {name} ({symbol})", "Unlocks {name} ({symbol})"],
-        maximumLevel: ["Högsta nivån uppnådd", "Highest level reached"],
-        maxGuide: ["Fortsätt handla för att bygga kapital och träna dina handlare.", "Keep trading to build capital and train your traders."],
+        progressShort: ["Vinstrekord {actual} / {target}", "Best profit {actual} / {target}"],
+        unlock: ["Låser upp {symbol}", "Unlocks {symbol}"],
+        maximumLevel: ["Maxnivå", "Max level"],
         personnel: ["Handlare", "Traders"],
-        personnelGuide: ["Botarna följer livekurserna även när du är borta och handlar i egna positioner med firmans kassa. Pausade botar kan stänga öppna positioner.", "Bots follow live prices while you’re away and trade their own positions using firm cash. Paused bots can close open positions."],
+        personnelGuide: ["Botar handlar med firmans kassa, även när du är borta.", "Bots trade with firm cash, even while you’re away."],
         skill: ["Skicklighet", "Skill"],
         strategy: ["Riskbudget", "Risk budget"],
         careful: ["Försiktig", "Careful"],
@@ -37,54 +36,58 @@
         experienceOne: ["1 affär", "1 trade"],
         active: ["Aktiv", "Active"],
         paused: ["Pausad", "Paused"],
+        pausedGuide: ["Pausade botar kan fortfarande stänga positioner.", "Paused bots can still close positions."],
         pause: ["Pausa", "Pause"],
         resume: ["Aktivera", "Activate"],
         personAction: ["{action} {name}", "{action} {name}"],
-        hire: ["Anställ {name} för {price}", "Hire {name} for {price}"],
-        hireLocked: ["Nästa handlare blir tillgänglig på nivå {level}.", "The next trader becomes available at level {level}."],
-        closeDay: ["Stäng handelsdag", "Close trading day"],
-        closingGuide: ["Bokför dagens realiserade resultat, betala driftkostnaden och börja nästa handelsdag. Öppna positioner följer med.", "Record realised results, pay operating costs, and start the next trading day. Open positions carry over."],
-        closingCost: ["Driftskostnad per dag", "Daily operating cost"],
+        hire: ["Anställ {name} · {price}", "Hire {name} · {price}"],
+        hireLocked: ["Ny handlare på nivå {level}", "New trader at level {level}"],
+        dailyResults: ["Dagens resultat", "Today’s results"],
+        closeDay: ["Stäng dagen", "Close day"],
+        closingGuide: ["Driften betalas. Öppna positioner följer med.", "Costs are paid. Open positions carry over."],
+        closingCost: ["Driftkostnad", "Operating cost"],
+        operations: ["Driftinställningar", "Operating settings"],
         reserve: ["Kassareserv", "Cash reserve"],
-        reserveGuide: ["Reserven skyddar rörelsen men minskar hur mycket du kan handla för.", "The reserve protects operations and reduces the cash available for trading."],
+        reserveGuide: ["Kassa som sparas till driften.", "Cash set aside for costs."],
         standard: ["Standard", "Standard"],
         buffered: ["Buffert", "Buffered"],
         defensive: ["Defensiv", "Defensive"],
         riskOption: ["{policy} · {amount}", "{policy} · {amount}"],
-        desk: ["Handlarnas arbetsbord", "Traders’ desk"],
+        desk: ["Handelsbord", "Trading desk"],
         deskOption: ["{name} · {cost}/dag", "{name} · {cost}/day"],
         lean: ["Basdrift", "Lean"],
         research: ["Analys", "Research"],
         execution: ["Orderutförande", "Execution"],
-        leanDesk: ["Grundvillkor för handlarna.", "Standard terms for traders."],
-        researchDesk: ["Handlarna får ett analysfönster som är {ticks} kurspunkter längre.", "Adds {ticks} quotes to trader analysis windows."],
-        executionDesk: ["{count} extra aktier per handlarorder och {points} procentenheter större handelsbudget.", "Adds {count} shares to each trader order and {points} percentage points to the trading budget."],
+        leanDesk: ["", ""],
+        researchDesk: ["+{ticks} kurser i botarnas analys", "+{ticks} quotes in bot analysis"],
+        executionDesk: ["+{count} aktier per botorder · +{points} procentenheter till riskbudgeten", "+{count} shares per bot order · +{points} percentage points to risk budget"],
         focus: ["Aktiefokus", "Stock focus"],
         allStocks: ["Alla upplåsta aktier", "All unlocked stocks"],
-        strategySettings: ["Botinställningar", "Bot settings"],
+        strategySettings: ["Inställningar", "Settings"],
         signal: ["Handelssignal", "Trading signal"],
         momentum: ["Momentum", "Momentum"],
         mean_reversion: ["Återgång till snittet", "Mean reversion"],
         breakout: ["Utbrott", "Breakout"],
-        momentumGuide: ["Följer prisets riktning under analysfönstret.", "Follows the price trend over the analysis window."],
-        mean_reversionGuide: ["Handlar mot kursens avvikelse från genomsnittet.", "Trades against deviations from the average price."],
-        breakoutGuide: ["Handlar i riktningen priset bryter ut från sitt tidigare intervall.", "Trades in the direction of a breakout from the previous price range."],
-        lookback: ["Analysfönster (kurspunkter)", "Analysis window (quotes)"],
+        momentumGuide: ["Följer trenden.", "Follows the trend."],
+        mean_reversionGuide: ["Handlar mot snittkursen.", "Trades toward the average price."],
+        breakoutGuide: ["Följer utbrott ur kursintervallet.", "Follows breakouts from the price range."],
+        lookback: ["Analysfönster (kurser)", "Analysis window (quotes)"],
         threshold: ["Signaltröskel (%)", "Signal threshold (%)"],
         stopLoss: ["Stop-loss (%)", "Stop-loss (%)"],
         takeProfit: ["Vinstmål (%)", "Take profit (%)"],
-        saveBot: ["Spara botinställningar", "Save bot settings"],
+        saveBot: ["Spara", "Save"],
+        reportsTab: ["Rapporter", "Reports"],
         reports: ["Dagsrapporter", "Daily reports"],
-        noReports: ["Stäng handelsdagen för att bokföra dagens resultat och driftskostnad här.", "Close the trading day to record its results and operating cost here."],
+        noReports: ["Första rapporten skapas när du stänger dagen.", "Close the day to create your first report."],
         reportDay: ["Dag", "Day"],
         reportTrading: ["Egna affärer", "Own trades"],
         reportEmployees: ["Handlare", "Traders"],
         reportCost: ["Drift", "Costs"],
         reportNet: ["Netto", "Net"],
-        equipment: ["Utöka kapaciteten", "Expand capacity"],
-        equipmentBenefit: ["{count} extra aktier per affär", "{count} additional shares per trade"],
-        equipmentOne: ["1 extra aktie per affär", "1 additional share per trade"],
-        equipmentBuy: ["Uppgradera för {price}", "Upgrade for {price}"],
+        equipment: ["Orderkapacitet", "Order capacity"],
+        equipmentBenefit: ["+{count} aktier per order", "+{count} shares per order"],
+        equipmentOne: ["+1 aktie per order", "+1 share per order"],
+        equipmentBuy: ["Uppgradera · {price}", "Upgrade · {price}"],
         signed_out: ["Logga in igen från huvudmenyn för att spela.", "Sign in again from the main menu to play."],
         reload: ["Försök igen", "Try again"],
         network: ["Anslutningen bröts. Försök igen.", "The connection was lost. Try again."],
@@ -150,96 +153,102 @@
     function renderHeader() {
         return `<header class="company-hero">
             <div>
-                <div class="company-kicker"><span>${tx("level", { level: number(state.level.number) })}</span>
-                    <span>${escape(localized(state.level.name))}</span></div>
                 <h1 class="company-title">${tx("title")}</h1>
-                <div class="company-hero-links">
+                <div class="company-kicker">
+                    <span>${tx("level", { level: number(state.level.number) })}</span>
+                    <span>${escape(localized(state.level.name))}</span>
                     <span>${tx("day", { day: number(state.day) })}</span>
                 </div>
             </div>
-            <dl class="company-balance" aria-live="polite">
-                <div><dt>${tx("cash")}</dt><dd class="company-positive">${money(state.cash)}</dd></div>
-                <div><dt>${tx("profit")}</dt><dd class="${tone(state.profit)}">${money(state.profit, true)}</dd></div>
-                <div><dt>${tx("capacity")}</dt><dd>${number(state.capacity)}</dd></div>
-            </dl>
+            <div class="company-hero-stats">
+                <dl class="company-balance" aria-live="polite">
+                    <div><dt>${tx("cash")}</dt><dd class="company-positive">${money(state.cash)}</dd></div>
+                    <div><dt>${tx("profit")}</dt><dd class="${tone(state.profit)}">${money(state.profit, true)}</dd></div>
+                    <div><dt>${tx("capacity")}</dt><dd>${number(state.capacity)}</dd></div>
+                </dl>
+                ${renderProgress()}
+            </div>
         </header>`;
     }
 
     function renderNavigation() {
         return `<nav class="company-navigation" aria-label="${tx("sections")}">
-            <a href="#company-market">${tx("liveMarket")}</a>
-            <a href="#company-admin">${tx("administration")}</a>
-            <a href="#company-reports">${tx("reports")}</a>
-            <a href="#company-standings">${tx("otherFirms")}</a>
+            <a id="company-tab-market" href="#company-market"><span class="company-nav-icon company-nav-market" aria-hidden="true"></span>${tx("liveMarket")}</a>
+            <a id="company-tab-admin" href="#company-admin"><span class="company-nav-icon" aria-hidden="true">⚙︎</span>${tx("administration")}</a>
+            <a id="company-tab-reports" href="#company-reports"><span class="company-nav-icon" aria-hidden="true">▤</span>${tx("reportsTab")}</a>
+            <a id="company-tab-standings" href="#company-standings"><span class="company-nav-icon" aria-hidden="true">♟︎</span>${tx("otherFirms")}</a>
         </nav>`;
+    }
+
+    function showView() {
+        const selected = views.find((view) => `#${view.id}` === location.hash) ?? views[0];
+        for (const view of views) view.hidden = !state || view !== selected;
+        for (const link of content.querySelectorAll(".company-navigation a")) {
+            if (link.hash === `#${selected.id}`) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+        }
     }
 
     function renderProgress() {
         const next = state.nextLevel;
-        if (!next) {
-            return `<section class="company-panel company-progress" aria-labelledby="company-progress-title">
-                <h2 id="company-progress-title">${tx("maximumLevel")}</h2>
-                <p class="company-muted">${tx("maxGuide")}</p>
-            </section>`;
-        }
+        if (!next) return `<p class="company-progress company-positive">${tx("maximumLevel")}</p>`;
         const attained = Math.min(next.target, Math.max(state.peakProfit, 0));
-        return `<section class="company-panel company-progress" aria-labelledby="company-progress-title">
-            <div class="company-section-heading">
-                <h2 id="company-progress-title">${tx("progress")}</h2>
-                <strong>${tx("nextLevel", { name: localized(next.name), level: number(next.number) })}</strong>
+        const amount = { actual: number(attained), target: money(next.target) };
+        return `<div class="company-progress">
+            <div class="company-progress-footer">
+                <span id="company-progress-title">${tx("progress")} · ${tx("progressShort", amount)}</span>
+                ${next.liveUnlock ? `<strong>${tx("unlock", { symbol: next.liveUnlock.symbol })}</strong>` : ""}
             </div>
             <progress value="${attained}" max="${next.target}" aria-labelledby="company-progress-title"
                 aria-valuetext="${tx("progressAmount", { actual: money(attained), target: money(next.target) })}"></progress>
-            <div class="company-progress-footer">
-                <span>${tx("progressAmount", { actual: money(attained), target: money(next.target) })}</span>
-                ${next.liveUnlock ? `<span>${tx("unlock", { name: localized(next.liveUnlock.name), symbol: next.liveUnlock.symbol })}</span>` : ""}
-            </div>
-        </section>`;
+        </div>`;
     }
 
     function renderAdministration() {
         const admin = state.administration;
         if (!admin) return "";
         const desk = admin.desks.find(({ id }) => id === admin.desk);
+        const deskGuide = tx(`${desk.id}Desk`, {
+            points: number(desk.stakeBonus), count: number(desk.capacityBonus), ticks: number(desk.lookbackBonus),
+        });
         const options = (items, current, format) => items.map((item) =>
             `<option value="${escape(item.id)}"${item.id === current ? " selected" : ""}>${format(item)}</option>`).join("");
-        return `<section id="company-admin" class="company-panel company-admin" aria-labelledby="company-admin-title">
-            <h2 id="company-admin-title">${tx("administration")}</h2>
-            <div class="company-admin-settings">
-                <label for="company-reserve">${tx("reserve")}</label>
-                <select id="company-reserve" data-policy="reserve" aria-describedby="company-reserve-guide"${pending ? " disabled" : ""}>
-                    ${options(admin.reservePolicies, admin.reservePolicy, ({ id, amount }) => tx("riskOption", { policy: text(id), amount: money(amount) }))}
-                </select>
-                <p id="company-reserve-guide" class="company-muted">${tx("reserveGuide")}</p>
-                <label for="company-admin-desk">${tx("desk")}</label>
-                <select id="company-admin-desk" data-policy="desk" aria-describedby="company-desk-guide"${pending ? " disabled" : ""}>
-                    ${options(admin.desks, admin.desk, ({ id, cost }) => tx("deskOption", { name: text(id), cost: money(cost) }))}
-                </select>
-                <p id="company-desk-guide" class="company-muted">${tx(`${desk.id}Desk`, {
-                    points: number(desk.stakeBonus), count: number(desk.capacityBonus), ticks: number(desk.lookbackBonus),
-                })}</p>
-            </div>
+        return `<section class="company-panel company-admin" aria-labelledby="company-admin-title">
+            <h2 id="company-admin-title">${tx("dailyResults")}</h2>
             <div class="company-close-day">
-                <p class="company-muted">${tx("closingGuide")}</p>
                 <dl>
                     <div><dt>${tx("reportTrading")}</dt><dd class="${tone(admin.dayTradingProfit)}">${money(admin.dayTradingProfit, true)}</dd></div>
                     <div><dt>${tx("reportEmployees")}</dt><dd class="${tone(admin.dayEmployeeProfit)}">${money(admin.dayEmployeeProfit, true)}</dd></div>
                     <div><dt>${tx("closingCost")}</dt><dd class="company-cost">${money(admin.closingCost)}</dd></div>
                 </dl>
-                <button class="button button-secondary" id="company-close-day" type="button" data-command="close_day"
-                    ${pending || state.cash < admin.closingCost ? "disabled" : ""}>${tx("closeDay")}</button>
+                <button class="button button-primary" id="company-close-day" type="button" data-command="close_day"
+                    aria-describedby="company-close-guide"${pending || state.cash < admin.closingCost ? " disabled" : ""}>${tx("closeDay")}<span aria-hidden="true">→</span></button>
+                <p class="company-muted" id="company-close-guide">${tx(state.cash < admin.closingCost ? "closing_cost_unavailable" : "closingGuide")}</p>
             </div>
+            <details id="company-operating-settings" class="company-details"${document.getElementById("company-operating-settings")?.open ? " open" : ""}>
+                <summary>${tx("operations")}</summary>
+                <div class="company-admin-settings">
+                    <label for="company-reserve">${tx("reserve")}</label>
+                    <select id="company-reserve" data-policy="reserve" aria-describedby="company-reserve-guide"${pending ? " disabled" : ""}>
+                        ${options(admin.reservePolicies, admin.reservePolicy, ({ id, amount }) => tx("riskOption", { policy: text(id), amount: money(amount) }))}
+                    </select>
+                    <p id="company-reserve-guide" class="company-muted">${tx("reserveGuide")}</p>
+                    <label for="company-admin-desk">${tx("desk")}</label>
+                    <select id="company-admin-desk" data-policy="desk"${deskGuide ? ' aria-describedby="company-desk-guide"' : ""}${pending ? " disabled" : ""}>
+                        ${options(admin.desks, admin.desk, ({ id, cost }) => tx("deskOption", { name: text(id), cost: money(cost) }))}
+                    </select>
+                    ${deskGuide ? `<p id="company-desk-guide" class="company-muted">${deskGuide}</p>` : ""}
+                </div>
+            </details>
         </section>`;
     }
 
-    function renderBotEditor(person) {
+    function renderBotFields(person) {
         if (!person.bot) return "";
         const id = escape(person.id);
         const draft = botDrafts.get(person.id) ?? person.bot;
         const fields = [["lookback", 3, 12, 1], ["threshold", 0.1, 10, 0.1], ["stopLoss", 1, 20, 1], ["takeProfit", 1, 25, 1]];
-        return `<details class="company-bot-settings" data-bot-editor="${id}"${openBotEditors.has(person.id) ? " open" : ""}>
-            <summary>${tx("strategySettings")} <strong>${tx(person.bot.strategy)}</strong></summary>
-            <form id="company-bot-${id}" data-bot="${id}">
+        return `<form id="company-bot-${id}" data-bot="${id}">
                 <label for="company-bot-strategy-${id}">${tx("signal")}</label>
                 <select id="company-bot-strategy-${id}" class="company-field" name="strategy" aria-describedby="company-bot-guide-${id}">
                     ${["momentum", "mean_reversion", "breakout"].map((strategy) => `<option value="${strategy}"${strategy === draft.strategy ? " selected" : ""}>${tx(strategy)}</option>`).join("")}
@@ -251,8 +260,7 @@
                     </label>`).join("")}
                 </div>
                 <button id="company-bot-save-${id}" type="submit" class="button button-secondary">${tx("saveBot")}</button>
-            </form>
-        </details>`;
+            </form>`;
     }
 
     function renderEmployee(person) {
@@ -263,30 +271,35 @@
         return `<article class="company-employee">
             <div class="company-section-heading">
                 <h3>${escape(person.name)}</h3>
-                <span class="${person.active ? "company-positive" : "company-muted"}">${tx(person.active ? "active" : "paused")}</span>
+                <span class="company-trader-status ${person.active ? "company-positive" : "company-muted"}">${tx(person.active ? "active" : "paused")}</span>
             </div>
             <div class="company-skill">
                 <span id="company-skill-${id}">${tx("skill")}</span><strong>${percent(person.skill)}</strong>
             </div>
             <progress value="${person.skill}" max="100" aria-labelledby="company-skill-${id}"></progress>
-            <div class="company-strategy">
-                <label for="company-strategy-${id}">${tx("strategy")}</label>
-                <select id="company-strategy-${id}" data-employee="${id}" data-setting="strategy"${pending ? " disabled" : ""}>
-                    ${["careful", "balanced", "aggressive"].map((choice) => `<option value="${choice}"${choice === strategy ? " selected" : ""}>${tx(choice)}</option>`).join("")}
-                </select>
-                <label for="company-focus-${id}">${tx("focus")}</label>
-                <select id="company-focus-${id}" data-employee="${id}" data-setting="focus"${pending ? " disabled" : ""}>
-                    <option value="all">${tx("allStocks")}</option>
-                    ${(state.liveAssets ?? []).filter((asset) => asset.unlocked).map((asset) => `<option value="${escape(asset.symbol)}"${asset.symbol === focus ? " selected" : ""}>${escape(localized(asset.name))}</option>`).join("")}
-                </select>
-            </div>
             <div class="company-employee-footer">
                 <span>${tx(person.trades === 1 ? "experienceOne" : "experience", { count: number(person.trades) })}</span>
                 <strong class="${tone(person.profit)}">${money(person.profit, true)}</strong>
                 <button class="button button-secondary" id="company-employee-${id}" type="button"
-                    data-command="toggle_employee" data-employee="${id}" aria-label="${tx("personAction", { action: text(action), name: person.name })}"${pending ? " disabled" : ""}>${tx(action)}</button>
+                    data-command="toggle_employee" data-employee="${id}" aria-label="${tx("personAction", { action: text(action), name: person.name })}"${pending ? " disabled" : ""}>
+                    <span aria-hidden="true">${person.active ? "Ⅱ" : "▶︎"}</span>${tx(action)}</button>
             </div>
-            ${renderBotEditor(person)}
+            <details class="company-details company-bot-settings" data-bot-editor="${id}"${openBotEditors.has(person.id) ? " open" : ""}>
+                <summary>${tx("strategySettings")}${person.bot ? `<strong>${tx(person.bot.strategy)}</strong>` : ""}</summary>
+                <div class="company-strategy">
+                    <label for="company-strategy-${id}">${tx("strategy")}</label>
+                    <select id="company-strategy-${id}" data-employee="${id}" data-setting="strategy"${pending ? " disabled" : ""}>
+                        ${["careful", "balanced", "aggressive"].map((choice) => `<option value="${choice}"${choice === strategy ? " selected" : ""}>${tx(choice)}</option>`).join("")}
+                    </select>
+                    <label for="company-focus-${id}">${tx("focus")}</label>
+                    <select id="company-focus-${id}" data-employee="${id}" data-setting="focus"${pending ? " disabled" : ""}>
+                        <option value="all">${tx("allStocks")}</option>
+                        ${(state.liveAssets ?? []).filter((asset) => asset.unlocked).map((asset) => `<option value="${escape(asset.symbol)}"${asset.symbol === focus ? " selected" : ""}>${escape(localized(asset.name))}</option>`).join("")}
+                    </select>
+                </div>
+                ${renderBotFields(person)}
+                ${person.active ? "" : `<p class="company-muted">${tx("pausedGuide")}</p>`}
+            </details>
         </article>`;
     }
 
@@ -298,7 +311,7 @@
             <div class="company-employees">${state.employees.map(renderEmployee).join("")}</div>
             <div class="company-employee-actions">
                 ${hire && state.level.number >= hire.unlockLevel ? `<button class="button button-secondary" id="company-hire" type="button"
-                    data-command="hire"${pending || !hire.available ? " disabled" : ""}>${tx("hire", { name: hire.name, price: money(hire.price) })}</button>` : ""}
+                    data-command="hire"${pending || !hire.available ? " disabled" : ""}><span aria-hidden="true">+</span>${tx("hire", { name: hire.name, price: money(hire.price) })}</button>` : ""}
                 ${hire && state.level.number < hire.unlockLevel ? `<p class="company-muted">${tx("hireLocked", { level: number(hire.unlockLevel) })}</p>` : ""}
             </div>
         </section>`;
@@ -308,17 +321,19 @@
         const upgrade = state.upgrade;
         if (!upgrade) return "";
         return `<section class="company-panel company-upgrade" aria-labelledby="company-upgrade-title">
-            <h2 id="company-upgrade-title">${tx("equipment")}</h2>
-            <p class="company-muted">${tx(upgrade.bonus === 1 ? "equipmentOne" : "equipmentBenefit", { count: number(upgrade.bonus) })}</p>
+            <div>
+                <h2 id="company-upgrade-title">${tx("equipment")}</h2>
+                <p class="company-positive">${tx(upgrade.bonus === 1 ? "equipmentOne" : "equipmentBenefit", { count: number(upgrade.bonus) })}</p>
+            </div>
             <button class="button button-secondary" id="company-upgrade" type="button" data-command="upgrade"
-                ${pending || !upgrade.available ? "disabled" : ""}>${tx("equipmentBuy", { price: money(upgrade.price) })}</button>
+                ${pending || !upgrade.available ? "disabled" : ""}><span aria-hidden="true">↑</span>${tx("equipmentBuy", { price: money(upgrade.price) })}</button>
         </section>`;
     }
 
     function renderReport() {
         const reports = state.administration?.reports ?? [];
         const headings = ["reportDay", "reportTrading", "reportEmployees", "reportCost", "reportNet"];
-        return `<section id="company-reports" class="company-panel company-report" aria-labelledby="company-report-title">
+        return `<section class="company-panel company-report" aria-labelledby="company-report-title">
             <h2 id="company-report-title">${tx("reports")}</h2>
             ${reports.length ? `<div class="company-table-scroll"><table class="company-data-table" aria-labelledby="company-report-title">
                 <thead><tr>${headings.map((heading) => `<th scope="col">${tx(heading)}</th>`).join("")}</tr></thead>
@@ -329,7 +344,8 @@
                     <td>${money(-report.operatingCost, true)}</td>
                     <td class="${tone(report.net)}"><strong>${money(report.net, true)}</strong></td>
                 </tr>`).join("")}</tbody>
-            </table></div>` : `<p class="company-muted">${tx("noReports")}</p>`}
+            </table></div>` : `<div class="company-report-empty"><p class="company-muted">${tx("noReports")}</p>
+                <a class="button button-secondary" href="#company-admin">${tx("administration")}<span aria-hidden="true">→</span></a></div>`}
         </section>`;
     }
 
@@ -339,10 +355,9 @@
         }
         document.title = text("title") + " · Stock Fight";
         renderNotice();
-        desk.hidden = !state;
         if (state) {
             openBotEditors = new Set([...operations.querySelectorAll("[data-bot-editor][open]")].map((editor) => Number(editor.dataset.botEditor)));
-            content.innerHTML = `${renderHeader()}${renderNavigation()}${renderProgress()}`;
+            content.innerHTML = `${renderHeader()}${renderNavigation()}`;
             tradeHistory.innerHTML = renderReport();
             operations.innerHTML = `${renderAdministration()}${renderPersonnel()}${renderUpgrade()}`;
         } else if (error) {
@@ -351,6 +366,7 @@
         } else {
             content.innerHTML = `<h1 class="company-title">${tx("title")}</h1><p class="company-muted">${tx("loading")}</p>`;
         }
+        showView();
         const focus = focusId && document.getElementById(focusId);
         if (focus && !focus.disabled) focus.focus({ preventScroll: true });
     }
@@ -442,6 +458,14 @@
     }
 
     workspace.addEventListener("click", (event) => {
+        const link = event.target.closest("a[href^='#company-']");
+        if (link && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+            event.preventDefault();
+            if (location.hash !== link.hash) history.pushState(null, "", link.hash);
+            showView();
+            if (!content.contains(link)) content.querySelector("[aria-current='location']")?.focus({ preventScroll: true });
+            return;
+        }
         const button = event.target.closest("button[data-command]");
         if (!button || pending) return;
         const { command, employee } = button.dataset;
@@ -492,10 +516,11 @@
     });
 
     window.addEventListener("company:market-command", ({ detail }) => {
-        if (detail?.action === "market_trade") send(detail, "company-market-side");
+        if (detail?.action === "market_trade") send(detail, "company-market-submit");
         if (detail?.action === "buy_peer" || detail?.action === "sell_peer") send(detail);
     });
     window.addEventListener("company:refresh", refreshCompany);
+    window.addEventListener("hashchange", showView);
     window.addEventListener("stockfight:languagechange", () => render(document.activeElement?.id));
     load();
 })();

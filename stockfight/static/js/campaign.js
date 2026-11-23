@@ -5,28 +5,27 @@
     const notice = document.getElementById("career-notice");
     const copy = {
         career: ["Börskarriär", "Market Career"],
-        office: ["Fondkontoret", "Fund office"],
-        home: ["Till huvudmenyn", "Main menu"],
-        loading: ["Laddar fondkontoret …", "Loading the fund office …"],
+        home: ["Huvudmeny", "Main menu"],
+        loading: ["Laddar …", "Loading …"],
         role: ["Din roll", "Your role"],
-        roleProgress: ["Fasta {fixed}/3 · Valbara {elective}/5", "Core {fixed}/3 · Electives {elective}/5"],
-        roleComplete: ["Hela karriären klar", "Career complete"],
+        roleComplete: ["Karriären klar", "Career complete"],
+        checklist: ["{label}: {count} av {total}", "{label}: {count} of {total}"],
         stages: ["Karriärsteg", "Career stages"],
         ranks: ["Lärling|Analytiker|Juniorförvaltare|Portföljförvaltare|Seniorförvaltare|Fondchef",
             "Trainee|Analyst|Junior fund manager|Portfolio manager|Senior fund manager|Fund director"],
         cleared: ["Avklarat", "Completed"],
         current: ["Aktuellt", "Current"],
         locked: ["Låst", "Locked"],
-        mandates: ["Kundmandat", "Client mandates"],
-        fixed: ["Fasta mandat", "Core mandates"],
-        elective: ["Valbara mandat", "Elective mandates"],
-        exam: ["Slutprov", "Crisis exam"],
+        mandates: ["Välj uppdrag", "Choose a mandate"],
+        fixed: ["Obligatoriska", "Core"],
+        elective: ["Valbara", "Electives"],
+        exam: ["Slutprov", "Exam"],
         comeback: ["Comebackuppdrag", "Recovery mandate"],
         passed: ["Godkänt", "Passed"],
         mastery: ["Mästarmål", "Mastery target"],
         best: ["Bästa resultat", "Best result"],
-        examDuration: ["{count} min realtid", "{count} min of live trading"],
-        dayDuration: ["{count} börsdagar", "{count} market days"],
+        examDuration: ["{count} min", "{count} min"],
+        dayDuration: ["{count} dagar", "{count} days"],
         requirements: ["Mål", "Goals"],
         stocks: ["Aktier", "Stocks"],
         details: ["Om uppdraget", "About the mandate"],
@@ -34,73 +33,70 @@
         credits: ["{amount} krediter", "{amount} credits"],
         tools: ["Verktyg", "Tools"],
         slots: ["{used} av {max} valda", "{used} of {max} selected"],
-        analysis: ["Analysvy", "Correlation view"],
+        analysis: ["Samvariation", "Correlation"],
         analysisDesc: ["Se vilka aktier som rör sig tillsammans.", "See which stocks move together."],
-        stop: ["Automatisk säljorder", "Automatic sell order"],
+        stop: ["Automatisk säljorder", "Auto-sell"],
         stopDesc: ["Sälj vid en stoppkurs eller ett vinstmål.", "Sell at a stop price or profit target."],
-        extra: ["Extra ombalansering", "Extra rebalance"],
+        extra: ["Extra ändring", "Extra rebalance"],
         extraDesc: ["Ändra din portfölj en extra gång.", "Change your portfolio one more time."],
-        start: ["Starta mandat", "Start mandate"],
+        start: ["Starta uppdrag", "Start mandate"],
         startExam: ["Starta slutprov", "Start exam"],
-        startComeback: ["Starta comeback", "Start recovery mandate"],
+        startComeback: ["Starta comeback", "Start recovery"],
         replay: ["Spela om", "Play again"],
-        replayMarket: ["Varje nytt försök på det här mandatet använder samma kursscenario.", "Each new attempt at this mandate uses the same price scenario."],
-        lockedExam: ["Klara tre fasta och fem valbara mandat för att låsa upp slutprovet.", "Pass three core and five elective mandates to unlock the exam."],
-        lockedComeback: ["Klara comebackuppdraget för att försöka igen.", "Pass the recovery mandate to try again."],
-        lockedStage: ["Klara det föregående karriärsteget för att spela här.", "Complete the previous career stage to play here."],
-        lockedFirst: ["Klara ditt första mandat för att låsa upp resten.", "Complete your first mandate to unlock the rest."],
-        activeExists: ["Avsluta ditt pågående mandat innan du startar ett nytt.", "Finish your current mandate before starting a new one."],
-        active: ["Pågående mandat", "Mandate in progress"],
-        resume: ["Fortsätt mandat", "Resume mandate"],
+        replayMarket: ["Samma kurser vid varje försök.", "Same prices on every attempt."],
+        lockedExam: ["Klara 3 obligatoriska och 5 valbara.", "Pass 3 core and 5 elective mandates."],
+        lockedComeback: ["Klara comebackuppdraget först.", "Pass the recovery mandate first."],
+        lockedStage: ["Klara föregående steg först.", "Complete the previous stage first."],
+        lockedFirst: ["Klara första uppdraget.", "Pass the first mandate."],
+        active: ["Pågående", "In progress"],
+        resume: ["Fortsätt", "Resume"],
         results: ["Se resultat", "View report"],
-        toOffice: ["Till fondkontoret", "Fund office"],
+        toOffice: ["Uppdrag", "Mandates"],
+        nextMandate: ["Välj uppdrag", "Choose a mandate"],
         trading: ["Handel", "Trading"],
-        preview: ["Inför första börsdagen", "Before the first market day"],
-        day: ["Dag {day} av {total}", "Day {day} of {total}"],
-        phase: ["Fas {phase} av 3", "Phase {phase} of 3"],
+        preview: ["Före börsstart", "Before trading"],
+        day: ["Dag {day} / {total}", "Day {day} / {total}"],
+        phase: ["Fas {phase} / 3", "Phase {phase} / 3"],
         value: ["Portföljvärde", "Portfolio value"],
         cash: ["Kassa", "Cash"],
-        return: ["Din avkastning", "Your return"],
+        return: ["Avkastning", "Return"],
         benchmark: ["Index", "Benchmark"],
-        marketChart: ["Följ kurserna", "Market prices"],
-        portfolioChart: ["Jämför portföljen", "Compare portfolio"],
+        marketChart: ["Kurser", "Prices"],
+        portfolioChart: ["Portfölj", "Portfolio"],
         portfolio: ["Portföljen", "Portfolio"],
         chartLabel: ["Kursgraf, indexerad till 100 vid start", "Price chart, indexed to 100 at the start"],
         chartUnavailable: ["Kursgrafen kunde inte laddas.", "The chart could not load."],
-        outlook: ["Marknadsutsikter", "Market outlook"],
-        outlookDays: ["Handelsdag {first}–{last}", "Trading days {first}–{last}"],
+        outlook: ["Trend", "Trend"],
+        outlookDays: ["Dag {first}–{last}", "Days {first}–{last}"],
         outlookPoints: ["Kurspunkter {first}–{last}", "Price points {first}–{last}"],
-        outlookNote: ["Väg den övergripande trenden mot mandatets riskmål och kassakrav. Kurserna kan svänga under perioden.",
-            "Weigh the broad trend against the mandate’s risk and cash goals. Prices can fluctuate during the period."],
         strongUp: ["Tydligt uppåt", "Strong upward trend"],
         up: ["Svagt uppåt", "Slight upward trend"],
         steady: ["Sidledes", "Broadly flat"],
         down: ["Svagt nedåt", "Slight downward trend"],
         strongDown: ["Tydligt nedåt", "Strong downward trend"],
-        allocate: ["Fördela startkapitalet", "Allocate your starting capital"],
-        rebalance: ["Ändra portföljen", "Rebalance your portfolio"],
-        feesDesc: ["Handelsavgift 0,1 %", "Trading fee 0.1%"],
+        allocate: ["Fördela kapitalet", "Allocate capital"],
+        rebalance: ["Ändra portföljen", "Rebalance"],
+        feesDesc: ["Avgift 0,1 %", "0.1% fee"],
         allocateSubmit: ["Bekräfta fördelning", "Confirm allocation"],
-        rebalanceSubmit: ["Bekräfta ändring", "Confirm changes"],
+        rebalanceSubmit: ["Spara ändring", "Save changes"],
         rebalances: ["{count} ändringar kvar", "{count} changes left"],
         evenSplit: ["Jämn mix", "Even split"],
-        allCash: ["Allt i kassa", "All cash"],
+        allCash: ["Bara kassa", "All cash"],
         lessWeight: ["Minska {asset} med 10 procentenheter", "Decrease {asset} by 10 percentage points"],
         moreWeight: ["Öka {asset} med 10 procentenheter", "Increase {asset} by 10 percentage points"],
         weightLimit: ["Högst {value} per aktie", "Up to {value} per stock"],
-        nextDay: ["Nästa handelsdag", "Next trading day"],
-        lastDay: ["Spela sista dagen", "Play final day"],
-        phaseFirst: ["Ny kurs var 5:e sekund", "New prices every 5 seconds"],
+        nextDay: ["Nästa dag", "Next day"],
+        lastDay: ["Sista dagen", "Final day"],
+        phaseFirst: ["Ny kurs var 5 s", "New prices every 5s"],
         phaseStart: ["Starta fas", "Start phase"],
-        phasePlan: ["Du kan använda en ombalansering redan innan du startar fasen.", "You can use a rebalance before starting the phase."],
         timeLeft: ["Tid kvar", "Time left"],
         holdings: ["Innehav", "Holdings"],
         price: ["Kurs", "Price"],
-        move: ["Rörelse", "Move"],
         weight: ["Vikt", "Weight"],
         newWeight: ["Ny vikt", "New weight"],
+        currentWeight: ["Nu {value}", "Now {value}"],
         stockWeight: ["Ny vikt för {asset}", "New weight for {asset}"],
-        cashAfter: ["Kassa efter ändring", "Cash after allocation"],
+        cashAfter: ["Kassa efteråt", "Cash left"],
         placeStop: ["Lägg säljorder", "Place sell order"],
         lossStop: ["Stoppkurs", "Stop-loss"],
         profitStop: ["Vinstmål", "Take-profit"],
@@ -109,37 +105,35 @@
         stopPrice: ["Stoppkurs", "Stop price"],
         stopStatus: ["Sälj {asset} vid {comparison} {price}", "Sell {asset} at {comparison} {price}"],
         analysisPair: ["{asset} och {other}", "{asset} and {other}"],
-        analysisMethod: ["Samvariation utifrån de senaste visade kurserna. +1 betyder att kurserna rört sig åt samma håll och −1 åt motsatt håll.", "Correlation uses recent revealed prices. +1 means prices moved together and −1 means prices moved in opposite directions."],
-        abandon: ["Avsluta mandat", "End mandate"],
+        analysisSame: ["Samma håll", "Same direction"],
+        analysisOpposite: ["Motsatt håll", "Opposite directions"],
+        abandon: ["Avbryt uppdrag", "End mandate"],
         confirmAbandon: ["Vill du avsluta det här försöket?", "End this attempt?"],
         examAbandon: ["Avslutar du efter att krisen har startat behöver du klara comebackuppdraget inför nästa försök.", "If you end an exam after the crisis starts, you must pass the recovery mandate before trying again."],
         goalIndex: ["Mot index", "Vs. benchmark"],
         beatIndex: ["Matcha eller slå index", "Match or beat the benchmark"],
-        goalDrawdown: ["Högsta nedgång", "Maximum drawdown"],
-        goalCash: ["Kassa vid handelsdag {step}", "Cash on trading day {step}"],
-        goalPhaseCash: ["Kassa vid slutet av fas {phase}", "Cash at the end of phase {phase}"],
-        goalStepCash: ["Kassa vid kurspunkt {step}", "Cash at price point {step}"],
-        goalExposure: ["Lägsta aktieandel", "Minimum stock exposure"],
-        goalConcentration: ["Högsta målvikt per aktie", "Maximum target weight per stock"],
+        goalDrawdown: ["Nedgång", "Drawdown"],
+        goalCash: ["Kassa vid dag {step}", "Cash on day {step}"],
+        goalPhaseCash: ["Kassa efter fas {phase}", "Cash after phase {phase}"],
+        goalStepCash: ["Kassa vid punkt {step}", "Cash at point {step}"],
+        goalExposure: ["Aktieandel", "Stock exposure"],
+        goalConcentration: ["Vikt per aktie", "Weight per stock"],
         goalReturn: ["Slutavkastning", "Final return"],
-        minimum: ["Minst {value}", "At least {value}"],
-        maximum: ["Högst {value}", "At most {value}"],
-        actual: ["Utfall {value}", "Actual {value}"],
+        minimum: ["≥ {value}", "≥ {value}"],
+        maximum: ["≤ {value}", "≤ {value}"],
         met: ["Uppnått", "Met"],
         missed: ["Missat", "Missed"],
         waiting: ["Väntar", "Pending"],
-        progress: ["Hittills {value}", "So far {value}"],
-        report: ["Resultatrapport", "Mandate report"],
-        reportPassed: ["Mandatet godkänt", "Mandate passed"],
-        reportFailed: ["Mandatet behöver spelas om", "Mandate needs another try"],
-        reportAbandoned: ["Mandatet avbrutet", "Mandate ended early"],
-        reportMastered: ["Mästarmålet uppnått", "Mastery target met"],
+        report: ["Resultat", "Report"],
+        reportPassed: ["Godkänt", "Passed"],
+        reportFailed: ["Ej godkänt", "Not passed"],
+        reportAbandoned: ["Avbrutet", "Ended early"],
+        reportMastered: ["Mästarmål uppnått", "Mastery target met"],
         fees: ["Avgifter", "Fees"],
         worst: ["Störst nedgång", "Worst drawdown"],
         worstAt: ["Nedgången var som störst vid steg {step}.", "The largest drawdown was at step {step}."],
         finalPromotion: ["Fondchef – karriären klar", "Fund director – career complete"],
         promotion: ["Befordran till {rank}", "Promoted to {rank}"],
-        afterPromotion: ["Välj nya mandat eller förbättra dina tidigare resultat från fondkontoret.", "Choose new mandates or improve your past results from the fund office."],
         viewRecovery: ["Se comebackuppdrag", "View recovery mandate"],
         toExam: ["Till slutprovet", "Go to exam"],
         loadError: ["Fondkontoret gick inte att öppna.", "The fund office could not be opened."],
@@ -213,11 +207,18 @@
         }).format(value / 100);
     }
 
-    function button(label, action, { primary = false, disabled = false } = {}) {
-        const icon = { start: "▶", retry: "↻", resume: "▶", phase: "▶", advance: "→", office: "←" }[action];
+    function button(label, action, { primary = false } = {}) {
+        const icon = { start: "▶", retry: "↻", resume: "▶", phase: "▶", advance: "→", office: "←",
+            recovery: "→", exam: "→", split: "◧", cash: "▤" }[action];
         return `<button type="button" class="career-button${primary ? " career-button-primary" : ""}"
-            id="button-${action}" data-action="${action}"${disabled ? " disabled" : ""}>
+            id="button-${action}" data-action="${action}">
             ${icon ? `<span class="career-button-icon" aria-hidden="true">${icon}</span>` : ""}${tx(label)}</button>`;
+    }
+
+    function statusIcon(label, kind) {
+        const symbols = { pass: "✓", fail: "×", mastery: "★", current: "●", locked: "🔒︎" };
+        return `<span class="career-status career-status-${kind}" title="${tx(label)}">
+            <span aria-hidden="true">${symbols[kind]}</span><span class="sr-only">${tx(label)}</span></span>`;
     }
 
     function goalTitle(goal, mission) {
@@ -236,16 +237,15 @@
         return `<ul class="career-goals">${goals.map((goal) => {
             const atMost = goal.type === "drawdown" || goal.type === "concentration";
             const target = tx(atMost ? "maximum" : "minimum", { value: goalValue(goal, goal.value) });
-            let outcome = target;
-            if (showActual) {
-                const live = showActual === "live" && goal.type !== "cash";
-                const actual = goal.actual == null ? tx("waiting") : tx(live ? "progress" : "actual", { value: goalValue(goal, goal.actual) });
-                const verdict = goal.met == null || live ? "" : `<strong class="${goal.met ? "career-goal-pass" : "career-goal-fail"}">${tx(goal.met ? "met" : "missed")}</strong>`;
-                outcome = verdict ? `${verdict}<small>${actual}</small>` : actual;
-            }
-            const matchIndex = goal.type === "index" && goal.value === 0;
-            const label = matchIndex && !showActual ? tx("beatIndex") : goalTitle(goal, mission);
-            return `<li><span>${label}${showActual ? `<small>${target}</small>` : ""}</span>${matchIndex && !showActual ? "" : `<span>${outcome}</span>`}</li>`;
+            const live = showActual === "live" && goal.type !== "cash";
+            const verdict = !showActual || goal.met == null || live ? "" :
+                statusIcon(goal.met ? "met" : "missed", goal.met ? "pass" : "fail");
+            const matchIndex = goal.type === "index" && goal.value === 0 && !showActual;
+            const label = matchIndex ? tx("beatIndex") : goalTitle(goal, mission);
+            const metric = showActual
+                ? `<span><strong>${goal.actual == null ? tx("waiting") : escapeHTML(goalValue(goal, goal.actual))}</strong><small>${target}</small></span>`
+                : `<strong>${matchIndex ? "" : target}</strong>`;
+            return `<li><span>${label}</span><span class="career-goal-reading">${metric}${verdict}</span></li>`;
         }).join("")}</ul>`;
     }
 
@@ -263,27 +263,38 @@
             if (mission.kind === "fixed") fixed++;
             if (mission.kind === "elective") elective++;
         }
-        return { fixed, elective: Math.min(elective, 5) };
+        return { fixed: Math.min(fixed, 3), elective: Math.min(elective, 5) };
+    }
+
+    function checklist(label, count, total) {
+        return `<div class="career-checklist" role="img" aria-label="${tx("checklist", { label: translate(label), count, total })}">
+            <small aria-hidden="true">${tx(label)} <b>${count}/${total}</b></small>
+            <span aria-hidden="true">${Array.from({ length: total }, (_, index) =>
+                `<i${index < count ? ' class="is-filled"' : ""}></i>`).join("")}</span></div>`;
     }
 
     function missionStatus(mission) {
         const award = state.achievements[mission.id];
-        if (award?.mastered) return [tx("mastery"), "career-mastered", "★"];
-        if (award?.passed) return [tx("passed"), "career-goal-pass", "✓"];
-        if (!mission.available) return [tx("locked"), ""];
-        return [tx(mission.kind === "exam" ? "examDuration" : "dayDuration", {
+        if (award?.mastered) return statusIcon("mastery", "mastery");
+        if (award?.passed) return statusIcon("passed", "pass");
+        if (!mission.available) return statusIcon("locked", "locked");
+        return `<small>${tx(mission.kind === "exam" ? "examDuration" : "dayDuration", {
             count: mission.kind === "exam" ? 3 : mission.steps,
-        }), ""];
+        })}</small>`;
     }
 
     function missionList(missions, kind) {
         if (!missions.length) return "";
-        return `<h3>${tx(kind)}</h3><ul class="career-options">${missions.map((mission) => {
-            const [caption, statusClass, mark] = missionStatus(mission);
-            return `<li><button class="career-mission" type="button" id="pick-${escapeHTML(mission.id)}" data-action="pick"
+        const options = `<ul class="career-options">${missions.map((mission) =>
+            `<li><button class="career-mission" type="button" id="pick-${escapeHTML(mission.id)}" data-action="pick"
                 data-kind="${escapeHTML(mission.kind)}" data-mission="${escapeHTML(mission.id)}" aria-pressed="${selectedMission === mission.id}">
-                <strong>${title(mission)}</strong><small class="${statusClass}">${mark ? `<span aria-hidden="true">${mark} </span>` : ""}${caption}</small></button></li>`;
-        }).join("")}</ul>`;
+                <strong>${title(mission)}</strong>${missionStatus(mission)}</button></li>`).join("")}</ul>`;
+        if (kind === "elective") {
+            const selected = missions.some((mission) => selectedMission === mission.id);
+            return `<details class="career-mission-group" id="career-electives-${browseRank}"${selected ? " open" : ""}>
+                <summary>${tx(kind)}</summary>${options}</details>`;
+        }
+        return `<h3>${tx(kind)}</h3>${options}`;
     }
 
     function lockedReason(mission) {
@@ -301,18 +312,16 @@
         return `<section id="career-briefing" class="career-briefing" aria-labelledby="career-briefing-title">
             <div class="career-briefing-header">
                 <h2 tabindex="-1" id="career-briefing-title">${title(mission)}</h2>
-                <div class="career-funding"><span>${tx("capital")}</span>
-                    <strong>${tx("credits", { amount: number(mission.capital, 0) })}</strong></div>
+                <dl class="career-funding"><div><dt>${tx("capital")}</dt>
+                    <dd>${tx("credits", { amount: number(mission.capital, 0) })}</dd></div>
+                    ${award ? `<div><dt>${tx("best")}</dt><dd>${escapeHTML(percent(award.score, true))}</dd></div>` : ""}</dl>
             </div>
-            <div class="career-briefing-block">
-                <h3>${tx("requirements")}</h3>${goalsList(mission.goals, mission)}
+            <div class="career-briefing-block career-briefing-goals">
+                <h3><span aria-hidden="true">◎</span> ${tx("requirements")}</h3>${goalsList(mission.goals, mission)}
             </div>
-            ${award ? `<div class="career-briefing-block">
-                <dl class="career-best"><dt>${tx("best")}</dt><dd>${escapeHTML(percent(award.score, true))}</dd></dl>
-            </div>` : ""}
-            ${tools.length && mission.available ? `<div class="career-briefing-block">
-                <div class="career-section-header"><h3>${tx("tools")}</h3>
-                <span class="career-muted career-slot-caption" id="career-tool-count">${tx("slots", { used: chosenTools.length, max: state.toolSlots })}</span></div>
+            ${tools.length && mission.available && !active ? `<details class="career-briefing-block career-briefing-details" id="career-tools">
+                <summary>${tx("tools")}
+                <span class="career-muted career-slot-caption" id="career-tool-count">${tx("slots", { used: chosenTools.length, max: state.toolSlots })}</span></summary>
                 ${tools.map((tool) => {
                     const checked = chosenTools.includes(tool.id);
                     return `<label class="career-tool">
@@ -320,20 +329,25 @@
                             ${!checked && chosenTools.length >= state.toolSlots ? " disabled" : ""}>
                         <span>${tx(tool.id)}<small>${tx(tool.id + "Desc")}</small></span>
                     </label>`;
-                }).join("")}</div>` : ""}
-            <div class="career-actions">${button(startLabel, "start", { primary: true, disabled: Boolean(active) || !mission.available })}
-                ${!mission.available ? `<p class="career-catalog-note">${tx(lockedReason(mission))}</p>` :
-                    active ? `<p class="career-catalog-note">${tx("activeExists")}</p>` : ""}
-            </div>
-            ${mission.available && !active ? `<p class="career-catalog-note career-replay-note">${tx("replayMarket")}</p>` : ""}
-            <details class="career-briefing-block career-briefing-details">
+                }).join("")}</details>` : ""}
+            ${!mission.available ? `<p class="career-locked-note">${statusIcon("locked", "locked")}${tx(lockedReason(mission))}</p>` :
+                active ? "" : `<div class="career-actions career-start-action">${button(startLabel, "start", { primary: true })}</div>`}
+            <details class="career-briefing-block career-briefing-details" id="career-mission-info">
                 <summary>${tx("details")}</summary>
                 <p class="career-catalog-note">${brief(mission)}</p>
                 <ul class="career-symbols" aria-label="${tx("stocks")}">${mission.assets.map((asset) =>
                     `<li><strong>${escapeHTML(asset)}</strong> ${escapeHTML(state.assetNames?.[asset] ?? "")}</li>`).join("")}</ul>
                 ${mission.mastery ? `<h3>${tx("mastery")}</h3>${goalsList([mission.mastery], mission)}` : ""}
+                ${mission.available ? `<p class="career-catalog-note">${tx("replayMarket")}</p>` : ""}
             </details>
         </section>`;
+    }
+
+    function recommendedMission(missions) {
+        const available = missions.filter((mission) => mission.available && !state.achievements[mission.id]?.passed);
+        return missions.find((mission) => mission.id === state.comeback) ||
+            ["exam", "fixed", "elective"].map((kind) => available.find((mission) => mission.kind === kind)).find(Boolean) ||
+            missions[0];
     }
 
     function renderOffice() {
@@ -341,25 +355,27 @@
         const stageMissions = state.missions.filter((mission) => mission.rank === browseRank &&
             (mission.kind !== "comeback" || state.comeback === mission.id));
         if (!stageMissions.some((mission) => mission.id === selectedMission)) {
-            selectedMission = (stageMissions.find((mission) => mission.id === state.comeback) ?? stageMissions[0])?.id;
+            selectedMission = recommendedMission(stageMissions)?.id;
         }
         const mission = findMission(selectedMission);
         const resume = state.attempt && findMission(state.attempt.missionId);
         const isComplete = state.attempt?.status === "complete";
         return `<header class="career-intro">
-            <div><p class="career-kicker">${tx("office")}</p><h1 tabindex="-1" id="career-heading">${tx("career")}</h1></div>
-            <div class="career-rank"><p class="career-kicker">${tx("role")}</p><strong>${escapeHTML(rankName(state.rank))}</strong>
-                <small>${state.rank === maxRank() ? tx("roleComplete") : tx("roleProgress", progress)}</small>
-                <progress class="career-progress" max="8" value="${state.rank === maxRank() ? 8 : progress.fixed + progress.elective}" aria-label="${tx("role")}"></progress>
-            </div>
+            <h1 tabindex="-1" id="career-heading">${tx("career")}</h1>
+            <section class="career-rank" aria-label="${tx("role")}">
+                <strong>${escapeHTML(rankName(state.rank))}</strong>
+                ${state.rank === maxRank() ? `<small>${statusIcon("roleComplete", "mastery")} <span aria-hidden="true">${tx("roleComplete")}</span></small>` :
+                    `<div class="career-checklists">${checklist("fixed", progress.fixed, 3)}${checklist("elective", progress.elective, 5)}</div>`}
+            </section>
         </header>
         ${resume ? `<aside class="career-resume">
             <div><strong>${title(resume)}</strong><p class="career-muted">${tx(isComplete ? "report" : "active")}</p></div>
-            ${button(isComplete ? "results" : "resume", "resume", { primary: true })}</aside>` : ""}
+            ${button(isComplete ? "results" : "resume", "resume", { primary: !isComplete })}</aside>` : ""}
         <nav class="career-rank-tabs" aria-label="${tx("stages")}">
             ${state.ranks.slice(0, -1).map((_, index) =>
                 `<button type="button" id="rank-${index}" data-action="rank" data-rank="${index}" aria-pressed="${index === browseRank}">
-                    ${escapeHTML(rankName(index))}<span>${tx(index < state.rank ? "cleared" : index === state.rank ? "current" : "locked")}</span></button>`
+                    ${statusIcon(...(index < state.rank ? ["cleared", "pass"] : index === state.rank ? ["current", "current"] : ["locked", "locked"]))}
+                    <span>${escapeHTML(rankName(index))}</span></button>`
             ).join("")}
         </nav>
         <div class="career-office">
@@ -382,33 +398,50 @@
 
     function chartOptions() {
         return `<div class="career-chart-controls">
-            <button type="button" id="chart-market" class="career-button" data-action="chart" data-mode="market" aria-pressed="${chartMode === "market"}">${tx("marketChart")}</button>
-            <button type="button" id="chart-portfolio" class="career-button" data-action="chart" data-mode="portfolio" aria-pressed="${chartMode === "portfolio"}">${tx("portfolioChart")}</button>
+            <button type="button" id="chart-market" class="career-button" data-action="chart" data-mode="market" aria-pressed="${chartMode === "market"}">
+                <span aria-hidden="true">↗</span>${tx("marketChart")}</button>
+            <button type="button" id="chart-portfolio" class="career-button" data-action="chart" data-mode="portfolio" aria-pressed="${chartMode === "portfolio"}">
+                <span aria-hidden="true">▥</span>${tx("portfolioChart")}</button>
         </div>
         <div id="career-chart-slot"></div><ul class="career-chart-legend" id="career-chart-legend"></ul>`;
+    }
+
+    function outlookCell(direction) {
+        const directions = {
+            strongUp: ["↑↑", "career-goal-pass"], up: ["↑", "career-goal-pass"], steady: ["→", ""],
+            down: ["↓", "career-goal-fail"], strongDown: ["↓↓", "career-goal-fail"],
+        };
+        const [arrow, color] = directions[direction];
+        return `<td class="career-trend" title="${tx(direction)}">
+            <b class="${color}" aria-hidden="true">${arrow}</b><span class="sr-only">${tx(direction)}</span></td>`;
     }
 
     function holdings(mission, attempt, editable) {
         const prices = last(attempt.prices).prices;
         const prior = attempt.prices.at(-2).prices;
         const setup = attempt.status === "setup";
+        const outlook = attempt.outlook;
+        const period = outlook && tx(mission.kind === "exam" ? "outlookPoints" : "outlookDays", {
+            first: outlook.startStep + 1, last: outlook.throughStep,
+        });
         return `<table class="career-allocation-items">
-            <thead><tr><th scope="col">${tx("stocks")}</th><th scope="col">${tx("price")}</th><th scope="col">${tx("move")}</th>
-                ${setup ? "" : `<th scope="col">${tx("weight")}</th>`}
-                ${editable ? `<th scope="col">${tx("newWeight")}</th>` : ""}</tr></thead>
+            <thead><tr><th scope="col">${tx("stocks")}</th><th scope="col">${tx("price")}</th>
+                ${outlook ? `<th scope="col" class="career-trend">${tx("outlook")}<small>${period}</small></th>` : ""}
+                <th scope="col">${tx(editable && !setup ? "newWeight" : "weight")}</th></tr></thead>
             <tbody>${mission.assets.map((asset, index) => {
                 const symbol = escapeHTML(asset);
                 const move = (prices[index] / prior[index] - 1) * 100;
+                const current = percent(attempt.weights[asset]);
                 return `<tr><th scope="row" title="${escapeHTML(state.assetNames[asset])}">
                     <span class="career-symbol-dot" style="--stock-color:${colors[index]}" aria-hidden="true"></span>${symbol}</th>
-                    <td>${escapeHTML(number(prices[index]))}</td>
-                    <td class="${signedClass(move)}">${escapeHTML(percent(move, true))}</td>
-                    ${setup ? "" : `<td>${escapeHTML(percent(attempt.weights[asset]))}</td>`}
-                    ${editable ? `<td><div class="career-stepper" role="group" aria-label="${tx("stockWeight", { asset })}">
+                    <td>${escapeHTML(number(prices[index]))}<small class="${signedClass(move)}">${escapeHTML(percent(move, true))}</small></td>
+                    ${outlook ? outlookCell(outlook.assets[asset].direction) : ""}
+                    <td>${editable ? `<div class="career-weight-controls"><div class="career-stepper" role="group" aria-label="${tx("stockWeight", { asset })}">
                         <button type="button" id="less-${symbol}" data-action="weight" data-asset="${symbol}" data-delta="-10" aria-label="${tx("lessWeight", { asset })}">−</button>
                         <output id="weight-${symbol}" for="less-${symbol} more-${symbol}"></output>
                         <button type="button" id="more-${symbol}" data-action="weight" data-asset="${symbol}" data-delta="10" aria-label="${tx("moreWeight", { asset })}">+</button>
-                    </div></td>` : ""}</tr>`;
+                    </div>${setup ? "" : `<small>${tx("currentWeight", { value: current })}</small>`}</div>` :
+                        escapeHTML(current)}</td></tr>`;
             }).join("")}</tbody></table>`;
     }
 
@@ -417,31 +450,8 @@
         return Math.floor(cap / 10) * 10;
     }
 
-    function renderOutlook(mission, outlook) {
-        if (!outlook) return "";
-        const directions = {
-            strongUp: ["↑↑", "career-goal-pass"], up: ["↑", "career-goal-pass"], steady: ["→", ""],
-            down: ["↓", "career-goal-fail"], strongDown: ["↓↓", "career-goal-fail"],
-        };
-        const period = tx(mission.kind === "exam" ? "outlookPoints" : "outlookDays", {
-            first: outlook.startStep + 1, last: outlook.throughStep,
-        });
-        return `<section class="career-outlook" aria-labelledby="career-outlook-title">
-            <div class="career-outlook-heading"><h3 id="career-outlook-title">${tx("outlook")}</h3><span>${period}</span></div>
-            <dl class="career-outlook-list">${mission.assets.map((asset, index) => {
-                const direction = outlook.assets[asset].direction;
-                const [arrow, color] = directions[direction];
-                return `<div><dt title="${escapeHTML(state.assetNames[asset])}">
-                    <span class="career-symbol-dot" style="--stock-color:${colors[index]}" aria-hidden="true"></span>${escapeHTML(asset)}</dt>
-                    <dd class="${color}"><span aria-hidden="true">${arrow}</span> ${tx(direction)}</dd></div>`;
-            }).join("")}</dl>
-            <p class="career-catalog-note">${tx("outlookNote")}</p>
-        </section>`;
-    }
-
     function allocation(mission, attempt) {
         const setup = attempt.status === "setup";
-        const planning = attempt.status === "phaseReady";
         const changes = attempt.rebalances + Number(attempt.extraAvailable);
         if (!setup && changes === 0) {
             return `<h3>${tx("holdings")}</h3>
@@ -455,7 +465,6 @@
                 <div class="career-trade-hints"><span>${tx("feesDesc")}</span>
                     ${setup ? "" : `<span>${tx("rebalances", { count: changes })}</span>`}
                     ${limit < 100 ? `<span>${tx("weightLimit", { value: percent(limit) })}</span>` : ""}</div>
-                ${planning ? `<p class="career-catalog-note career-phase-plan">${tx("phasePlan")}</p>` : ""}
                 <div class="career-presets">${button("evenSplit", "split")}${button("allCash", "cash")}</div>
                 ${holdings(mission, attempt, true)}
                 <div class="career-allocation-bar" aria-hidden="true">${mission.assets.map((asset, index) =>
@@ -518,27 +527,32 @@
             prices.slice(1).map((row, step) => row[index] / prices[step][index] - 1));
         return `<section class="career-card"><details id="career-analysis">
             <summary>${tx("analysis")}</summary>
-            <p class="career-catalog-note">${tx("analysisMethod")}</p>
+            <div class="career-correlation-labels"><span>−1 · ${tx("analysisOpposite")}</span><span>+1 · ${tx("analysisSame")}</span></div>
             <ul class="career-goals">${mission.assets.flatMap((asset, index) =>
-                mission.assets.slice(index + 1).map((other, offset) => `<li>
-                    <span>${tx("analysisPair", { asset, other })}</span>
-                    <span>${escapeHTML(number(pairedCorrelation(returns[index], returns[index + 1 + offset])))}</span></li>`)).join("")}
+                mission.assets.slice(index + 1).map((other, offset) => {
+                    const correlation = pairedCorrelation(returns[index], returns[index + 1 + offset]);
+                    return `<li><span>${tx("analysisPair", { asset, other })}</span>
+                        <span class="career-correlation-meter ${correlation < 0 ? "is-negative" : ""}" aria-hidden="true">
+                            <i style="--correlation-width:${Math.min(50, Math.abs(correlation) * 50)}%"></i></span>
+                        <strong>${escapeHTML(number(correlation))}</strong></li>`;
+                })).join("")}
             </ul></details></section>`;
     }
 
-    function activeIntro(mission, kicker) {
+    function activeIntro(mission, nextMandate = false) {
         return `<header class="career-intro career-active-intro">
-            <div><p class="career-kicker">${tx(kicker)}</p><h1 id="career-heading" tabindex="-1">${title(mission)}</h1></div>
-            ${button("toOffice", "office")}
+            <h1 id="career-heading" tabindex="-1">${title(mission)}</h1>
+            ${button(nextMandate ? "nextMandate" : "toOffice", "office", { primary: nextMandate })}
         </header>`;
     }
 
     function renderTrading(mission, attempt) {
         const exam = mission.kind === "exam";
+        const setup = attempt.status === "setup";
         const phaseReady = attempt.status === "phaseReady";
         const phaseActive = attempt.status === "phaseActive";
         const progress = exam ? tx("phase", { phase: attempt.phase }) : attempt.step === 0 ? tx("preview") : tx("day", { day: attempt.step, total: mission.steps });
-        return `${activeIntro(mission, "trading")}
+        return `${activeIntro(mission)}
         <div class="career-trading">
             <section class="career-card career-trade-summary" aria-label="${tx("trading")}">
                 <div class="career-day-controls">
@@ -548,21 +562,21 @@
                     </div>
                     ${attempt.status === "trading" ? button(attempt.step + 1 === mission.steps ? "lastDay" : "nextDay", "advance", { primary: true }) : ""}
                     ${phaseReady ? button("phaseStart", "phase", { primary: true }) : ""}
-                    ${phaseActive ? `<span id="career-clock" class="career-clock" aria-label="${tx("timeLeft")}"></span>` : ""}
+                    ${phaseActive ? `<div class="career-clock"><span aria-hidden="true">◷</span>
+                        <span id="career-clock" role="timer" aria-label="${tx("timeLeft")}"></span></div>` : ""}
                 </div>
-                ${metrics([
+                ${metrics(setup ? [["capital", number(mission.capital, 0)]] : [
                     ["value", number(attempt.value)], ["cash", number(attempt.cash), "", percent(attempt.cashPercent)],
                     ["return", percent(attempt.returnPercent, true), signedClass(attempt.returnPercent)],
                     ["benchmark", percent(attempt.indexReturn, true), signedClass(attempt.indexReturn)],
                 ])}
             </section>
             <section class="career-trade-panel career-trade-controls" aria-label="${tx("portfolio")}">
-                ${renderOutlook(mission, attempt.outlook)}
                 <section>
                     ${allocation(mission, attempt)}
                 </section>
+                <section><h3><span aria-hidden="true">◎</span> ${tx("requirements")}</h3>${goalsList(attempt.goals, mission, "live")}</section>
                 ${stopForm(mission, attempt)}
-                <section><h3>${tx("requirements")}</h3>${goalsList(attempt.goals, mission, "live")}</section>
                 <button class="career-abandon" type="button" id="career-abandon" data-action="abandon">${tx("abandon")}</button>
             </section>
             <div class="career-market-panel">
@@ -577,34 +591,36 @@
         const verdict = report.abandoned ? "reportAbandoned" : report.passed ? "reportPassed" : "reportFailed";
         const promoted = report.promoted;
         const mayReplay = findMission(mission.id)?.available && (mission.kind !== "comeback" || !report.passed);
-        return `${activeIntro(mission, "report")}
-            <div class="career-trading">
+        const recovery = state.comeback && mission.kind === "exam" && !report.passed;
+        const exam = mission.kind === "comeback" && report.passed;
+        return `${activeIntro(mission, report.passed && !exam)}
+            <div class="career-trading career-results">
                 <section class="career-card career-report" aria-labelledby="career-report-title">
-                    <h2 id="career-report-title" class="${report.passed ? "career-goal-pass" : "career-goal-fail"}">${tx(verdict)}</h2>
-                    ${report.mastered ? `<p class="career-mastered">${tx("reportMastered")}</p>` : ""}
-                    ${promoted ? `<div class="career-briefing-block">
-                        <h3>${tx(state.rank === maxRank() ? "finalPromotion" : "promotion", { rank: rankName(state.rank) })}</h3>
-                        <p class="career-catalog-note">${tx("afterPromotion")}</p>
-                    </div>` : ""}
+                    <div class="career-result-banner ${report.passed ? "career-goal-pass" : "career-goal-fail"}">
+                        <span aria-hidden="true">${report.passed ? "✓" : "×"}</span>
+                        <div><h2 id="career-report-title">${tx(verdict)}</h2>
+                        ${report.mastered ? `<p class="career-mastered"><span aria-hidden="true">★</span> ${tx("reportMastered")}</p>` : ""}
+                        ${promoted ? `<p>${tx(state.rank === maxRank() ? "finalPromotion" : "promotion", { rank: rankName(state.rank) })}</p>` : ""}</div>
+                    </div>
                     <div class="career-briefing-block">
                         ${metrics([
                             ["return", percent(attempt.returnPercent, true), signedClass(attempt.returnPercent)],
                             ["benchmark", percent(attempt.indexReturn, true), signedClass(attempt.indexReturn)],
                             ["worst", percent(attempt.drawdown)], ["fees", number(attempt.fees)],
                         ])}
-                        ${attempt.worstStep > 0 ? `<p class="career-catalog-note">${tx("worstAt", { step: attempt.worstStep })}</p>` : ""}
+                        ${attempt.worstStep > 0 ? `<p class="career-catalog-note career-drawdown-detail">${tx("worstAt", { step: attempt.worstStep })}</p>` : ""}
                         ${chartOptions()}
                     </div>
                 </section>
                 <section class="career-card">
-                    <h3>${tx("requirements")}</h3>${goalsList(report.goals, mission, true)}
+                    <h3><span aria-hidden="true">◎</span> ${tx("requirements")}</h3>${goalsList(report.goals, mission, true)}
                     ${report.mastery ? `<div class="career-briefing-block"><h3>${tx("mastery")}</h3>
                         ${goalsList([report.mastery], mission, true)}</div>` : ""}
-                    <div class="career-actions">
-                        ${state.comeback && mission.kind === "exam" && !report.passed ? button("viewRecovery", "recovery", { primary: true }) : ""}
-                        ${mission.kind === "comeback" && report.passed ? button("toExam", "exam", { primary: true }) : ""}
-                        ${mayReplay ? button("replay", "retry", { primary: !promoted }) : ""}
-                    </div>
+                    ${recovery || exam || mayReplay ? `<div class="career-actions">
+                        ${recovery ? button("viewRecovery", "recovery", { primary: true }) : ""}
+                        ${exam ? button("toExam", "exam", { primary: true }) : ""}
+                        ${mayReplay ? button("replay", "retry", { primary: !report.passed && !recovery }) : ""}
+                    </div>` : ""}
                 </section>
             </div>`;
     }
@@ -717,15 +733,13 @@
     }
 
     function render(focusId) {
-        document.querySelector(".career-home").textContent = translate("home");
         document.title = translate("career") + " · Stock Fight";
         if (!state) return;
         const activeElement = document.activeElement;
         const focus = focusId ?? (content.contains(activeElement) ? activeElement.id : "");
         const ranks = content.querySelector(".career-rank-tabs");
         const rankScroll = ranks?.scrollLeft ?? 0;
-        const analysisOpen = document.getElementById("career-analysis")?.open ?? false;
-        const orderOpen = document.getElementById("career-order")?.open ?? false;
+        const openDetails = [...content.querySelectorAll("details[open][id]")].map((element) => element.id);
         const attempt = state.attempt;
         const mission = attempt && (attempt.mission ?? findMission(attempt.missionId));
         const showAttempt = !office && mission;
@@ -735,10 +749,10 @@
             const nextRanks = content.querySelector(".career-rank-tabs");
             if (nextRanks) nextRanks.scrollLeft = rankScroll;
         }
-        const analysis = document.getElementById("career-analysis");
-        if (analysis) analysis.open = analysisOpen;
-        const order = document.getElementById("career-order");
-        if (order) order.open = orderOpen;
+        for (const id of openDetails) {
+            const details = document.getElementById(id);
+            if (details) details.open = true;
+        }
         updateChart(mission, attempt);
         updateAllocation();
         updateStopForm();
@@ -973,11 +987,9 @@
         }
     });
     window.addEventListener("stockfight:languagechange", () => {
+        for (const node of document.querySelectorAll("[data-career-text]")) node.textContent = translate(node.dataset.careerText);
         render();
         renderNotice(errorCode);
-        if (!state) {
-            for (const node of document.querySelectorAll("[data-career-text]")) node.textContent = translate(node.dataset.careerText);
-        }
     });
     document.addEventListener("visibilitychange", poll);
     window.setInterval(updateClock, 200);

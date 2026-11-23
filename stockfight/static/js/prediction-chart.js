@@ -124,7 +124,7 @@
             }
             drawTarget?.toggleAttribute("hidden", !editable);
 
-            context.fillStyle = colors.future;
+            context.fillStyle = editable ? "#29263d" : colors.future;
             context.fillRect(anchor, top, end - anchor, bottom - top);
             context.textBaseline = "middle";
             context.textAlign = "right";
@@ -134,10 +134,11 @@
                 context.fillText(label, left - 7, y(bps));
             }
             segment(anchor, top, anchor, bottom, "#536982", [4, 4]);
-            segment(end, top, end, bottom, colors.grid);
+            segment(end, top, end, bottom, editable ? "#6b5a92" : colors.grid);
             context.textAlign = "center";
             context.fillStyle = colors.labels;
             context.fillText(t("Historik"), (left + anchor) / 2, height - 11);
+            if (editable) context.fillStyle = colors.self;
             context.fillText(editable ? t("Rita prognos") : t("Nästa punkt"), (anchor + end) / 2, height - 11);
 
             context.save();
@@ -154,6 +155,18 @@
             context.stroke();
             context.restore();
             mark(anchor, y(0), colors.history, 3);
+
+            if (editable && own == null) {
+                const gripX = (anchor + end) / 2;
+                const gripY = (top + bottom) / 2;
+                context.fillStyle = "#3d3355";
+                context.beginPath();
+                context.arc(gripX, gripY, 19, 0, 2 * Math.PI);
+                context.fill();
+                segment(gripX, gripY - 8, gripX, gripY + 8, colors.self, [], 2);
+                arrow(gripX, gripY - 10, 1, colors.self);
+                arrow(gripX, gripY + 10, -1, colors.self);
+            }
 
             function forecast(move, color, dash, thickness) {
                 if (move == null) return;

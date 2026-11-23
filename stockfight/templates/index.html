@@ -1,3 +1,6 @@
+{% macro icon(symbol, kind='') -%}
+    <span class="ui-icon{% if kind %} {{ kind }}{% endif %}" aria-hidden="true">{{ symbol }}</span>
+{%- endmacro %}
 {% macro market_preview() -%}
     {% set candles = [
         (100, 100.46, 99.63, 100.74), (100.46, 100.89, 100.18, 101.13),
@@ -16,7 +19,7 @@
     {% set latest = candles[-1][1] %}
     <figure class="market-preview">
         <figcaption class="preview-heading">
-            <span class="eyebrow" data-i18n="Exempelgraf">Nvidia</span>
+            <span class="eyebrow" data-i18n="Exempelgraf">Exempelgraf</span>
             <span class="preview-quote mono">
                 <strong data-i18n-number="{{ '%.2f'|format(latest) }}">{{ '%.2f'|format(latest)|replace('.', ',') }}</strong>
                 <span data-i18n-signed-percent="{{ latest / candles[0][0] - 1 }}">{{ '%+.2f'|format((latest / candles[0][0] - 1) * 100)|replace('.', ',') }} %</span>
@@ -80,9 +83,9 @@
         <section id="auth-screen" class="screen auth-screen" aria-label="Stock Fight">
             <div class="auth-intro panel">
                 <div class="intro-copy">
-                    <h1 class="screen-title"><span data-i18n="Börsduell">Börsduell</span> <em data-i18n="i realtid">i realtid</em></h1>
-                    <p data-i18n="Handla med virtuella krediter på historiska börskurser. Tävla mot andra spelare eller öva mot en bot.">Handla med virtuella krediter på historiska börskurser. Tävla mot andra spelare eller öva mot en bot.</p>
-                    <p id="auth-invite-note" hidden data-i18n="Logga in eller skapa ett konto för att öppna din vänduell.">Logga in eller skapa ett konto för att öppna din vänduell.</p>
+                    <h1 class="screen-title" data-i18n="Börsduell">Börsduell</h1>
+                    <p data-i18n="Handla med spelpengar.">Handla med spelpengar.</p>
+                    <p id="auth-invite-note" hidden data-i18n="Logga in för att gå med i vänduellen.">Logga in för att gå med i vänduellen.</p>
                 </div>
                 {{ market_preview() }}
             </div>
@@ -114,8 +117,10 @@
         <section id="tutorial-screen" class="screen tutorial-screen" aria-labelledby="tutorial-title" hidden>
             <div class="tutorial-card panel">
                 <header class="tutorial-heading">
-                    <h1 id="tutorial-title" class="screen-title" tabindex="-1" data-i18n="Din första 1 mot 1-duell">Din första 1 mot 1-duell</h1>
-                    <p id="tutorial-progress" class="eyebrow"></p>
+                    <h1 id="tutorial-title" class="screen-title" tabindex="-1" data-i18n="Så spelar du">Så spelar du</h1>
+                    <div id="tutorial-progress" class="tutorial-progress" role="progressbar" aria-label="Introduktion" data-i18n-aria-label="Introduktion" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1">
+                        {% for step in range(4) %}<span aria-hidden="true"></span>{% endfor %}
+                    </div>
                 </header>
 
                 <section id="tutorial-page-1" class="tutorial-page" aria-labelledby="tutorial-step-1">
@@ -125,13 +130,11 @@
                             <h3 data-i18n="Du">Du</h3>
                             <p class="mono">100 HP</p>
                             <progress class="meter" max="100" value="100" aria-hidden="true"></progress>
-                            <p data-i18n="500 krediter">500 krediter</p>
                         </div>
                         <div class="tutorial-player">
                             <h3 data-i18n="Motståndare">Motståndare</h3>
-                            <p class="mono">100 HP</p>
-                            <progress class="meter" max="100" value="100" aria-hidden="true"></progress>
-                            <p data-i18n="500 krediter">500 krediter</p>
+                            <p class="mono">0 HP</p>
+                            <progress class="meter" max="100" value="0" aria-hidden="true"></progress>
                         </div>
                     </div>
                 </section>
@@ -139,17 +142,15 @@
                 <section id="tutorial-page-2" class="tutorial-page" aria-labelledby="tutorial-step-2" hidden>
                     <h2 id="tutorial-step-2" class="card-title" tabindex="-1" data-i18n="Välj riktning">Välj riktning</h2>
                     <dl class="tutorial-stake">
-                        <dt data-i18n="Vald insats">Vald insats</dt>
+                        <dt data-i18n="Insats">Insats</dt>
                         <dd class="mono" data-i18n="25 % · 125 krediter">25 % · 125 krediter</dd>
                     </dl>
-                    <div class="panel-actions" role="group" aria-label="Välj riktning för din position" data-i18n-aria-label="Välj riktning för din position">
+                    <div class="tutorial-options" role="group" aria-label="Välj riktning för din position" data-i18n-aria-label="Välj riktning för din position">
                         <button class="button button-buy direction-button" type="button" data-action="tutorial-up" aria-pressed="false">
-                            <span><span aria-hidden="true">↗</span> <span data-i18n="UPP">UPP</span></span>
-                            <small data-i18n="Vinst vid uppgång">Vinst vid uppgång</small>
+                            {{ icon('↗') }} <span data-i18n="UPP">UPP</span>
                         </button>
                         <button class="button button-short direction-button" type="button" data-action="tutorial-down" aria-pressed="false">
-                            <span><span aria-hidden="true">↘</span> <span data-i18n="NER">NER</span></span>
-                            <small data-i18n="Vinst vid nedgång">Vinst vid nedgång</small>
+                            {{ icon('↘') }} <span data-i18n="NER">NER</span>
                         </button>
                     </div>
                     <p id="tutorial-direction-feedback" class="tutorial-feedback tutorial-outcome" role="status" hidden></p>
@@ -158,27 +159,25 @@
                 <section id="tutorial-page-3" class="tutorial-page" aria-labelledby="tutorial-step-3" hidden>
                     <h2 id="tutorial-step-3" class="card-title" tabindex="-1" data-i18n="Använd vinsten">Använd vinsten</h2>
                     <strong class="tutorial-outcome mono" data-i18n="+5 krediter">+5 krediter</strong>
-                    <button class="button button-secondary tutorial-close-position" type="button" data-action="tutorial-close-position" aria-controls="tutorial-profit-options" data-i18n="STÄNG POSITION">STÄNG POSITION</button>
-                    <div id="tutorial-profit-options" class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till" hidden>
+                    <button class="button button-primary tutorial-close-position" type="button" data-action="tutorial-close-position" aria-controls="tutorial-profit-options">{{ icon('✓') }} <span data-i18n="Stäng affären">Stäng affären</span></button>
+                    <div id="tutorial-profit-options" class="tutorial-options" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till" hidden>
                         <button class="button button-attack direction-button" type="button" data-action="tutorial-attack" aria-pressed="false">
-                            <span><span aria-hidden="true">⚡︎</span> Attack</span>
+                            <span>{{ icon('ϟ') }} Attack</span>
                             <small data-i18n="Gör skada">Gör skada</small>
                         </button>
                         <button class="button button-buy direction-button" type="button" data-action="tutorial-grow" aria-pressed="false">
-                            <span><span aria-hidden="true">↗</span> Grow</span>
-                            <small data-i18n="Bygg kapital och bonus">Bygg kapital och bonus</small>
+                            <span>{{ icon('↗') }} Grow</span>
+                            <small data-i18n="Spara vinsten">Spara vinsten</small>
                         </button>
                     </div>
                     <p id="tutorial-profit-feedback" class="tutorial-feedback tutorial-outcome" role="status" hidden></p>
-                    <p data-i18n="En förlust kostar krediter och kan kosta HP.">En förlust kostar krediter och kan kosta HP.</p>
                 </section>
 
                 <section id="tutorial-page-4" class="tutorial-page" aria-labelledby="tutorial-step-4" hidden>
                     <h2 id="tutorial-step-4" class="card-title" tabindex="-1" data-i18n="När duellen avgörs">När duellen avgörs</h2>
                     <ul class="tutorial-rules" role="list">
-                        <li><span aria-hidden="true">◷</span><span data-i18n="Efter 75 sekunder drar stormen HP från båda.">Efter 75 sekunder drar stormen HP från båda.</span></li>
-                        <li><span aria-hidden="true">≡</span><span data-i18n="Vid dubbel KO avgör kapital, sedan attackskada.">Vid dubbel KO avgör kapital, sedan attackskada.</span></li>
-                        <li><span aria-hidden="true">↗</span><span data-i18n="Öva i Botduell. Tävla om Elo i rankat läge.">Öva i Botduell. Tävla om Elo i rankat läge.</span></li>
+                        <li>{{ icon('◷') }}<span><strong>1:15</strong> <span data-i18n="Stormen tar HP från båda.">Stormen tar HP från båda.</span></span></li>
+                        <li>{{ icon('⚖︎') }}<span><strong data-i18n="Dubbel KO">Dubbel KO</strong> <span data-i18n="Kapital avgör, sedan skada.">Kapital avgör, sedan skada.</span></span></li>
                     </ul>
                 </section>
 
@@ -186,79 +185,82 @@
                     <p id="tutorial-error" class="form-error" role="alert" hidden></p>
                     <div class="panel-actions">
                         <button class="button button-secondary" type="button" data-action="tutorial-back" disabled data-i18n="Tillbaka">Tillbaka</button>
-                        <button class="button button-primary" type="button" data-action="tutorial-next" data-i18n="Nästa">Nästa</button>
-                        <button class="button button-primary" type="button" data-action="tutorial-finish" hidden data-i18n="Slutför introduktionen">Slutför introduktionen</button>
+                        <button class="button button-primary" type="button" data-action="tutorial-next"><span data-i18n="Nästa">Nästa</span><span class="arrow-right" aria-hidden="true"></span></button>
+                        <button class="button button-primary" type="button" data-action="tutorial-finish" hidden data-i18n="Klar">Klar</button>
                     </div>
-                    <button id="tutorial-exit" class="header-button" type="button" data-action="tutorial-exit" hidden data-i18n="Till huvudmenyn">Till huvudmenyn</button>
+                    <button id="tutorial-exit" class="header-button" type="button" data-action="tutorial-exit" hidden>{{ icon('←') }} <span data-i18n="Huvudmeny">Huvudmeny</span></button>
                 </footer>
             </div>
         </section>
 
         <section id="menu-screen" class="screen menu-screen" aria-labelledby="menu-title" hidden>
             <header class="menu-greeting">
-                <h1 id="menu-title" class="screen-title" tabindex="-1" data-i18n="Wall Street-marknaden">Wall Street-marknaden</h1>
-                <p><span data-i18n="Inloggad som">Inloggad som</span> <strong id="menu-name">—</strong></p>
+                <h1 id="menu-title" class="screen-title" tabindex="-1" data-i18n="Spela">Spela</h1>
             </header>
             <div class="menu-main">
                 <section class="play-panel panel" aria-labelledby="ranked-title">
                     <div class="play-copy">
-                        <p class="eyebrow" data-i18n="Rankad · 1 mot 1">Rankad · 1 mot 1</p>
-                        <h2 id="ranked-title" data-i18n="Handelsduell">Handelsduell</h2>
-                        <p data-i18n="Handla på samma aktiekurs som motståndaren och tävla om Elo.">Handla på samma aktiekurs som motståndaren och tävla om Elo.</p>
+                        <div class="play-heading">
+                            <h2 id="ranked-title" data-i18n="Handelsduell">Handelsduell</h2>
+                            <p data-i18n="Rankad · 1 mot 1">Rankad · 1 mot 1</p>
+                        </div>
                         <button class="button button-primary play-button" type="button" data-action="play">
-                            <span data-i18n="Spela rankad duell">Spela rankad duell</span> <span class="arrow-right" aria-hidden="true"></span>
+                            {{ icon('▶︎') }} <span data-i18n="Spela rankad duell">Spela rankad duell</span>
                         </button>
                     </div>
                     {{ market_preview() }}
                 </section>
-                <section class="career-panel mode-panel panel" aria-labelledby="career-title">
-                    <div>
-                        <p class="eyebrow" data-i18n="Strategi · Flerspelare">Strategi · Flerspelare</p>
-                        <h2 id="career-title" data-i18n="Börsföretag">Börsföretag</h2>
-                        <p data-i18n="Handla på riktiga aktiekurser med virtuellt kapital, sätt firmans riskpolicy och led dina handelsbotar.">Handla på riktiga aktiekurser med virtuellt kapital, sätt firmans riskpolicy och led dina handelsbotar.</p>
-                    </div>
-                    <div class="panel-actions">
-                        <a class="button button-secondary" href="{{ url_for('campaign_page') }}" data-i18n="Öppna handelsfirman">Öppna handelsfirman</a>
-                    </div>
+                <section class="career-panel panel" aria-labelledby="career-title">
+                    <a class="career-link" href="{{ url_for('campaign_page') }}" aria-labelledby="career-title" aria-describedby="career-description">
+                        {{ icon('▤', 'mode-icon mode-icon-company') }}
+                        <div>
+                            <h2 id="career-title" data-i18n="Börsföretag">Börsföretag</h2>
+                            <p id="career-description" data-i18n="Driv en handelsfirma">Driv en handelsfirma</p>
+                        </div>
+                        <span class="arrow-right" aria-hidden="true"></span>
+                    </a>
                 </section>
                 <section class="menu-modes" aria-labelledby="modes-title">
                     <h2 id="modes-title" data-i18n="Fler spellägen">Fler spellägen</h2>
                     <div class="menu-mode-grid">
                         <article class="mode-panel panel">
-                            <div>
-                                <h3 data-i18n="Ritduell">Ritduell</h3>
-                                <p id="prediction-description" data-i18n="Rita nästa kursrörelse. Den som kommer närmast gör skada.">Rita nästa kursrörelse. Den som kommer närmast gör skada.</p>
+                            <div class="mode-heading">
+                                {{ icon('⌁', 'mode-icon mode-icon-forecast') }}
+                                <div>
+                                    <h3 id="forecast-title" data-i18n="Ritduell">Ritduell</h3>
+                                    <p data-i18n="Rita nästa kursrörelse">Rita nästa kursrörelse</p>
+                                </div>
                             </div>
                             <div class="panel-actions">
-                                <button class="button button-secondary" type="button" data-action="play-prediction" aria-describedby="prediction-description" data-i18n="Spela ritduell">Spela ritduell</button>
-                                <button class="button button-secondary" type="button" data-action="practice-prediction" data-i18n="Öva ritduell">Öva ritduell</button>
+                                <button class="button button-secondary" type="button" data-action="play-prediction" aria-describedby="forecast-title" data-i18n="Rankad">Rankad</button>
+                                <button class="button button-quiet" type="button" data-action="practice-prediction" aria-describedby="forecast-title" data-i18n="Öva">Öva</button>
                             </div>
                         </article>
                         <article class="mode-panel panel">
-                            <div>
-                                <h3 data-i18n="Botduell">Botduell</h3>
-                                <p id="bot-description" data-i18n="Orankad duell med svårighetsgrad anpassad till ditt Elo.">Orankad duell med svårighetsgrad anpassad till ditt Elo.</p>
+                            <div class="mode-heading">
+                                {{ icon('', 'mode-icon mode-icon-bot') }}
+                                <h3 id="bot-title" data-i18n="Botduell">Botduell</h3>
                             </div>
                             <div class="panel-actions">
-                                <button class="button button-secondary" type="button" data-action="play-bot" aria-describedby="bot-description">
-                                    <span id="bot-start-label" data-i18n="Spela mot bot">Spela mot bot</span>
+                                <button class="button button-secondary" type="button" data-action="play-bot" aria-describedby="bot-title">
+                                    <span id="bot-start-label" data-i18n="Spela">Spela</span>
                                 </button>
-                                <button class="button button-secondary" type="button" data-action="help" data-i18n="Så spelar du">Så spelar du</button>
+                                <button class="button button-quiet" type="button" data-action="help">Guide</button>
                             </div>
                         </article>
                         <article class="mode-panel panel">
-                            <div>
+                            <div class="mode-heading">
+                                {{ icon('⇄', 'mode-icon mode-icon-friend') }}
                                 <h3 data-i18n="Vänduell">Vänduell</h3>
-                                <p data-i18n="Skicka en länk till en vän och spela en orankad handelsduell.">Skicka en länk till en vän och spela en orankad handelsduell.</p>
                             </div>
                             <div class="panel-actions">
-                                <button class="button button-secondary" type="button" data-action="friend-create" data-i18n="Spela med en vän">Spela med en vän</button>
+                                <button class="button button-secondary" type="button" data-action="friend-create" data-i18n="Bjud in en vän">Bjud in en vän</button>
                             </div>
                         </article>
                         <article class="mode-panel panel">
-                            <div>
+                            <div class="mode-heading">
+                                {{ icon('', 'mode-icon mode-icon-live') }}
                                 <h3 data-i18n="Pågående matcher">Pågående matcher</h3>
-                                <p data-i18n="Följ andra spelares dueller i realtid.">Följ andra spelares dueller i realtid.</p>
                             </div>
                             <div class="panel-actions">
                                 <button class="button button-secondary" type="button" data-action="spectate" data-i18n="Titta live">Titta live</button>
@@ -274,10 +276,7 @@
                         <span class="eyebrow" data-i18n="Handelsduell">Handelsduell</span>
                     </header>
                     <div class="rating-top">
-                        <div>
-                            <p class="eyebrow" data-i18n="Liga">Liga</p>
-                            <h3 id="menu-level" class="league">—</h3>
-                        </div>
+                        <h3 id="menu-level" class="league">—</h3>
                         <button class="league-mark" type="button" data-action="leagues" aria-label="Visa alla ranker" data-i18n-aria-label="Visa alla ranker" aria-haspopup="dialog" aria-controls="leagues-dialog" title="Visa alla ranker" data-i18n-title="Visa alla ranker">
                             <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
                         </button>
@@ -309,7 +308,7 @@
         <section id="spectate-screen" class="screen spectate-screen" aria-labelledby="spectate-title" hidden>
             <header class="spectate-heading">
                 <h1 id="spectate-title" class="screen-title" tabindex="-1" data-i18n="Pågående matcher">Pågående matcher</h1>
-                <button class="button button-secondary" type="button" data-action="spectate-menu" data-i18n="Till huvudmenyn">Till huvudmenyn</button>
+                <button class="button button-secondary" type="button" data-action="spectate-menu">{{ icon('←') }} <span data-i18n="Huvudmeny">Huvudmeny</span></button>
             </header>
             <p id="spectate-list-status" class="spectate-list-status panel" role="status" data-i18n="Laddar pågående matcher …">Laddar pågående matcher …</p>
             <ul id="spectate-list" class="spectate-list" role="list" aria-label="Matcher att följa live" data-i18n-aria-label="Matcher att följa live"></ul>
@@ -324,7 +323,7 @@
                 </div>
                 <div class="spectate-heading-actions">
                     <button class="button button-secondary" id="spectate-live-retry" type="button" data-action="spectate-live-retry" hidden data-i18n="Försök igen">Försök igen</button>
-                    <button class="button button-secondary" type="button" data-action="spectate-back" data-i18n="Till matchlistan">Till matchlistan</button>
+                    <button class="button button-secondary" type="button" data-action="spectate-back">{{ icon('←') }} <span data-i18n="Matchlista">Matchlista</span></button>
                 </div>
             </header>
             <div id="spectate-contest" hidden>
@@ -412,8 +411,8 @@
                     <input id="invite-link" type="url" readonly>
                 </label>
                 <div class="panel-actions">
-                    <button id="invite-copy" class="button button-secondary" type="button" data-action="friend-copy" hidden data-i18n="Kopiera länk">Kopiera länk</button>
-                    <button id="invite-join" class="button button-primary" type="button" data-action="friend-join" hidden data-i18n="Gå med i duellen">Gå med i duellen</button>
+                    <button id="invite-copy" class="button button-primary" type="button" data-action="friend-copy" hidden>{{ icon('⧉') }} <span data-i18n="Kopiera länk">Kopiera länk</span></button>
+                    <button id="invite-join" class="button button-primary" type="button" data-action="friend-join" hidden data-i18n="Gå med">Gå med</button>
                     <button id="invite-cancel" class="button button-secondary" type="button" data-action="friend-cancel" data-i18n="Avbryt">Avbryt</button>
                 </div>
             </div>
@@ -450,7 +449,7 @@
             </div>
             <div id="bot-guide" class="bot-guide panel" hidden>
                 <p id="bot-guide-step" role="status"></p>
-                <button class="button button-secondary" type="button" data-action="guide-skip" data-i18n="Hoppa över guiden">Hoppa över guiden</button>
+                <button class="button button-quiet" type="button" data-action="guide-skip" data-i18n="Hoppa över">Hoppa över</button>
             </div>
             <div class="match-layout">
                 <section class="market-panel panel" aria-label="Marknad och kursgraf" data-i18n-aria-label="Marknad och kursgraf">
@@ -484,13 +483,8 @@
                     </div>
                 </section>
                 <section id="trade-panel" class="trade-panel panel" aria-label="Position och handel" data-i18n-aria-label="Position och handel">
-                    <ol id="trade-steps" class="trade-steps" role="list" aria-label="Handelns steg" data-i18n-aria-label="Handelns steg">
-                        <li data-trade-step="entry" aria-current="step"><span aria-hidden="true">↗</span><span data-i18n="Öppna">Öppna</span></li>
-                        <li data-trade-step="hold"><span aria-hidden="true">◷</span><span data-i18n="Följ kursen">Följ kursen</span></li>
-                        <li data-trade-step="exit"><span aria-hidden="true">✓</span><span data-i18n="Avsluta">Avsluta</span></li>
-                    </ol>
                     <div id="open-order" class="trade-order">
-                        <h2 class="trade-label" data-i18n="Välj insats i krediter">Välj insats i krediter</h2>
+                        <h2 class="trade-label" data-i18n="Insats">Insats</h2>
                         <div class="percent-buttons" role="group" aria-label="Andel av tillgängliga krediter att satsa" data-i18n-aria-label="Andel av tillgängliga krediter att satsa">
                             <button type="button" data-percent="25" aria-pressed="false" disabled>25 %<small id="stake-25">—</small></button>
                             <button type="button" data-percent="50" aria-pressed="false" disabled>50 %<small id="stake-50">—</small></button>
@@ -500,18 +494,16 @@
                         <h2 class="trade-label" data-i18n="Välj riktning">Välj riktning</h2>
                         <div class="order-buttons" role="group" aria-label="Välj riktning för din position" data-i18n-aria-label="Välj riktning för din position">
                             <button class="button button-buy direction-button" type="button" data-action="buy" disabled>
-                                <span><span aria-hidden="true">↗</span> <span data-i18n="UPP">UPP</span></span>
-                                <small data-i18n="Vinst vid uppgång">Vinst vid uppgång</small>
+                                {{ icon('↗') }} <span data-i18n="UPP">UPP</span>
                             </button>
                             <button class="button button-short direction-button" type="button" data-action="short" disabled>
-                                <span><span aria-hidden="true">↘</span> <span data-i18n="NER">NER</span></span>
-                                <small data-i18n="Vinst vid nedgång">Vinst vid nedgång</small>
+                                {{ icon('↘') }} <span data-i18n="NER">NER</span>
                             </button>
                         </div>
                     </div>
                     <div id="position-summary" class="position-summary" hidden>
                         <div class="position-result">
-                            <div><span data-i18n="Affären just nu">Affären just nu</span><strong id="match-pnl" class="mono">—</strong> <small data-i18n="krediter">krediter</small></div>
+                            <div><span data-i18n="Öppen position">Öppen position</span><strong id="match-pnl" class="mono">—</strong> <small data-i18n="krediter">krediter</small></div>
                             <span id="match-direction" class="position-direction mono">—</span>
                         </div>
                         <dl class="position-meta">
@@ -524,15 +516,15 @@
                     </div>
                     <div id="sell-choice" class="sell-choice" hidden>
                         <h2 id="sell-choice-title" class="trade-label" data-i18n="Använd vinsten">Använd vinsten</h2>
-                        <div id="profit-actions" class="order-buttons" role="group" aria-labelledby="sell-choice-title" aria-describedby="sell-choice-hint">
+                        <div id="profit-actions" class="order-buttons" role="group" aria-labelledby="sell-choice-title">
                             <button class="button button-attack direction-button" type="button" data-action="attack">
-                                <span><span aria-hidden="true">⚡︎</span> ATTACK</span><small id="attack-preview" data-i18n="Gör skada">Gör skada</small>
+                                <span>{{ icon('ϟ') }} ATTACK</span><small id="attack-preview" data-i18n="Gör skada">Gör skada</small>
                             </button>
                             <button class="button button-buy direction-button" type="button" data-action="grow">
-                                <span><span aria-hidden="true">↗</span> GROW</span><small id="grow-preview" data-i18n="Bygg kapital och bonus">Bygg kapital och bonus</small>
+                                <span>{{ icon('↗') }} GROW</span><small id="grow-preview" data-i18n="Spara vinsten">Spara vinsten</small>
                             </button>
                         </div>
-                        <p id="sell-choice-hint" class="trade-detail"></p>
+                        <p id="sell-choice-hint" class="trade-detail" hidden></p>
                         <button id="pending-close" class="button button-primary" type="button" data-action="confirm-close" aria-describedby="sell-choice-hint" hidden data-i18n="Stäng affären">Stäng affären</button>
                         <button class="button button-secondary keep-holding" type="button" data-action="keep-holding" data-i18n="Fortsätt hålla">Fortsätt hålla</button>
                     </div>
@@ -548,17 +540,16 @@
                         <p id="prediction-reason" class="prediction-reason" hidden></p>
                     </div>
                     <form id="prediction-controls" class="prediction-controls" novalidate>
-                        <p id="prediction-instructions" data-i18n="Dra uppåt eller nedåt i prognosfältet, eller skriv din gissning i procent.">Dra uppåt eller nedåt i prognosfältet, eller skriv din gissning i procent.</p>
                         <div class="field">
                             <label for="prediction-move" data-i18n="Din prognos (%)">Din prognos (%)</label>
                             <div class="prediction-input">
-                                <input id="prediction-move" class="mono" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" maxlength="32" placeholder="t.ex. −1,25" data-i18n-placeholder="t.ex. −1,25" aria-describedby="prediction-instructions prediction-feedback">
+                                <input id="prediction-move" class="mono" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" spellcheck="false" maxlength="32" placeholder="0,00" data-i18n-placeholder="0,00" aria-describedby="prediction-feedback">
                                 <button id="prediction-sign" class="button button-secondary" type="button" data-action="prediction-sign" aria-label="Negativt tecken" data-i18n-aria-label="Negativt tecken" aria-pressed="false">±</button>
                             </div>
                         </div>
                         <div class="prediction-actions">
-                            <button class="button button-secondary" type="button" data-action="prediction-clear" data-i18n="Rensa">Rensa</button>
-                            <button class="button button-primary" id="prediction-lock" type="submit" data-i18n="Lås prognos">Lås prognos</button>
+                            <button class="button button-quiet" type="button" data-action="prediction-clear" data-i18n="Rensa">Rensa</button>
+                            <button class="button button-primary" id="prediction-lock" type="submit">{{ icon('✓') }} <span data-i18n="Lås prognos">Lås prognos</span></button>
                         </div>
                         <p id="prediction-feedback" class="match-feedback" role="status" hidden></p>
                     </form>
@@ -587,35 +578,55 @@
                         </span>
                     </div>
                 </div>
-                <div class="result-instrument">
+                <div id="result-instrument" class="result-instrument">
                     <strong id="result-symbol">—</strong>
                     <span id="result-period">—</span>
                 </div>
                 <div id="result-explanation" class="result-detail" hidden>
                     <p id="result-decisive"></p>
                     <dl id="result-comparison" class="result-stats result-comparison">
-                        <div><dt data-i18n="Dina slut-HP">Dina slut-HP</dt><dd id="result-self-hp" class="mono">—</dd></div>
-                        <div><dt id="result-opponent-label" data-i18n="Motståndarens slut-HP">Motståndarens slut-HP</dt><dd id="result-opponent-hp" class="mono">—</dd></div>
+                        <div>
+                            <dt data-i18n="Du">Du</dt>
+                            <dd>
+                                <span id="result-self-hp" class="mono">—</span> HP
+                                <progress id="result-self-meter" class="meter" max="100" value="0" aria-hidden="true"></progress>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt id="result-opponent-label" data-i18n="Motståndare">Motståndare</dt>
+                            <dd>
+                                <span id="result-opponent-hp" class="mono">—</span> HP
+                                <progress id="result-opponent-meter" class="meter" max="100" value="0" aria-hidden="true"></progress>
+                            </dd>
+                        </div>
                     </dl>
                 </div>
-                <dl id="result-trade-stats" class="result-stats">
-                    <div><dt data-i18n="Affärer">Affärer</dt><dd id="result-trades" class="mono">—</dd></div>
-                    <div><dt data-i18n="Vinstaffärer">Vinstaffärer</dt><dd id="result-wins" class="mono">—</dd></div>
-                    <div><dt data-i18n="Förlustaffärer">Förlustaffärer</dt><dd id="result-losses" class="mono">—</dd></div>
-                    <div><dt data-i18n="Attackskada">Attackskada</dt><dd id="result-attack" class="mono">—</dd></div>
-                    <div><dt data-i18n="Grow-val">Grow-val</dt><dd id="result-grow" class="mono">—</dd></div>
-                    <div><dt data-i18n="Högsta kapital">Högsta kapital</dt><dd id="result-peak" class="mono">—</dd></div>
-                    <div><dt data-i18n="Ditt slutkapital">Ditt slutkapital</dt><dd id="result-capital" class="mono">—</dd></div>
-                    <div id="result-opponent-capital-stat" hidden><dt data-i18n="Motståndarens slutkapital">Motståndarens slutkapital</dt><dd id="result-opponent-capital" class="mono">—</dd></div>
-                    <div id="result-trade-hp-stat"><dt data-i18n="Hälsa vid slut">Hälsa vid slut</dt><dd id="result-hp" class="mono">—</dd></div>
-                    <div><dt data-i18n="Matchlängd">Matchlängd</dt><dd id="result-duration" class="mono">—</dd></div>
-                </dl>
-                <dl id="result-prediction-stats" class="result-stats" hidden>
-                    <div><dt data-i18n="Rundor">Rundor</dt><dd id="result-rounds" class="mono">—</dd></div>
-                    <div id="result-prediction-attack-stat"><dt data-i18n="Attackskada">Attackskada</dt><dd id="result-prediction-attack" class="mono">—</dd></div>
-                    <div id="result-prediction-hp-stat"><dt data-i18n="Hälsa vid slut">Hälsa vid slut</dt><dd id="result-prediction-hp" class="mono">—</dd></div>
-                    <div><dt data-i18n="Matchlängd">Matchlängd</dt><dd id="result-prediction-duration" class="mono">—</dd></div>
-                </dl>
+                <div class="result-actions">
+                    <button class="button button-secondary" type="button" data-action="main-menu" data-i18n="Huvudmeny">Huvudmeny</button>
+                    <button id="result-rematch" class="button button-primary" type="button" data-action="play-again" data-i18n="Spela igen">Spela igen</button>
+                    <p id="result-revenge-status" class="match-feedback" role="status" hidden></p>
+                </div>
+                <details id="result-statistics" class="result-detail">
+                    <summary data-i18n="Statistik">Statistik</summary>
+                    <dl id="result-trade-stats" class="result-stats">
+                        <div><dt data-i18n="Affärer">Affärer</dt><dd id="result-trades" class="mono">—</dd></div>
+                        <div><dt data-i18n="Vinstaffärer">Vinstaffärer</dt><dd id="result-wins" class="mono">—</dd></div>
+                        <div><dt data-i18n="Förlustaffärer">Förlustaffärer</dt><dd id="result-losses" class="mono">—</dd></div>
+                        <div><dt data-i18n="Attackskada">Attackskada</dt><dd id="result-attack" class="mono">—</dd></div>
+                        <div><dt data-i18n="Grow-val">Grow-val</dt><dd id="result-grow" class="mono">—</dd></div>
+                        <div><dt data-i18n="Högsta kapital">Högsta kapital</dt><dd id="result-peak" class="mono">—</dd></div>
+                        <div><dt data-i18n="Ditt slutkapital">Ditt slutkapital</dt><dd id="result-capital" class="mono">—</dd></div>
+                        <div id="result-opponent-capital-stat" hidden><dt data-i18n="Motståndarens slutkapital">Motståndarens slutkapital</dt><dd id="result-opponent-capital" class="mono">—</dd></div>
+                        <div id="result-trade-hp-stat"><dt data-i18n="Hälsa vid slut">Hälsa vid slut</dt><dd id="result-hp" class="mono">—</dd></div>
+                        <div><dt data-i18n="Matchlängd">Matchlängd</dt><dd id="result-duration" class="mono">—</dd></div>
+                    </dl>
+                    <dl id="result-prediction-stats" class="result-stats" hidden>
+                        <div><dt data-i18n="Rundor">Rundor</dt><dd id="result-rounds" class="mono">—</dd></div>
+                        <div id="result-prediction-attack-stat"><dt data-i18n="Attackskada">Attackskada</dt><dd id="result-prediction-attack" class="mono">—</dd></div>
+                        <div id="result-prediction-hp-stat"><dt data-i18n="Hälsa vid slut">Hälsa vid slut</dt><dd id="result-prediction-hp" class="mono">—</dd></div>
+                        <div><dt data-i18n="Matchlängd">Matchlängd</dt><dd id="result-prediction-duration" class="mono">—</dd></div>
+                    </dl>
+                </details>
                 <details id="result-trade-detail" class="result-detail" hidden>
                     <summary data-i18n="Dina affärer">Dina affärer</summary>
                     <div class="table-wrap" tabindex="0" aria-label="Dina affärer" data-i18n-aria-label="Dina affärer">
@@ -626,7 +637,7 @@
                     </div>
                 </details>
                 <details id="result-round-detail" class="result-detail" hidden>
-                    <summary data-i18n="Prognos och facit per runda">Prognos och facit per runda</summary>
+                    <summary data-i18n="Rundresultat">Rundresultat</summary>
                     <div class="table-wrap" tabindex="0" aria-label="Prognos och facit per runda" data-i18n-aria-label="Prognos och facit per runda">
                         <table>
                             <thead><tr><th scope="col" data-i18n="Runda">Runda</th><th id="round-outcome-header" scope="col" data-i18n="Utfall">Utfall</th><th scope="col" data-i18n="Facit">Facit</th><th scope="col" data-i18n="Du">Du</th><th scope="col" data-i18n="Ditt fel">Ditt fel</th><th id="round-opponent-header" scope="col" data-i18n="Motståndaren">Motståndaren</th><th id="round-opponent-error-header" scope="col" data-i18n="Motståndarens fel">Motståndarens fel</th></tr></thead>
@@ -634,11 +645,6 @@
                         </table>
                     </div>
                 </details>
-                <div class="result-actions">
-                    <button id="result-rematch" class="button button-primary" type="button" data-action="play-again" data-i18n="Spela igen">Spela igen</button>
-                    <button class="button button-secondary" type="button" data-action="main-menu" data-i18n="Huvudmeny">Huvudmeny</button>
-                    <p id="result-revenge-status" class="match-feedback" role="status" hidden></p>
-                </div>
             </div>
         </section>
 
@@ -653,8 +659,8 @@
         <div class="help-content">
             <h3 data-i18n="Handelsduell">Handelsduell</h3>
             <ul class="tutorial-rules" role="list">
-                <li><span aria-hidden="true">↕</span><span data-i18n="Välj insats → UPP eller NER → Stäng affären.">Välj insats → UPP eller NER → Stäng affären.</span></li>
-                <li><span aria-hidden="true">⚡︎</span><span data-i18n="Attack gör skada. Grow sparar vinsten.">Attack gör skada. Grow sparar vinsten.</span></li>
+                <li>{{ icon('↕') }}<span data-i18n="Insats → Upp/Ner → Stäng">Insats → Upp/Ner → Stäng</span></li>
+                <li>{{ icon('ϟ') }}<span data-i18n="Attack gör skada. Grow sparar vinsten.">Attack gör skada. Grow sparar vinsten.</span></li>
             </ul>
             <details class="help-rules">
                 <summary data-i18n="Fler duellregler">Fler duellregler</summary>
@@ -664,11 +670,15 @@
                 <p data-i18n="Vid dubbel KO avgör kapital, sedan attackskada. Vid lika blir det oavgjort.">Vid dubbel KO avgör kapital, sedan attackskada. Vid lika blir det oavgjort.</p>
             </details>
             <div class="panel-actions">
-                <button class="button button-secondary" type="button" data-action="tutorial-replay" data-i18n="Spela introduktionen igen">Spela introduktionen igen</button>
-                <button class="button button-primary" type="button" data-action="guide-start" data-i18n="Starta guidad botduell">Starta guidad botduell</button>
+                <button class="button button-secondary" type="button" data-action="tutorial-replay" data-i18n="Introduktion">Introduktion</button>
+                <button class="button button-primary" type="button" data-action="guide-start" data-i18n="Guidad botduell">Guidad botduell</button>
             </div>
             <h3 data-i18n="Ritduell">Ritduell</h3>
-            <p data-i18n="Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.">Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.</p>
+            <ul class="tutorial-rules" role="list">
+                <li>{{ icon('↕') }}<span data-i18n="Rita eller ange % → Lås prognos">Rita eller ange % → Lås prognos</span></li>
+                <li>{{ icon('ϟ') }}<span data-i18n="Närmast facit gör skada.">Närmast facit gör skada.</span></li>
+                <li>{{ icon('♥') }}<span data-i18n="Vinn på KO eller flest HP.">Vinn på KO eller flest HP.</span></li>
+            </ul>
             <button class="button button-secondary" type="button" data-action="practice-prediction" data-i18n="Öva ritduell">Öva ritduell</button>
         </div>
     </dialog>
@@ -684,13 +694,13 @@
                 <dd class="mono" data-i18n="+5 krediter">+5 krediter</dd>
             </dl>
             <div class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till">
-                <button class="button button-attack" type="button" data-action="guide-example-attack" aria-pressed="false" data-i18n="Prova Attack">Prova Attack</button>
-                <button class="button button-buy" type="button" data-action="guide-example-grow" aria-pressed="false" data-i18n="Prova Grow">Prova Grow</button>
+                <button class="button button-attack" type="button" data-action="guide-example-attack" aria-pressed="false">{{ icon('ϟ') }} Attack</button>
+                <button class="button button-buy" type="button" data-action="guide-example-grow" aria-pressed="false">{{ icon('↗') }} Grow</button>
             </div>
             <p id="guide-example-result" class="tutorial-outcome" role="status" hidden></p>
             <div class="panel-actions">
-                <button class="button button-primary" type="button" data-action="guide-begin" data-i18n="Starta guidad botduell">Starta guidad botduell</button>
-                <button class="button button-secondary" type="button" data-action="guide-bypass" data-i18n="Hoppa över guiden">Hoppa över guiden</button>
+                <button class="button button-primary" type="button" data-action="guide-begin" data-i18n="Starta med guide">Starta med guide</button>
+                <button class="button button-secondary" type="button" data-action="guide-bypass" data-i18n="Spela direkt">Spela direkt</button>
             </div>
             <p id="guide-start-error" class="form-error" role="alert" hidden></p>
         </div>
@@ -790,11 +800,11 @@
             </select>
         </label>
         <label class="setting">
-            <span><strong data-i18n="Ljud">Ljud</strong><small data-i18n="Ljudeffekter vid attacker, Grow och matchslut.">Ljudeffekter vid attacker, Grow och matchslut.</small></span>
+            <strong data-i18n="Ljudeffekter">Ljudeffekter</strong>
             <input id="setting-sound" class="setting-toggle" type="checkbox">
         </label>
         <label class="setting">
-            <span><strong data-i18n="Kraftiga animationer">Kraftiga animationer</strong><small data-i18n="Skärmeffekter vid bland annat skada och KO.">Skärmeffekter vid bland annat skada och KO.</small></span>
+            <strong data-i18n="Skärmeffekter">Skärmeffekter</strong>
             <input id="setting-effects" class="setting-toggle" type="checkbox" checked>
         </label>
     </dialog>

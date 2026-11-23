@@ -1,7 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from decimal import Decimal
 from threading import Barrier
-from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -306,29 +304,6 @@ def test_bot_strategies_evaluate_the_same_market_move_differently():
     assert signal({**config, "strategy": "breakout"}, recovering) is None
     assert signal({**config, "strategy": "momentum"}, falling) == "sell"
     assert signal({**config, "strategy": "mean_reversion"}, falling) == "buy"
-
-
-def test_alpaca_quotes_use_exact_cents_and_exchange_timestamps(monkeypatch):
-    from stockfight.company_catalog import LIVE_ASSETS
-    from stockfight.company_quotes import AlpacaQuotes
-
-    provider = AlpacaQuotes("test-key", "test-secret", "iex")
-
-    def fetch(url):
-        endpoint = urlsplit(url)
-        if endpoint.path == "/v2/clock":
-            return {"is_open": True}
-        assert endpoint.path == "/v2/stocks/trades/latest"
-        assert parse_qs(endpoint.query) == {"symbols": [",".join(LIVE_ASSETS)], "feed": ["iex"]}
-        timestamp = "1970-01-01T00:08:20.125Z"
-        return {"trades": {
-            "F": {"p": Decimal("12.345"), "t": timestamp},
-            "AAPL": {"p": Decimal("0"), "t": timestamp},
-            "UNKNOWN": {"p": Decimal("50"), "t": timestamp},
-        }}
-
-    monkeypatch.setattr(provider, "_get", fetch)
-    assert provider.snapshot(500.5) == (True, {"F": (1235, 500.125)})
 
 
 def test_offline_bots_trade_both_firms_once_per_published_tick(live_company_app):

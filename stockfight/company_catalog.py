@@ -4,9 +4,12 @@ STARTING_CASH = 500
 
 LIVE_ASSETS = {
     "F": {"name": {"sv": "Ford Motor", "en": "Ford Motor"}, "unlockLevel": 1},
+    "SOSI": {"name": {"sv": "Sotkamo Silver", "en": "Sotkamo Silver"}, "unlockLevel": 1, "market": "SE", "currency": "SEK"},
     "PLTR": {"name": {"sv": "Palantir Technologies", "en": "Palantir Technologies"}, "unlockLevel": 1},
     "SOFI": {"name": {"sv": "SoFi Technologies", "en": "SoFi Technologies"}, "unlockLevel": 2},
+    "BRIX": {"name": {"sv": "Briox", "en": "Briox"}, "unlockLevel": 2, "market": "SE", "currency": "SEK"},
     "INTC": {"name": {"sv": "Intel", "en": "Intel"}, "unlockLevel": 3},
+    "SPLTN": {"name": {"sv": "Spiltan Invest", "en": "Spiltan Invest"}, "unlockLevel": 3, "market": "SE", "currency": "SEK"},
     "AMD": {"name": {"sv": "AMD", "en": "AMD"}, "unlockLevel": 4},
     "AAPL": {"name": {"sv": "Apple", "en": "Apple"}, "unlockLevel": 5},
 }

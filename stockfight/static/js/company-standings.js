@@ -6,33 +6,32 @@
     section.setAttribute("aria-labelledby", "company-standings-title");
 
     const copy = {
-        title: ["Andra handelsfirmor", "Other trading firms"],
+        title: ["Spelarbörs", "Player exchange"],
         live: ["Live", "Live"],
-        refreshing: ["Löpande uppdatering", "Periodic updates"],
-        description: ["Varje spelare får automatiskt en firma. Köp och sälj en aktie åt gången med virtuella krediter. Kurserna följer firmornas handelsresultat.",
-            "Each player automatically gets a firm. Buy and sell one share at a time with virtual credits. Quotes track each firm’s trading results."],
+        refreshing: ["Uppdateras", "Refreshing"],
         loading: ["Hämtar börskurser …", "Loading share prices …"],
-        empty: ["Det finns inga listade firmor just nu.", "There are no listed firms right now."],
-        noMatches: ["Hittade inga firmor som matchar sökningen.", "No firms matched your search."],
+        empty: ["Inga listade firmor", "No listed firms"],
+        noMatches: ["Inga träffar", "No matches"],
         searchLabel: ["Spelarnamn", "Player name"],
-        search: ["Sök firmor", "Search firms"],
+        search: ["Sök", "Search"],
         clearSearch: ["Rensa sökning", "Clear search"],
         pages: ["Sidor med handelsfirmor", "Trading firm pages"],
         previous: ["Föregående", "Previous"],
         next: ["Nästa", "Next"],
         page: ["Sida {page}", "Page {page}"],
         error: ["Marknaden kunde inte uppdateras just nu.", "The market could not be refreshed."],
-        firm: ["Handelsfirma", "Trading firm"],
+        firm: ["Firma", "Firm"],
         price: ["Kurs", "Price"],
         level: ["Nivå", "Level"],
-        profit: ["Handelsresultat", "Trading profit"],
+        profit: ["Resultat", "Profit"],
         held: ["Äger", "Owned"],
         trade: ["Handel", "Trade"],
         own: ["Din firma", "Your firm"],
-        buy: ["Köp", "Buy"],
-        sell: ["Sälj", "Sell"],
-        holdingsValue: ["Värde i spelarfirmor", "Value in player firms"],
-        reserve: ["Rörelsekassa som måste vara kvar", "Cash kept for operations"],
+        buy: ["Köp 1", "Buy 1"],
+        sell: ["Sälj 1", "Sell 1"],
+        tradeFirm: ["{action} aktie i {firm}", "{action} share in {firm}"],
+        holdingsValue: ["Innehavsvärde", "Holdings value"],
+        reserve: ["Kassareserv", "Cash reserve"],
         stale_quote: ["Kursen hann ändras. Kontrollera den nya kursen innan du försöker igen.",
             "The quote changed. Check the new price before trying again."],
         stale_revision: ["Firmans saldo har uppdaterats. Kontrollera dina innehav och försök igen.",
@@ -52,9 +51,9 @@
 
     section.innerHTML = `<header class="company-standings-heading"></header>
         <form class="company-exchange-search" role="search" aria-labelledby="company-standings-title">
-            <div><label for="company-exchange-name"></label><input class="company-field" id="company-exchange-name" type="search" maxlength="24"></div>
+            <div><label for="company-exchange-name" class="sr-only"></label><input class="company-field" id="company-exchange-name" type="search" maxlength="24"></div>
             <button type="submit" class="button button-secondary company-exchange-button"></button>
-            <button type="button" class="button button-secondary company-exchange-button" data-clear-search hidden></button>
+            <button type="button" class="button button-secondary company-exchange-button" data-clear-search hidden><span aria-hidden="true">×</span></button>
         </form>
         <nav class="company-exchange-pages" hidden>
             <button type="button" data-page-change="-1" class="button button-secondary company-exchange-button"></button>
@@ -98,10 +97,12 @@
         heading.innerHTML = `<div class="company-exchange-title">
             <h2 id="company-standings-title">${text("title")}</h2>
             <span class="company-exchange-status${socket?.connected ? " company-exchange-connected" : ""}">${text(socket?.connected ? "live" : "refreshing")}</span>
-        </div><p>${text("description")}</p>`;
+        </div>`;
         searchForm.querySelector("label").textContent = text("searchLabel");
+        searchInput.placeholder = text("searchLabel");
         searchForm.querySelector("[type=submit]").textContent = text("search");
-        clearSearch.textContent = text("clearSearch");
+        clearSearch.setAttribute("aria-label", text("clearSearch"));
+        clearSearch.title = text("clearSearch");
         clearSearch.hidden = !search;
         pages.hidden = page <= 1 && !market?.hasMore;
         pages.setAttribute("aria-label", text("pages"));
@@ -122,9 +123,9 @@
             <tbody>${rows.map((firm) => {
                 const buyDisabled = pending || failed || cash === undefined || cash - firm.price < market.cashReserve;
                 const sellDisabled = pending || failed || cash === undefined || !firm.held;
-                const button = (action, disabled) => `<button class="button button-secondary company-exchange-button" type="button"
+                const button = (action, disabled) => `<button class="button button-secondary company-exchange-button company-peer-${action}" type="button"
                     id="peer-${action}-${firm.id}" data-peer="${action}" data-firm="${firm.id}"
-                    aria-label="${text(action)} ${escape(firm.name)}"${disabled ? " disabled" : ""}>${text(action)}</button>`;
+                    aria-label="${escape(text("tradeFirm", { action: text(action), firm: firm.name }))}"${disabled ? " disabled" : ""}>${text(action)}</button>`;
                 return `<tr${firm.isYou ? ' class="company-standing-own"' : ""}>
                     <th scope="row"><span>${escape(firm.name)}</span><small>${text("level")} ${format.format(firm.level)} ·
                     ${text("profit")} ${signed.format(firm.profit)}</small></th>

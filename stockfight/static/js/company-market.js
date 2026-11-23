@@ -3,52 +3,63 @@
 
     const section = document.getElementById("company-market");
     const copy = {
-        title: ["Livebörsen", "Live exchange"],
+        title: ["Aktiemarknad", "Stock market"],
         simulation: ["Riktiga aktiekurser · virtuellt kapital", "Real stock quotes · virtual capital"],
+        previousSession: ["Riktiga kurser från föregående handelsdag · virtuellt kapital", "Real quotes from the previous trading session · virtual capital"],
+        replayTime: ["Spelar upp {time}", "Replaying {time}"],
         loading: ["Hämtar kurser …", "Loading quotes …"],
+        live: ["Öppen", "Open"],
+        replay: ["Uppspelning", "Replay"],
+        quoteDetails: ["Kurskälla", "Quote source"],
         frequency: ["Uppdateras var {seconds}:e sekund", "Refreshes every {seconds} seconds"],
         source: ["Källa {source}", "Source {source}"],
+        sweden: ["Sverige", "Sweden"],
+        unitedStates: ["USA", "United States"],
         lastQuote: ["Kurs från {time}", "Quote from {time}"],
         marketClosed: ["Börsen stängd", "Exchange closed"],
         marketUnavailable: ["Kursdata saknas", "Quotes unavailable"],
-        noQuote: ["Aktuell kurs saknas.", "No current quote."],
-        noHistory: ["Kurshistorik visas när data har hämtats.", "Price history appears once quotes are available."],
+        noHistory: ["Ingen kurshistorik än", "No price history yet"],
         quoteWait: ["Inväntar nya kurser", "Waiting for quotes"],
-        unavailable: ["Kurserna kunde inte uppdateras. Handeln öppnar när anslutningen är tillbaka.", "Quotes could not be updated. Trading resumes when the connection returns."],
+        unavailable: ["Anslutningen försvann. Väntar på kurser.", "Connection lost. Waiting for quotes."],
         chartMissing: ["Kursgrafen går inte att visa.", "The price chart is unavailable."],
         chartDescription: ["Senaste kursrörelserna för {symbol}", "Recent price movements for {symbol}"],
+        replayChartDescription: ["Historiska kursrörelser för {symbol} under uppspelningen", "Historical price movements for {symbol} during replay"],
         trend: ["Senaste rörelse", "Latest move"],
         chart: ["Kursgraf", "Price chart"],
         stockList: ["Välj aktie", "Select stock"],
         locked: ["Låst", "Locked"],
-        locked_asset: ["Aktien låses upp när firman når en högre nivå.", "The stock unlocks when the firm reaches a higher level."],
+        locked_asset: ["Låses upp på en högre nivå", "Unlocks at a higher level"],
         ticket: ["Lägg order", "Order ticket"],
+        orderJump: ["Order", "Order"],
+        orderJumpLabel: ["Gå till orderformuläret", "Go to order form"],
         action: ["Ordertyp", "Order type"],
-        buy: ["Köp · uppgång", "Buy · price rises"],
-        sell: ["Sälj innehav", "Sell holding"],
-        short: ["Blanka · nedgång", "Short · price falls"],
+        buy: ["Köp", "Buy"],
+        sell: ["Sälj", "Sell"],
+        short: ["Blanka", "Short"],
         cover: ["Täck blankning", "Cover short"],
-        shortGuide: ["Säkerheten motsvarar ordervärdet. Du kan förlora den och handelsavgiften.", "Collateral equals the order value. You can lose it and the trading fee."],
-        buyDone: ["Köpte {quantity} {symbol} för {price} per aktie", "Bought {quantity} {symbol} at {price} per share"],
-        sellDone: ["Sålde {quantity} {symbol} för {price} per aktie", "Sold {quantity} {symbol} at {price} per share"],
-        shortDone: ["Blankade {quantity} {symbol} för {price} per aktie", "Shorted {quantity} {symbol} at {price} per share"],
-        coverDone: ["Täckte {quantity} {symbol} för {price} per aktie", "Covered {quantity} {symbol} at {price} per share"],
-        quantity: ["Antal aktier", "Number of shares"],
+        shortGuide: ["Ordervärdet binds som säkerhet och kan förloras med avgiften.", "The order value is held as collateral and can be lost with the fee."],
+        buyDone: ["Köpte {quantity} {symbol} à {price}", "Bought {quantity} {symbol} at {price} each"],
+        sellDone: ["Sålde {quantity} {symbol} à {price}", "Sold {quantity} {symbol} at {price} each"],
+        shortDone: ["Blankade {quantity} {symbol} à {price}", "Shorted {quantity} {symbol} at {price} each"],
+        coverDone: ["Täckte {quantity} {symbol} à {price}", "Covered {quantity} {symbol} at {price} each"],
+        quantity: ["Antal", "Shares"],
+        fewer: ["Minska antal", "Fewer shares"],
+        more: ["Öka antal", "More shares"],
         max: ["Max {count}", "Max {count}"],
-        order: ["Genomför order", "Place order"],
-        available: ["Kassa över reserv", "Cash above reserve"],
-        equity: ["Värde inkl. börspositioner", "Value incl. market positions"],
+        orderValue: ["Ordervärde", "Order value"],
+        available: ["Handelskassa", "Trading cash"],
+        equity: ["Totalt värde", "Total equity"],
         paperProfit: ["Orealiserat resultat", "Unrealised P/L"],
-        fees: ["Totala avgifter", "Total fees"],
-        positions: ["Egna positioner", "Own positions"],
-        noPositions: ["Köp inför uppgång eller blanka inför nedgång för att öppna en position.", "Buy if you expect a rise or short if you expect a fall to open a position."],
+        fees: ["Avgifter", "Fees"],
+        positions: ["Mina positioner", "My positions"],
+        noPositions: ["Inga öppna positioner", "No open positions"],
         symbol: ["Aktie", "Stock"],
         direction: ["Riktning", "Direction"],
         long: ["Uppgång", "Long"],
         shortDirection: ["Nedgång", "Short"],
         average: ["Snittkurs", "Average price"],
         return: ["Resultat", "P/L"],
-        botPositions: ["Handelsbotar", "Trading bots"],
+        botPositions: ["Botarnas affärer", "Bot trades"],
         botName: ["Handlare", "Trader"],
         botPosition: ["Position", "Position"],
         botFill: ["Senaste affär", "Latest trade"],
@@ -65,10 +76,11 @@
         position_conflict: ["Stäng den befintliga positionen innan du byter riktning.", "Close the existing position before switching direction."],
         position_limit: ["Ordern överskrider firmans gräns för antal aktier.", "The order exceeds the firm’s share limit."],
         invalid_quantity: ["Ange ett giltigt helt antal aktier.", "Enter a valid whole number of shares."],
-        market_unavailable: ["En aktuell handelskurs saknas. Lägg ordern när handeln öppnar igen.", "There is no current tradeable quote. Place the order once trading resumes."],
+        market_closed: ["Börsen är stängd.", "The exchange is closed."],
+        market_unavailable: ["Väntar på en aktuell handelskurs.", "Waiting for a current quote."],
         commandError: ["Ordern kunde inte genomföras.", "The order could not be placed."],
     };
-    const sides = ["buy", "sell", "short", "cover"];
+    const sideIcons = { buy: "↗", sell: "✓", short: "↘", cover: "✓" };
     const locale = () => window.StockFightI18n?.getLocale() ?? "sv-SE";
     const english = () => locale().startsWith("en");
     const escape = (value) => String(value).replace(/[&<>"']/g, (character) => ({
@@ -81,16 +93,22 @@
     const money = (value, signed = false) => format(value, {
         maximumFractionDigits: 2, signDisplay: signed ? "exceptZero" : "auto",
     }) + (english() ? " cr" : " kred.");
-    const price = (value) => value == null ? "–" : format(value, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+    const price = (value, currency = "USD") => value == null ? "–" : format(value, { style: "currency", currency, maximumFractionDigits: 2 });
     const percent = (value) => value == null ? "–" : format(value / 100, { style: "percent", maximumFractionDigits: 2, signDisplay: "exceptZero" });
+    const formatTime = (value) => new Intl.DateTimeFormat(locale(), {
+        year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short",
+    }).format(new Date(value * 1000));
     const tone = (value) => value < 0 ? "company-negative" : value > 0 ? "company-positive" : "";
     const stockName = (asset) => asset.name[english() ? "en" : "sv"];
     const selectedAsset = () => market?.assets.find(({ symbol }) => symbol === selected);
+    const marketName = (asset) => asset?.market === "SE" ? text("sweden") : asset?.market === "US" ? text("unitedStates") : "";
+    const tradingStatus = (asset) => asset?.marketStatus ?? market?.status;
     const byId = (id) => document.getElementById(`company-market-${id}`);
 
     let market;
     let revision;
     let selected;
+    let manuallySelected = false;
     let side = "buy";
     let quantity = "1";
     let pending = false;
@@ -107,11 +125,16 @@
     function mount() {
         if (mountedLanguage === locale()) return;
         mountedLanguage = locale();
+        const showSource = byId("quote-details")?.open;
+        const showBots = byId("bots")?.open;
         chart?.remove();
         chart = series = chartKey = undefined;
         section.innerHTML = `<div class="company-market-heading">
-            <div><h2 id="company-market-title">${tx("title")}</h2><p class="company-muted" id="company-market-source">${tx("simulation")}</p></div>
+            <h2 id="company-market-title">${tx("title")}</h2>
             <span id="company-market-status" class="company-market-status"></span>
+            <button id="company-market-order-jump" class="company-order-jump" type="button" aria-label="${tx("orderJumpLabel")}" aria-controls="company-market-order" hidden>
+                ${tx("orderJump")} <span aria-hidden="true">↓</span>
+            </button>
         </div>
         <p class="company-market-warning" id="company-market-error" role="status" hidden></p>
         <div id="company-market-data" hidden>
@@ -123,31 +146,49 @@
                     <p id="company-market-chart-empty" class="company-market-chart company-muted" hidden></p>
                 </div>
                 <form class="company-order" id="company-market-order" aria-labelledby="company-market-order-title">
-                    <h3 id="company-market-order-title">${tx("ticket")}</h3>
-                    <label for="company-market-side">${tx("action")}</label>
-                    <select id="company-market-side" class="company-field" name="side">${sides.map((value) => `<option value="${value}">${tx(value)}</option>`).join("")}</select>
+                    <h3 id="company-market-order-title" tabindex="-1">${tx("ticket")}</h3>
+                    <fieldset id="company-market-sides" class="company-order-sides">
+                        <legend class="sr-only">${tx("action")}</legend>
+                        ${Object.entries(sideIcons).map(([value, icon]) => `<label class="company-order-option company-side-${value}" hidden>
+                            <input type="radio" class="sr-only" id="company-market-side-${value}" name="side" value="${value}">
+                            <span><b aria-hidden="true">${icon}</b>${tx(value)}</span>
+                        </label>`).join("")}
+                    </fieldset>
                     <div class="company-order-label"><label for="company-market-quantity">${tx("quantity")}</label><span id="company-market-limit"></span></div>
-                    <input id="company-market-quantity" class="company-field" name="quantity" type="number" min="1" step="1" inputmode="numeric" aria-describedby="company-market-limit" required>
-                    <div class="company-order-total" id="company-market-order-total"></div>
+                    <div class="company-order-stepper">
+                        <button id="company-market-fewer" type="button" data-step="-1" aria-label="${tx("fewer")}">−</button>
+                        <input id="company-market-quantity" class="company-field" name="quantity" type="number" min="1" step="1" inputmode="numeric" aria-describedby="company-market-limit company-market-order-total" required>
+                        <button id="company-market-more" type="button" data-step="1" aria-label="${tx("more")}">+</button>
+                    </div>
+                    <dl class="company-order-total"><dt>${tx("orderValue")}</dt><dd id="company-market-order-total"></dd></dl>
                     <p id="company-market-order-help" class="company-muted company-order-help" hidden>${tx("shortGuide")}</p>
-                    <button type="submit" id="company-market-submit" class="button button-primary">${tx("order")}</button>
+                    <button type="submit" id="company-market-submit" class="button button-primary"></button>
+                    <p id="company-market-order-blocked" class="company-muted company-order-help" hidden></p>
                 </form>
             </div>
             <p id="company-market-fill" class="company-market-fill" role="status" hidden></p>
             <div id="company-market-balances"></div>
             <div id="company-market-positions" class="company-market-positions"></div>
-            <div id="company-market-bots" class="company-market-bots" hidden></div>
-        </div>`;
-        byId("side").value = side;
+            <details id="company-market-bots" class="company-details"${showBots ? " open" : ""} hidden>
+                <summary id="company-market-bots-title">${tx("botPositions")}</summary>
+                <div id="company-market-bot-rows"></div>
+            </details>
+        </div>
+        <details id="company-market-quote-details" class="company-details"${showSource ? " open" : ""}>
+            <summary>${tx("quoteDetails")}</summary>
+            <p class="company-muted" id="company-market-source">${tx("simulation")}</p>
+        </details>`;
         byId("quantity").value = quantity;
     }
 
     function paintAssets() {
         byId("assets").innerHTML = market.assets.map((asset) => {
-            const movement = percent(asset.changePercent);
+            const movement = asset.unlocked ? percent(asset.price == null ? null : asset.changePercent) : text("locked");
+            const details = [asset.market === "US" ? "USA" : asset.market, movement].filter(Boolean).join(" · ");
+            const label = [`${asset.symbol} ${stockName(asset)}`, marketName(asset), movement].filter(Boolean).join(", ");
             return `<button type="button" class="company-market-asset" id="company-market-asset-${escape(asset.symbol)}"
-                data-stock="${escape(asset.symbol)}" aria-pressed="${asset.symbol === selected}" aria-label="${escape(`${asset.symbol} ${stockName(asset)}`)}">
-                <strong>${escape(asset.symbol)}</strong><span class="${asset.unlocked ? tone(asset.changePercent) : ""}">${asset.unlocked ? movement : tx("locked")}</span>
+                data-stock="${escape(asset.symbol)}" aria-pressed="${asset.symbol === selected}" aria-label="${escape(label)}">
+                <strong>${escape(asset.symbol)}</strong><span class="${asset.unlocked ? tone(asset.changePercent) : ""}">${escape(details)}</span>
             </button>`;
         }).join("");
     }
@@ -162,14 +203,15 @@
             empty.textContent = text(library ? "noHistory" : "chartMissing");
             return;
         }
-        container.setAttribute("aria-label", text("chartDescription", { symbol: asset.symbol }));
+        const description = market.mode === "previous_session" ? "replayChartDescription" : "chartDescription";
+        container.setAttribute("aria-label", text(description, { symbol: asset.symbol }));
         if (!chart) {
             chart = library.createChart(container, {
                 autoSize: true,
                 layout: { background: { color: "#101b23" }, textColor: "#b3c2c9", attributionLogo: false },
                 grid: { vertLines: { color: "#23343f" }, horzLines: { color: "#23343f" } },
                 rightPriceScale: { borderColor: "#344851" },
-                localization: { locale: locale(), priceFormatter: price },
+                localization: { locale: locale(), priceFormatter: (value) => price(value, selectedAsset()?.currency) },
                 timeScale: { borderColor: "#344851", timeVisible: true, secondsVisible: true },
                 handleScroll: false,
                 handleScale: false,
@@ -190,18 +232,39 @@
     }
 
     function paintTicket(asset) {
+        const position = asset.position?.side;
+        const allowed = position === "long" ? ["buy", "sell"] : position === "short" ? ["short", "cover"] : ["buy", "short"];
+        if (!allowed.includes(side)) side = position === "short" ? "cover" : "buy";
         const max = asset.maxOrder[side];
         const orderQuantity = byId("quantity").valueAsNumber;
-        const cannotEdit = pending || !asset.unlocked;
-        const disabled = cannotEdit || failed || !asset.tradable || market.status !== "open" || market.revision !== revision;
-        byId("side").disabled = cannotEdit;
+        const status = tradingStatus(asset);
+        let blocked;
+        if (!asset.unlocked) blocked = "locked_asset";
+        else if (status === "closed") blocked = "market_closed";
+        else if (failed || !asset.tradable || status !== "open") blocked = "market_unavailable";
+        const cannotEdit = pending || Boolean(blocked);
+        for (const input of byId("sides").querySelectorAll("input")) {
+            input.closest("label").hidden = !allowed.includes(input.value);
+            input.disabled = cannotEdit || !allowed.includes(input.value);
+            input.checked = input.value === side;
+        }
         byId("quantity").disabled = cannotEdit;
         byId("quantity").max = Math.max(1, max);
-        byId("limit").textContent = text("max", { count: format(max) });
-        const orderTotal = `${price(asset.price)} × ${format(Number.isInteger(orderQuantity) && orderQuantity > 0 ? orderQuantity : 0)}`;
-        byId("order-total").textContent = !asset.unlocked ? text("locked_asset") : asset.price == null ? text("noQuote") : orderTotal;
-        byId("order-help").hidden = side !== "short" || !asset.unlocked;
-        byId("submit").disabled = disabled || !Number.isInteger(orderQuantity) || orderQuantity < 1 || orderQuantity > max;
+        byId("fewer").disabled = cannotEdit || max === 0 || !(orderQuantity > 1);
+        byId("more").disabled = cannotEdit || max === 0 || orderQuantity >= max;
+        byId("limit").textContent = blocked ? "" : text("max", { count: format(max) });
+        const validQuantity = Number.isInteger(orderQuantity) && orderQuantity > 0;
+        const estimated = validQuantity && !blocked;
+        byId("order-total").textContent = estimated
+            ? (Number.isFinite(asset.orderPrice) ? money(asset.orderPrice * orderQuantity) : price(asset.price * orderQuantity, asset.currency))
+            : "–";
+        byId("order-help").hidden = side !== "short" || Boolean(blocked);
+        const submit = byId("submit");
+        submit.textContent = `${text(side)} ${asset.symbol}`;
+        submit.disabled = cannotEdit || market.revision !== revision || !validQuantity || orderQuantity > max;
+        const reason = byId("order-blocked");
+        reason.hidden = !blocked;
+        reason.textContent = blocked ? text(blocked) : "";
     }
 
     function paintBalances() {
@@ -221,26 +284,25 @@
                 <thead><tr>${headings.map((heading) => `<th scope="col">${tx(heading)}</th>`).join("")}</tr></thead>
                 <tbody>${positions.map(({ symbol, position }) => `<tr><th scope="row">${escape(symbol)}</th>
                     <td>${tx(position.side === "long" ? "long" : "shortDirection")}</td>
-                    <td>${format(position.quantity)}</td><td>${price(position.averagePrice)}</td>
+                    <td>${format(position.quantity)}</td><td>${money(position.averagePrice)}</td>
                     <td class="${tone(position.unrealizedProfit)}"><strong>${money(position.unrealizedProfit, true)}</strong></td>
                 </tr>`).join("")}</tbody></table></div>` : `<p class="company-muted">${tx("noPositions")}</p>`}`;
     }
 
     function fillText(trade) {
         const outcome = trade.profit == null ? "" : ` · ${money(trade.profit, true)}`;
+        const fillPrice = trade.quotedPrice == null ? money(trade.price) : price(trade.quotedPrice, trade.currency);
         return text(`${trade.side}Done`, {
-            quantity: format(trade.quantity), symbol: trade.symbol, price: price(trade.price),
+            quantity: format(trade.quantity), symbol: trade.symbol, price: fillPrice,
         }) + outcome;
     }
 
     function paintBots() {
         const bots = market.bots ?? [];
-        const container = byId("bots");
-        container.hidden = !bots.length;
+        byId("bots").hidden = !bots.length;
         if (!bots.length) return;
         const headings = ["botName", "botPosition", "botFill"];
-        container.innerHTML = `<h3 id="company-market-bots-title">${tx("botPositions")}</h3>
-            <div class="company-table-scroll"><table class="company-data-table" aria-labelledby="company-market-bots-title">
+        byId("bot-rows").innerHTML = `<div class="company-table-scroll"><table class="company-data-table" aria-labelledby="company-market-bots-title">
                 <thead><tr>${headings.map((heading) => `<th scope="col">${tx(heading)}</th>`).join("")}</tr></thead>
                 <tbody>${bots.map(({ name, active, position, lastTrade }) => {
                     const positionInfo = position ? tx("botPositionInfo", {
@@ -270,22 +332,33 @@
     function render() {
         const focusId = section.contains(document.activeElement) ? document.activeElement.id : null;
         mount();
-        const status = byId("status");
-        const marketStatus = { closed: "marketClosed", open: "frequency", unavailable: "marketUnavailable" };
-        status.classList.toggle("company-market-connected", market?.status === "open" && !failed);
-        status.textContent = failed ? text("quoteWait") : market ? text(marketStatus[market.status] ?? "marketUnavailable", { seconds: market.tickSeconds }) : text("loading");
-        byId("source").textContent = text("simulation") + (market?.source ? ` · ${text("source", { source: market.source })}` : "");
-        byId("data").hidden = !market;
-        paintFeedback();
-        if (!market) return;
-        selected ||= market.assets.find(({ unlocked }) => unlocked)?.symbol ?? market.assets[0].symbol;
+        if (market && !manuallySelected && !selectedAsset()?.source && selectedAsset()?.price == null) {
+            const preferred = market.assets.find(({ unlocked, tradable }) => unlocked && tradable);
+            const sourced = market.assets.find(({ unlocked, source }) => unlocked && source);
+            selected = preferred?.symbol ?? sourced?.symbol ?? selected ?? market.assets.find(({ unlocked }) => unlocked)?.symbol;
+        }
         const asset = selectedAsset();
-        const time = asset.quotedAt == null ? null : new Intl.DateTimeFormat(locale(), {
-            day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short",
-        }).format(new Date(asset.quotedAt * 1000));
-        byId("quote").innerHTML = `<div><h3>${escape(stockName(asset))}</h3><strong>${price(asset.price)}</strong>
+        const status = byId("status");
+        const replay = market?.mode === "previous_session";
+        const marketStatus = { closed: "marketClosed", open: replay ? "replay" : "live", unavailable: "marketUnavailable" };
+        const selectedStatus = tradingStatus(asset);
+        status.classList.toggle("company-market-connected", selectedStatus === "open" && !failed);
+        status.textContent = failed ? text("quoteWait") : market ? text(marketStatus[selectedStatus] ?? "marketUnavailable") : text("loading");
+        const replayAt = asset?.market ? asset.replayAt : market?.replayAt;
+        const source = asset?.market ? asset.source : market?.source;
+        const sourceDetails = [text(replay ? "previousSession" : "simulation")];
+        if (replay && Number.isFinite(replayAt)) sourceDetails.push(text("replayTime", { time: formatTime(replayAt) }));
+        if (source) sourceDetails.push(text("source", { source }));
+        if (selectedStatus === "open") sourceDetails.push(text("frequency", { seconds: market.tickSeconds }));
+        byId("source").textContent = sourceDetails.join(" · ");
+        byId("data").hidden = !asset;
+        byId("order-jump").hidden = !asset;
+        paintFeedback();
+        if (!asset) return;
+        const time = Number.isFinite(asset.quotedAt) ? formatTime(asset.quotedAt) : null;
+        byId("quote").innerHTML = `<div><h3>${escape(stockName(asset))}</h3><strong>${price(asset.price, asset.currency)}</strong>
             ${time ? `<span class="company-muted">${tx("lastQuote", { time })}</span>` : ""}</div>
-            <div><span class="company-muted">${tx("trend")}</span><strong class="${tone(asset.changePercent)}">${percent(asset.changePercent)}</strong></div>`;
+            <strong class="company-market-move ${tone(asset.changePercent)}"><span class="sr-only">${tx("trend")} </span>${percent(asset.price == null ? null : asset.changePercent)}</strong>`;
         paintAssets();
         paintChart(asset);
         paintTicket(asset);
@@ -328,18 +401,33 @@
     }
 
     section.addEventListener("click", (event) => {
+        if (event.target.closest("#company-market-order-jump")) {
+            byId("order").scrollIntoView({ block: "start" });
+            byId("order-title").focus({ preventScroll: true });
+            return;
+        }
+        const stepper = event.target.closest("button[data-step]");
+        if (stepper && !stepper.disabled) {
+            const asset = selectedAsset();
+            const current = Math.trunc(byId("quantity").valueAsNumber || 0);
+            quantity = String(Math.max(1, Math.min(asset.maxOrder[side], current + Number(stepper.dataset.step))));
+            byId("quantity").value = quantity;
+            paintTicket(asset);
+            return;
+        }
         const button = event.target.closest("button[data-stock]");
-        if (!button || selected === button.dataset.stock) return;
+        if (!button) return;
+        manuallySelected = true;
+        if (selected === button.dataset.stock) return;
         selected = button.dataset.stock;
         side = selectedAsset().position?.side === "short" ? "cover" : "buy";
         quantity = "1";
-        byId("side").value = side;
         byId("quantity").value = quantity;
         error = undefined;
         render();
     });
     section.addEventListener("change", (event) => {
-        if (event.target === byId("side")) {
+        if (event.target.name === "side") {
             side = event.target.value;
             paintTicket(selectedAsset());
         }
@@ -353,6 +441,7 @@
     section.addEventListener("submit", (event) => {
         event.preventDefault();
         if (byId("submit").disabled) return;
+        manuallySelected = true;
         error = undefined;
         window.dispatchEvent(new CustomEvent("company:market-command", {
             detail: { action: "market_trade", symbol: selected, side, quantity: byId("quantity").valueAsNumber, tick: market.tick },
@@ -369,7 +458,8 @@
     });
     window.addEventListener("company:busy", ({ detail }) => {
         pending = detail;
-        if (market) paintTicket(selectedAsset());
+        const asset = selectedAsset();
+        if (asset) paintTicket(asset);
     });
     window.addEventListener("company:command-error", ({ detail }) => {
         if (detail.action !== "market_trade") return;

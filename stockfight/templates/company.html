@@ -23,7 +23,9 @@
                 <span class="brand-name">STOCK <strong>FIGHT</strong></span>
             </a>
             <div class="topbar-tools">
-                <a class="company-home" href="/" data-company-text="home">Till huvudmenyn</a>
+                <a class="company-home" href="/">
+                    <span aria-hidden="true">←</span><span data-company-text="home">Huvudmeny</span>
+                </a>
                 <select id="language-select" class="language-select" aria-label="Språk" data-i18n-aria-label="Språk">
                     <option value="sv" lang="sv">Svenska</option>
                     <option value="en" lang="en">English</option>
@@ -36,17 +38,13 @@
         <div id="company-workspace" aria-busy="true">
             <div id="company-content">
                 <h1 class="company-title" data-company-text="title">Börsföretag</h1>
-                <p class="company-description" data-company-text="loading">Laddar börsföretaget …</p>
+                <p class="company-muted" data-company-text="loading" role="status">Laddar …</p>
             </div>
-            <div id="company-desk" class="company-desk" hidden>
-                <div>
-                    <section id="company-market" class="company-panel company-market" aria-labelledby="company-market-title"></section>
-                    <div id="company-trade-history"></div>
-                </div>
-                <div id="company-operations"></div>
-            </div>
+            <section id="company-market" class="company-panel company-market" data-company-view aria-labelledby="company-market-title" hidden></section>
+            <div id="company-admin" class="company-operations" data-company-view hidden></div>
+            <div id="company-reports" data-company-view hidden></div>
+            <section id="company-standings" data-company-view hidden></section>
         </div>
-        <section id="company-standings"></section>
         <noscript>Börsföretag behöver JavaScript för att kunna spelas.</noscript>
     </main>
 </body>
