@@ -5,9 +5,9 @@ from time import time
 from flask import jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import func
 
-from . import company
+from . import company, company_bots, company_market
 from .campaign import CampaignError, apply_command, default_state, public_state
-from .company_catalog import TRADE_RESERVE
+from .company_live import load_firm, settle_firm
 from .data import CampaignSave, CompanySave, User, db, save_campaign
 from .multiplayer import token_matches
 
@@ -30,7 +30,7 @@ def install_company_socket(socketio):
 
 
 def _share_price(standing):
-    return max(5, 25 + standing["profit"] // 5)
+    return max(5, 25 + int(standing["profit"] // 5))
 
 
 def _trade_share(user_id, state, command):
@@ -40,9 +40,9 @@ def _trade_share(user_id, state, command):
     if firm_id == user_id:
         raise company.CompanyError("self_trade")
     issuer = db.session.get(CompanySave, firm_id)
-    if issuer is None:
+    if issuer is None and db.session.get(User, firm_id) is None:
         raise company.CompanyError("invalid_firm")
-    price = _share_price(company.public_standing(issuer.state))
+    price = _share_price(company.public_standing(issuer.state if issuer else company.default_state()))
     if quote != price:
         raise company.CompanyError("stale_quote")
 
@@ -50,7 +50,7 @@ def _trade_share(user_id, state, command):
     key = str(firm_id)
     quantity = shares.get(key, 0)
     if command["action"] == "buy_peer":
-        if state["cash"] - price < TRADE_RESERVE:
+        if company.available_cash(state) < price:
             raise company.CompanyError("insufficient_cash")
         state["cash"] -= price
         shares[key] = quantity + 1
@@ -65,13 +65,15 @@ def _trade_share(user_id, state, command):
 
     # Check the issuer snapshot within the same write that settles the buyer's balance.
     listed = CompanySave.__table__.alias("listed_firm")
-    return db.select(listed.c.user_id).where(
-        listed.c.user_id == firm_id, listed.c.revision == issuer.revision,
-    ).exists()
+    listing = db.select(listed.c.user_id).where(listed.c.user_id == firm_id)
+    if issuer is None:
+        return ~listing.exists()
+    return listing.where(listed.c.revision == issuer.revision).exists()
 
 
 def register_campaign(app, socketio):
     clock = app.config.get("CAMPAIGN_CLOCK", time)
+    market_clock = app.config.get("COMPANY_MARKET_CLOCK", time)
 
     def load_save(user_id):
         saved = db.session.get(CampaignSave, user_id)
@@ -92,19 +94,33 @@ def register_campaign(app, socketio):
             return redirect(url_for("index"))
         return render_template("campaign.html")
 
-    def load_company(user_id):
-        saved = db.session.get(CompanySave, user_id)
-        return (saved.revision, company.normalize_state(saved.state)) if saved else (0, company.default_state())
-
     def company_snapshot(revision, state):
         return {**company.public_state(state), "revision": revision}
+
+    def market_snapshot(revision, state, now):
+        market = company_market.public_state(state, revision, now)
+        tick = market["tick"]
+        totals = company_bots.totals(state, tick)
+        market["bots"] = company_bots.public_state(state, tick)
+        market["equity"] = round(market["equity"] + totals["liquidationValue"], 2)
+        market["unrealizedProfit"] = round(market["unrealizedProfit"] + totals["unrealizedProfit"], 2)
+        market["fees"] = round(market["fees"] + totals["fees"], 2)
+        return market
 
     @app.get("/api/company")
     def company_state():
         user_id = _player_id()
         if user_id is None:
             return jsonify(error="login_required"), 401
-        return company_snapshot(*load_company(user_id))
+        return company_snapshot(*load_firm(user_id))
+
+    @app.get("/api/company/market")
+    def live_company_market():
+        user_id = _player_id()
+        if user_id is None:
+            return jsonify(error="login_required"), 401
+        now = market_clock()
+        return market_snapshot(*load_firm(user_id), now)
 
     @app.get("/api/company/standings")
     def company_standings():
@@ -112,24 +128,42 @@ def register_campaign(app, socketio):
         if user_id is None:
             return jsonify(error="login_required"), 401
 
-        positions = load_company(user_id)[1]["peerShares"]
+        state = load_firm(user_id)[1]
+        positions = state["peerShares"]
         standing = CompanySave.state["standing"]
         legacy_profit = standing["week"].as_integer() * company.LEGACY_PROFIT_PER_WEEK
-        profit = func.coalesce(standing["profit"].as_integer(), legacy_profit, 0)
-        firms = db.select(User.id, User.username, CompanySave.state).join(CompanySave, CompanySave.user_id == User.id)
-        rows = db.session.execute(firms.order_by(profit.desc(), User.username_key).limit(50)).all()
-        shown = {player_id for player_id, _, _ in rows}
-        extra = ({int(key) for key in positions} | {user_id}) - shown
-        if extra:
-            rows.extend(db.session.execute(firms.where(User.id.in_(extra)).order_by(User.username_key)).all())
+        profit = func.coalesce(standing["profit"].as_float(), legacy_profit, 0)
+        firms = db.select(User.id, User.username, CompanySave.state).outerjoin(CompanySave, CompanySave.user_id == User.id)
+        search = request.args.get("search", "").strip()[:80].casefold()
+        page = min(1_000_000, max(1, request.args.get("page", 1, type=int)))
+        matching = firms.where(User.username_key.contains(search, autoescape=True)) if search else firms
+        rows = db.session.execute(matching.order_by(profit.desc(), User.username_key, User.id)
+                                  .offset((page - 1) * 50).limit(51)).all()
+        has_more = len(rows) > 50
+        rows = rows[:50]
+
+        relevant = {int(key) for key in positions}
+        if not search and page == 1:
+            relevant.add(user_id)
+        visible = {player_id for player_id, _, _ in rows}
+        extra = relevant - visible
+        additional = db.session.execute(firms.where(User.id.in_(extra)).order_by(User.username_key)).all() if extra else []
+        holdings_value = 0
+        for player_id, _, saved in [*rows, *additional]:
+            if held := positions.get(str(player_id), 0):
+                holdings_value += held * _share_price(company.public_standing(saved if saved else company.default_state()))
+
+        if not search and page == 1:
+            rows.extend(additional)
 
         listings = []
         for player_id, username, saved in rows:
-            public = company.public_standing(saved)
+            public = company.public_standing(saved if saved else company.default_state())
             listings.append({"id": player_id, "name": f"{username} Capital", "isYou": player_id == user_id,
                              "level": public["level"], "profit": public["profit"], "price": _share_price(public),
                              "held": positions.get(str(player_id), 0)})
-        return {"companies": listings, "cashReserve": TRADE_RESERVE}
+        return {"companies": listings, "cashReserve": company.required_cash(state),
+                "page": page, "hasMore": has_more, "holdingsValue": holdings_value}
 
     @app.post("/api/company/commands")
     def company_command():
@@ -140,28 +174,51 @@ def register_campaign(app, socketio):
         if not isinstance(command, dict) or type(command.get("revision")) is not int or command["revision"] < 0:
             return jsonify(error="invalid_command"), 400
 
-        revision, state = load_company(user_id)
+        action = command.get("action")
+        if action in ("trade", "advance") and not app.config.get("COMPANY_LEGACY_TRADES", False):
+            return jsonify(error="invalid_command"), 400
+        now = market_clock()
+        tick = company_market.trading_tick(now)
+        if app.config["COMPANY_MARKET_PROVIDER"] is not None:
+            revision, state, settled = settle_firm(user_id, tick)
+            if settled:
+                socketio.emit("company_market_changed", namespace=COMPANY_NAMESPACE)
+        else:
+            revision, state = load_firm(user_id)
+
+        def conflict(error, revision, state):
+            response = {"error": error, "state": company_snapshot(revision, state)}
+            if action == "market_trade":
+                response["market"] = market_snapshot(revision, state, now)
+            return jsonify(response), 409
+
         if command["revision"] != revision:
-            return jsonify(error="stale_revision", state=company_snapshot(revision, state)), 409
+            return conflict("stale_revision", revision, state)
 
         condition = None
         try:
-            if command.get("action") in ("buy_peer", "sell_peer"):
+            if action in ("buy_peer", "sell_peer"):
                 condition = _trade_share(user_id, state, command)
+            elif action == "market_trade":
+                company_market.apply_command(state, command, tick)
             else:
                 company.apply_command(state, command)
         except company.CompanyError as exc:
             if exc.code == "stale_quote":
-                return jsonify(error=exc.code, state=company_snapshot(revision, state)), 409
+                return conflict(exc.code, revision, state)
             return jsonify(error=exc.code), 400
 
+        company_bots.anchor(state, tick)
         state["standing"] = company.public_standing(state)
         if not save_campaign(user_id, revision, state, model=CompanySave, condition=condition):
-            current_revision, latest = load_company(user_id)
+            current_revision, latest = load_firm(user_id)
             error = "stale_quote" if condition is not None and current_revision == revision else "stale_revision"
-            return jsonify(error=error, state=company_snapshot(current_revision, latest)), 409
+            return conflict(error, current_revision, latest)
         socketio.emit("company_market_changed", namespace=COMPANY_NAMESPACE)
-        return company_snapshot(revision + 1, state)
+        response = company_snapshot(revision + 1, state)
+        if action == "market_trade":
+            response["market"] = market_snapshot(revision + 1, state, now)
+        return response
 
     @app.get("/api/campaign")
     def campaign_state():

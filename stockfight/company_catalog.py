@@ -2,6 +2,15 @@
 
 STARTING_CASH = 500
 
+LIVE_ASSETS = {
+    "F": {"name": {"sv": "Ford Motor", "en": "Ford Motor"}, "unlockLevel": 1},
+    "PLTR": {"name": {"sv": "Palantir Technologies", "en": "Palantir Technologies"}, "unlockLevel": 1},
+    "SOFI": {"name": {"sv": "SoFi Technologies", "en": "SoFi Technologies"}, "unlockLevel": 2},
+    "INTC": {"name": {"sv": "Intel", "en": "Intel"}, "unlockLevel": 3},
+    "AMD": {"name": {"sv": "AMD", "en": "AMD"}, "unlockLevel": 4},
+    "AAPL": {"name": {"sv": "Apple", "en": "Apple"}, "unlockLevel": 5},
+}
+
 ASSETS = {
     "AUR": {"name": {"sv": "Aurora Kraft", "en": "Aurora Power"}, "unlockLevel": 1},
     "DIM": {"name": {"sv": "Dimma Data", "en": "Dimma Data"}, "unlockLevel": 2},

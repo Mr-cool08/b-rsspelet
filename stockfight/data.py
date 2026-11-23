@@ -124,6 +124,14 @@ class CompanySave(db.Model):
     state = db.Column(db.JSON, nullable=False)
 
 
+class CompanyMarketTick(db.Model):
+    __tablename__ = "company_market_ticks"
+
+    tick = db.Column(db.BigInteger, primary_key=True, autoincrement=False)
+    market_open = db.Column(db.Boolean, nullable=True)
+    prices = db.Column(db.JSON, nullable=False)
+
+
 class PlayerRating(db.Model):
     __tablename__ = "player_ratings"
 

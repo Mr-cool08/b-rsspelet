@@ -9,8 +9,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/company.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/company-standings.css') }}">
     <script defer src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='vendor/lightweight-charts.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/i18n.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/company-standings.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/company-market.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/company.js') }}"></script>
 </head>
 <body class="company-body">
@@ -31,9 +33,18 @@
     </header>
     <main class="company-main" id="main">
         <p class="company-notice" id="company-notice" role="status" hidden></p>
-        <div id="company-content" aria-busy="true">
-            <h1 class="company-title" data-company-text="title">Börsföretag</h1>
-            <p class="company-description" data-company-text="loading">Laddar börsföretaget …</p>
+        <div id="company-workspace" aria-busy="true">
+            <div id="company-content">
+                <h1 class="company-title" data-company-text="title">Börsföretag</h1>
+                <p class="company-description" data-company-text="loading">Laddar börsföretaget …</p>
+            </div>
+            <div id="company-desk" class="company-desk" hidden>
+                <div>
+                    <section id="company-market" class="company-panel company-market" aria-labelledby="company-market-title"></section>
+                    <div id="company-trade-history"></div>
+                </div>
+                <div id="company-operations"></div>
+            </div>
         </div>
         <section id="company-standings"></section>
         <noscript>Börsföretag behöver JavaScript för att kunna spelas.</noscript>

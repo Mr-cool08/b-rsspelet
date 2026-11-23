@@ -11,7 +11,9 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .campaign_http import install_company_socket, register_campaign
+from .campaign_http import COMPANY_NAMESPACE, install_company_socket, register_campaign
+from .company_live import start_live_market
+from .company_quotes import configured_provider
 from .data import User, db, get_rating, initialize_database, leaderboard, profile
 from .engine import RANKED
 from .market_data import DatabaseMarketProvider, import_csv, seed_demo, seed_historical
@@ -57,6 +59,9 @@ def create_app(config=None):
     )
     if config is not None:
         app.config.update(config)
+    app.config.setdefault("COMPANY_MARKET_BACKGROUND", not app.testing)
+    if "COMPANY_MARKET_PROVIDER" not in app.config:
+        app.config["COMPANY_MARKET_PROVIDER"] = None if app.testing else configured_provider()
     app.config.setdefault("AUTO_SEED_HISTORICAL", not app.testing and env_flag("AUTO_SEED_HISTORICAL", True))
     if not 0.25 <= app.config["MARKET_TICK_SECONDS"] <= 60:
         raise ValueError("MARKET_TICK_SECONDS måste vara mellan 0,25 och 60.")
@@ -90,6 +95,7 @@ def create_app(config=None):
             seed_historical()
         if app.config["AUTO_SEED_DEMO"] and app.config["ALLOW_SYNTHETIC"]:
             seed_demo()
+    start_live_market(app, socketio, COMPANY_NAMESPACE)
     return app
 
 

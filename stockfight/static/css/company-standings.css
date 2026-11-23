@@ -20,6 +20,13 @@
 .company-exchange-summary div { display: flex; align-items: baseline; gap: 8px; }
 .company-exchange-summary dt { color: var(--company-fade); font-size: .78rem; }
 .company-exchange-summary dd { margin: 0; font: 700 .85rem var(--mono); }
+.company-exchange-search { display: flex; flex-wrap: wrap; align-items: end; gap: 7px; padding: 0 22px 14px; }
+.company-exchange-search > div { flex: 1 1 185px; max-width: 300px; }
+.company-exchange-search label { display: block; margin-bottom: 3px; color: var(--company-fade); font-size: .76rem; }
+.company-body .company-exchange-search .button { min-height: 38px; }
+.company-exchange-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 0 22px 14px; }
+.company-exchange-pages span { color: var(--company-fade); font: 700 .78rem var(--mono); }
+.company-exchange-pages .button[aria-disabled="true"] { opacity: .52; cursor: default; }
 
 .company-standings-table {
     border-collapse: collapse;
@@ -48,7 +55,7 @@
 
 @media (max-width: 520px) {
     .company-standings-heading { padding: 15px 13px 11px; }
-    .company-standings-message, .company-exchange-summary { padding-inline: 13px; }
+    .company-standings-message, .company-exchange-summary, .company-exchange-search, .company-exchange-pages { padding-inline: 13px; }
     .company-standings-table th, .company-standings-table td { padding: 8px 9px; }
     .company-standings-table tbody th { width: auto; }
     .company-exchange-controls { flex-direction: column; }

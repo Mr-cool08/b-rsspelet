@@ -48,7 +48,7 @@
         "Wall Street-marknaden": "Wall Street Market",
         "Strategi · Flerspelare": "Strategy · Multiplayer",
         "Börsföretag": "Trading Firms",
-        "Bygg din firma, träna handlare och köp aktier i andra spelares företag på livemarknaden.": "Build your firm, train traders, and buy shares in other players' companies on the live market.",
+        "Handla på riktiga aktiekurser med virtuellt kapital, sätt firmans riskpolicy och led dina handelsbotar.": "Trade real stock prices with virtual capital, set your firm's risk policy, and manage your trading bots.",
         "Öppna handelsfirman": "Open your trading firm",
         "Inloggad som": "Logged in as",
         "Rankad · 1 mot 1": "Ranked · 1 vs 1",
