@@ -31,6 +31,8 @@ PRIVATE_INVITE_SECONDS = 900
 PRIVATE_CODE_LENGTH = 8
 PRIVATE_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 BOT_USER_ID = 0  # Registered accounts receive positive IDs from SQLite.
+SPECTATE_LIST_ROOM = "spectate:list"
+SPECTATE_MATCH_PREFIX = "spectate:match:"
 
 
 def token_matches(expected, supplied):
@@ -139,6 +141,8 @@ class MatchService:
             connection = self._connections.pop(sid, None)
             if connection is None:
                 return
+            self._leave_spectate_match(sid)
+            self.socketio.server.leave_room(sid, SPECTATE_LIST_ROOM, namespace="/")
             user_id = connection.user_id
             self._sids[user_id].discard(sid)
             if not self._sids[user_id]:
@@ -160,6 +164,74 @@ class MatchService:
                 self.disconnect(sid)
         for sid in sids:
             self.socketio.server.disconnect(sid, namespace="/")
+
+    def online_count(self):
+        with self._lock:
+            return len(self._sids)
+
+    def spectate_list(self, sid, payload=None):
+        with self._lock:
+            if sid not in self._connections:
+                return failure("Logga in igen.")
+            if payload not in (None, {}):
+                return failure("Ogiltig förfrågan.")
+            self.socketio.server.enter_room(sid, SPECTATE_LIST_ROOM, namespace="/")
+            return {"ok": True, "matches": self._spectate_matches()}
+
+    def spectate_list_leave(self, sid):
+        with self._lock:
+            if sid not in self._connections:
+                return failure("Logga in igen.")
+            self.socketio.server.leave_room(sid, SPECTATE_LIST_ROOM, namespace="/")
+            return {"ok": True}
+
+    def spectate_join(self, sid, payload):
+        with self._lock:
+            if sid not in self._connections:
+                return failure("Logga in igen.")
+            if not isinstance(payload, dict) or payload.keys() != {"matchId"} or not isinstance(payload["matchId"], str):
+                return failure("Ogiltig matchförfrågan.")
+            match_id = payload["matchId"]
+            live = self.matches.get(match_id)
+            if live is None or live.game.status == "finished":
+                return {**failure("Matchen är inte längre live."), "code": "match_unavailable"}
+            self._leave_spectate_match(sid)
+            self.socketio.server.enter_room(sid, SPECTATE_MATCH_PREFIX + match_id, namespace="/")
+            return {"ok": True, "state": live.game.spectator_state(self.clock())}
+
+    def spectate_leave(self, sid):
+        with self._lock:
+            if sid not in self._connections:
+                return failure("Logga in igen.")
+            self._leave_spectate_match(sid)
+            return {"ok": True}
+
+    def _leave_spectate_match(self, sid):
+        server = self.socketio.server
+        for room in server.rooms(sid, namespace="/"):
+            if room.startswith(SPECTATE_MATCH_PREFIX):
+                server.leave_room(sid, room, namespace="/")
+
+    def _spectate_matches(self):
+        return [
+            {
+                "id": live.game.id,
+                "mode": live.game.mode.key,
+                "status": live.game.status,
+                "symbol": live.game.scenario.symbol,
+                "players": [
+                    {"id": user_id, "name": player.name}
+                    for user_id, player in live.game.players.items()
+                ],
+            }
+            for live in reversed(self.matches.values())
+            if live.game.status != "finished"
+        ]
+
+    def _broadcast_spectate_list(self):
+        server = self.socketio.server
+        if next(server.manager.get_participants("/", SPECTATE_LIST_ROOM), None) is not None:
+            self.socketio.emit("spectate_matches", {"matches": self._spectate_matches()}, to=SPECTATE_LIST_ROOM)
 
     def queue_join(self, sid, payload=None):
         with self._lock:
@@ -527,7 +599,8 @@ class MatchService:
             if int(now) != self._queue_reported:
                 self._queue_reported = int(now)
                 self._prune_practices(now)
-                for user_id in self.queue:
+                # A queue update can trigger a disconnect that removes an entry.
+                for user_id in tuple(self.queue):
                     self._send_queue(user_id, now)
                 self._expire_private(now)
                 self._results = {
@@ -609,13 +682,17 @@ class MatchService:
             for sid in self._sids.get(user_id, ()):
                 self.socketio.server.enter_room(sid, game.id)
         self._broadcast_state(live, now)
+        self._broadcast_spectate_list()
 
     def _advance_match(self, live, now):
+        previous_status = live.game.status
         changed = live.game.advance(now)
         if live.bot is not None and live.bot.act(live.game, BOT_USER_ID, now):
             changed = True
         if changed:
             self._broadcast_state(live, now)
+            if previous_status == "countdown" and live.game.status == "active":
+                self._broadcast_spectate_list()
         if live.game.status == "finished" and now >= live.retry_after:
             self._finish(live, now)
 
@@ -745,6 +822,13 @@ class MatchService:
         for user_id in live.game.players:
             if user_id != BOT_USER_ID:
                 self._send_state(live, user_id, now)
+        server = self.socketio.server
+        room = SPECTATE_MATCH_PREFIX + live.game.id
+        if next(server.manager.get_participants("/", room), None) is not None:
+            self.socketio.emit("spectate_state", live.game.spectator_state(now), to=room)
+        if live.game.status == "finished":
+            server.close_room(room, namespace="/")
+            self._broadcast_spectate_list()
 
     def _send_queue(self, user_id, now, *, sid=None, error=None):
         entry = self.queue.get(user_id)
@@ -757,7 +841,8 @@ class MatchService:
         self._emit_user("queue_state", state, user_id, sid=sid)
 
     def _emit_user(self, event, payload, user_id, sid=None):
-        targets = (sid,) if sid is not None else self._sids.get(user_id, ())
+        # Socket.IO can disconnect a client synchronously during emit.
+        targets = (sid,) if sid is not None else tuple(self._sids.get(user_id, ()))
         for target in targets:
             self.socketio.emit(event, payload, to=target)
 
@@ -786,6 +871,22 @@ def install_handlers(socketio):
     @socketio.on("disconnect")
     def on_disconnect(reason=None):
         service().disconnect(request.sid)
+
+    @socketio.on("spectate_list")
+    def on_spectate_list(payload=None):
+        return service().spectate_list(request.sid, payload)
+
+    @socketio.on("spectate_list_leave")
+    def on_spectate_list_leave(payload=None):
+        return service().spectate_list_leave(request.sid)
+
+    @socketio.on("spectate_join")
+    def on_spectate_join(payload=None):
+        return service().spectate_join(request.sid, payload)
+
+    @socketio.on("spectate_leave")
+    def on_spectate_leave(payload=None):
+        return service().spectate_leave(request.sid)
 
     @socketio.on("queue_join")
     def on_queue_join(payload=None):

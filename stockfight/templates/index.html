@@ -24,6 +24,7 @@
                     <span id="header-name" class="header-name"></span>
                     <button id="header-logout" class="header-button" type="button" data-action="logout" hidden>Logga ut</button>
                 </div>
+                <span id="online-count" class="online-count">{{ online_count }} online</span>
             </div>
         </div>
     </header>
@@ -84,6 +85,12 @@
                         PLAY <span class="arrow-right" aria-hidden="true"></span>
                     </button>
                 </div>
+                <div class="bot-panel panel spectate-entry">
+                    <h2>Pågående matcher</h2>
+                    <button class="button button-secondary" type="button" data-action="spectate">
+                        Titta live <span class="arrow-right" aria-hidden="true"></span>
+                    </button>
+                </div>
                 <div class="bot-panel panel prediction-menu">
                     <div>
                         <h2>Ritduell</h2>
@@ -123,7 +130,9 @@
                             <p class="eyebrow">Handelsduell</p>
                             <h2 id="menu-level" class="league">—</h2>
                         </div>
-                        <span class="league-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                        <button class="league-mark" type="button" data-action="leagues" aria-label="Visa alla ranker" aria-haspopup="dialog" aria-controls="leagues-dialog" title="Visa alla ranker">
+                            <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+                        </button>
                     </div>
                     <div class="rating-value mono"><strong id="menu-elo">—</strong><span>ELO</span></div>
                     <div class="progress-labels">
@@ -147,6 +156,88 @@
                     </button>
                 </nav>
             </aside>
+        </section>
+
+        <section id="spectate-screen" class="screen spectate-screen" aria-labelledby="spectate-title" hidden>
+            <header class="spectate-heading">
+                <h1 id="spectate-title" class="screen-title" tabindex="-1">Pågående matcher</h1>
+                <button class="button button-secondary" type="button" data-action="spectate-menu">Till huvudmenyn</button>
+            </header>
+            <p id="spectate-list-status" class="spectate-list-status panel" role="status">Laddar pågående matcher …</p>
+            <ul id="spectate-list" class="spectate-list" role="list" aria-label="Matcher att följa live"></ul>
+            <button class="button button-secondary spectate-retry" id="spectate-list-retry" type="button" data-action="spectate-list-retry" hidden>Försök igen</button>
+        </section>
+
+        <section id="spectate-live-screen" class="screen match-screen spectate-live-screen" aria-labelledby="spectate-mode" hidden>
+            <header class="spectate-heading">
+                <div>
+                    <h1 id="spectate-mode" class="screen-title" tabindex="-1">Åskådarläge</h1>
+                    <p id="spectate-status" class="spectate-status" role="status"></p>
+                </div>
+                <div class="spectate-heading-actions">
+                    <button class="button button-secondary" id="spectate-live-retry" type="button" data-action="spectate-live-retry" hidden>Försök igen</button>
+                    <button class="button button-secondary" type="button" data-action="spectate-back">Till matchlistan</button>
+                </div>
+            </header>
+            <div id="spectate-contest" hidden>
+                <div class="match-hud">
+                    <div class="duelist duelist-self">
+                        <div class="duelist-label"><strong id="spectate-first-name">—</strong><span id="spectate-first-hp-label" class="mono">—</span></div>
+                        <progress id="spectate-first-hp" class="meter health-meter" aria-label="Första spelarens hälsa" max="100" value="0"></progress>
+                        <div id="spectate-first-capital-row" class="duelist-details" hidden>
+                            <span>Kapital <strong id="spectate-first-capital" class="mono">—</strong></span>
+                        </div>
+                        <p id="spectate-first-activity" class="duelist-details" hidden></p>
+                    </div>
+                    <div class="match-clock">
+                        <span id="spectate-live-phase">Startar</span>
+                        <strong id="spectate-live-timing" class="mono">00:00</strong>
+                        <small id="spectate-live-detail" hidden></small>
+                    </div>
+                    <div class="duelist duelist-opponent">
+                        <div class="duelist-label"><strong id="spectate-second-name">—</strong><span id="spectate-second-hp-label" class="mono">—</span></div>
+                        <progress id="spectate-second-hp" class="meter health-meter" aria-label="Andra spelarens hälsa" max="100" value="0"></progress>
+                        <div id="spectate-second-capital-row" class="duelist-details" hidden>
+                            <span>Kapital <strong id="spectate-second-capital" class="mono">—</strong></span>
+                        </div>
+                        <p id="spectate-second-activity" class="duelist-details" hidden></p>
+                    </div>
+                </div>
+                <section class="market-panel panel" aria-label="Marknad och kursgraf">
+                    <div class="ticker">
+                        <div class="ticker-instrument">
+                            <div class="ticker-label"><strong id="spectate-instrument" class="mono">—</strong><span id="spectate-synthetic" class="market-badge" hidden>Syntetisk</span></div>
+                            <div id="spectate-instrument-detail" class="ticker-details"></div>
+                        </div>
+                        <div class="ticker-quote">
+                            <span class="eyebrow">Kurs</span>
+                            <strong id="spectate-price" class="mono">—</strong>
+                        </div>
+                    </div>
+                    <div class="chart-frame">
+                        <div id="spectate-trading-chart">
+                            <div id="spectate-chart" class="chart" role="img" aria-label="Graf över aktiekursen"></div>
+                            <p id="spectate-chart-status" class="chart-status" role="status" hidden></p>
+                        </div>
+                        <div id="spectate-prediction-chart-panel" hidden>
+                            <canvas id="spectate-prediction-chart" class="prediction-chart" role="img" aria-label="Kurshistorik och avslöjade prognoser"></canvas>
+                        </div>
+                    </div>
+                    <div id="spectate-chart-footer" class="chart-footer">
+                        <div id="spectate-chart-controls" class="chart-controls" role="group" aria-label="Zoom för kursgrafen" hidden>
+                            <button class="button button-secondary" type="button" data-action="spectate-zoom-out" aria-label="Zooma ut" title="Zooma ut">−</button>
+                            <button class="button button-secondary" type="button" data-action="spectate-zoom-in" aria-label="Zooma in" title="Zooma in">+</button>
+                        </div>
+                        <div class="chart-credit"><a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView Lightweight Charts™</a> · © 2025 TradingView, Inc.</div>
+                    </div>
+                    <p id="spectate-event" class="spectate-event" role="status" hidden></p>
+                    <dl id="spectate-prediction-reveal" class="prediction-breakdown spectate-prediction-reveal" hidden>
+                        <div><dt>Facit</dt><dd id="spectate-actual-prediction" class="mono">—</dd></div>
+                        <div id="spectate-first-prediction-card"><dt id="spectate-first-prediction-name">Första spelaren</dt><dd id="spectate-first-prediction" class="mono">—</dd></div>
+                        <div id="spectate-second-prediction-card"><dt id="spectate-second-prediction-name">Andra spelaren</dt><dd id="spectate-second-prediction" class="mono">—</dd></div>
+                    </dl>
+                </section>
+            </div>
         </section>
 
         <section id="queue-screen" class="screen queue-screen" aria-labelledby="queue-title" hidden>
@@ -426,6 +517,32 @@
             </div>
             <p id="guide-start-error" class="form-error" role="alert" hidden></p>
         </div>
+    </dialog>
+
+    <dialog id="leagues-dialog" class="game-dialog leagues-dialog" aria-labelledby="leagues-title">
+        <div class="dialog-header">
+            <h2 id="leagues-title" class="card-title">Ranker</h2>
+            <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng ranklistan">×</button>
+        </div>
+        <table>
+            <thead><tr><th scope="col">Rank</th><th scope="col">Elo</th></tr></thead>
+            <tbody>
+                {% for minimum, league in leagues %}
+                <tr>
+                    <th scope="row">{{ league }}</th>
+                    <td>
+                        {% if loop.first %}
+                            Under {{ loop.nextitem[0] }}
+                        {% elif loop.last %}
+                            {{ minimum }}+
+                        {% else %}
+                            {{ minimum }}–{{ loop.nextitem[0] - 1 }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </dialog>
 
     <dialog id="ranking-dialog" class="game-dialog" aria-labelledby="ranking-title">

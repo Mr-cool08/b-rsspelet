@@ -5,7 +5,7 @@ from typing import TypedDict
 STARTING_ELO = 1000
 K_FACTOR = 32
 
-_LEAGUES = (
+LEAGUES = (
     (0, "Bronze"),
     (900, "Silver"),
     (1100, "Gold"),
@@ -44,8 +44,8 @@ def rating_changes(a: int, b: int, score_a: float, *, k: int = K_FACTOR) -> tupl
 
 def league_progress(elo: int) -> LeagueProgress:
     """Return the current league and percentage toward the next league."""
-    lower_elo, league = _LEAGUES[0]
-    for next_elo, next_league in _LEAGUES[1:]:
+    lower_elo, league = LEAGUES[0]
+    for next_elo, next_league in LEAGUES[1:]:
         if elo < next_elo:
             return {
                 "league": league,

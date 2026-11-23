@@ -416,22 +416,9 @@ class Match:
             return self.mode.final_storm_at - elapsed
         return ceil(min(player.hp for player in self.players.values()) / self.mode.final_storm_damage)
 
-    def public(self, user_id: int, now: float) -> dict:
-        player = self._player(user_id)
-        opponent_id, opponent = self._opponent(user_id)
+    def _shared_state(self, now: float) -> dict:
         elapsed = int(self.duration)
         phase = self.mode.storm_phase(elapsed)
-        position = player.position
-        public_position = None
-        if position is not None:
-            profit = position.pnl(self.price)
-            public_position = {
-                "side": position.side,
-                "entryPrice": format(position.entry_price, "f"),
-                "invested": format(position.invested, "f"),
-                "pnl": format(profit, "f"),
-                "closePreview": self._close_preview(position, player, opponent, profit),
-            }
         scenario = self.scenario
         return {
             "id": self.id,
@@ -457,6 +444,25 @@ class Match:
                 }
                 for index, bar in enumerate(scenario.bars[: self.revealed_count])
             ],
+            "event": self._event.copy() if self._event is not None else None,
+        }
+
+    def public(self, user_id: int, now: float) -> dict:
+        player = self._player(user_id)
+        opponent_id, opponent = self._opponent(user_id)
+        position = player.position
+        public_position = None
+        if position is not None:
+            profit = position.pnl(self.price)
+            public_position = {
+                "side": position.side,
+                "entryPrice": format(position.entry_price, "f"),
+                "invested": format(position.invested, "f"),
+                "pnl": format(profit, "f"),
+                "closePreview": self._close_preview(position, player, opponent, profit),
+            }
+        return {
+            **self._shared_state(now),
             "self": {
                 "id": user_id,
                 "name": player.name,
@@ -476,8 +482,24 @@ class Match:
                 "hasPosition": opponent.position is not None,
                 "growBonus": opponent.grow_bonus,
             },
-            "event": self._event.copy() if self._event is not None else None,
         }
+
+    def spectator_state(self, now: float) -> dict:
+        state = self._shared_state(now)
+        state["players"] = [
+            {
+                "id": user_id,
+                "name": player.name,
+                "hp": player.hp,
+                "capital": format(player.capital, "f"),
+                "hasPosition": player.position is not None,
+                "growBonus": player.grow_bonus,
+            }
+            for user_id, player in self.players.items()
+        ]
+        if self.status == "finished":
+            state.update(winnerId=self.winner_id, endReason=self.end_reason)
+        return state
 
     def summary(self, user_id: int) -> dict:
         player = self._player(user_id)

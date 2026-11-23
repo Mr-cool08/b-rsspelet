@@ -16,16 +16,18 @@
     });
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const primaryTouch = window.matchMedia("(pointer: coarse)");
-    const screenIds = ["auth", "menu", "queue", "invite", "match", "result"];
+    const screenIds = ["auth", "menu", "queue", "invite", "match", "result", "spectate", "spectate-live"];
     const screenFocus = { auth: "auth-title", menu: "menu-name", queue: "queue-title",
-        invite: "invite-title", match: "match-screen", result: "result-outcome" };
+        invite: "invite-title", match: "match-screen", result: "result-outcome",
+        spectate: "spectate-title", "spectate-live": "spectate-mode" };
     const phaseLabels = { normal: "Handel", market: "Marknadsstorm", final: "Slutstorm" };
     const outcomeLabels = { win: "WIN", lose: "LOSE", loss: "LOSE", draw: "DRAW" };
+    const spectateModeLabels = { ranked: "Handelsduell", prediction: "Ritduell", bot: "Botduell", private: "Vänduell" };
     const acknowledgements = 5000;
     const chartRightPadding = 24;
     const chartZoomFactor = 1.5;
     const activityActions = ["play", "play-bot", "play-prediction", "practice-prediction", "guide-start",
-        "guide-begin", "guide-bypass", "friend-create", "main-menu"];
+        "guide-begin", "guide-bypass", "friend-create", "main-menu", "spectate"];
 
     let soundEnabled = preference("sound", "false") === "true";
     let effectsEnabled = preference("effects", "true") === "true";
@@ -40,6 +42,7 @@
     let menuProfileVersion = 0;
     let rankingVersion = 0;
     let toastTimer;
+    let onlineCountPending = false;
     let socket;
     let queueWanted = false;
     let queueMode = "ranked";
@@ -66,15 +69,16 @@
     let percent = 100;
     let lastEventId;
     let effectTimer;
-    let chart;
-    let priceSeries;
-    let entryLine;
-    let chartBars = [];
-    let chartFailed = false;
     let drawPredictionChart;
     let predictionRound;
     let predictionCommand;
     let predictionSubmitFocus = false;
+    let spectateCommands = Promise.resolve();
+    let spectateListRequest;
+    let spectateJoinRequest;
+    let spectatedMatchId;
+    let spectateFinished = false;
+    let drawSpectatePredictionChart;
 
     function put(id, value) {
         const element = byId(id);
@@ -132,11 +136,12 @@
         return Number.isNaN(parsed.getTime()) ? "—" : dateFormat.format(parsed);
     }
 
-    function period(start, end) {
+    function period(start, end, interval) {
         const dates = [start, end].map((value) => value ? new Date(value) : null);
         const valid = (value) => value && !Number.isNaN(value.getTime());
         const [first, last] = dates.map((value) => valid(value) ? marketDateFormat.format(value) : "—");
-        if (dates.every(valid) && start.includes("T") && end.includes("T")) {
+        const calendarInterval = /[dw]$/.test(interval ?? "");
+        if (!calendarInterval && dates.every(valid) && start.includes("T") && end.includes("T")) {
             const [firstTime, lastTime] = dates.map((value) => marketTimeFormat.format(value));
             if (first !== last) return `${first} ${firstTime} – ${last} ${lastTime} UTC`;
             return `${first} · ${firstTime}–${lastTime} UTC`;
@@ -163,9 +168,13 @@
     function activate(name) {
         if (screen === name) return;
         const previousScreen = screen;
+        if (previousScreen === "spectate") leaveSpectateList();
+        if (previousScreen === "spectate-live") leaveSpectateMatch();
         for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
         for (const id of screenIds) show(`${id}-screen`, id === name);
         screen = name;
+        show("online-count", name === "auth" || name === "menu");
+        void refreshOnlineCount();
         window.scrollTo(0, 0);
         if (previousScreen) byId(screenFocus[name]).focus({ preventScroll: true });
     }
@@ -189,6 +198,19 @@
             throw new Error(data?.error || "Servern kunde inte slutföra begäran.");
         }
         return data;
+    }
+
+    async function refreshOnlineCount() {
+        if (onlineCountPending || document.hidden || byId("online-count").hidden) return;
+        onlineCountPending = true;
+        try {
+            const { count } = await request("/api/online");
+            put("online-count", `${formatNumber(count)} online`);
+        } catch {
+            put("online-count", "— online");
+        } finally {
+            onlineCountPending = false;
+        }
     }
 
     function setAuthMode(mode) {
@@ -430,13 +452,17 @@
         }
         socket = window.io({ auth: { csrfToken: session.csrfToken }, autoConnect: false });
         socket.on("connect", () => {
+            spectateCommands = Promise.resolve();
             connection("online");
+            void refreshOnlineCount();
             renderTradeControls();
             renderPrediction();
             renderPrivate();
             if (queueLeavePending && !match) sendQueueCommand(false);
             else if (queueWanted && screen === "queue" && !match) sendQueueCommand(true);
             queueReconnect = false;
+            if (screen === "spectate") subscribeSpectateList();
+            if (screen === "spectate-live" && !spectateFinished) subscribeSpectateMatch();
         });
         socket.on("disconnect", (reason) => {
             queueReconnect = queueWanted;
@@ -454,6 +480,7 @@
             renderTradeControls();
             renderPrediction();
             renderPrivate();
+            showSpectateConnectionStatus();
             if (reason === "io server disconnect") {
                 connection("offline", "Spelanslutningen avslutades. Uppdatera sidan för att försöka igen.");
             }
@@ -463,13 +490,250 @@
             renderTradeControls();
             renderPrediction();
             renderPrivate();
+            showSpectateConnectionStatus();
         });
         socket.on("queue_state", receiveQueueState);
         socket.on("match_state", receiveMatchState);
         socket.on("match_result", receiveResult);
         socket.on("private_state", receivePrivateState);
         socket.on("prediction_practice_ended", receivePracticeEnded);
+        socket.on("spectate_matches", receiveSpectateList);
+        socket.on("spectate_state", receiveSpectateState);
         socket.connect();
+    }
+
+    function openSpectateList() {
+        activate("spectate");
+        subscribeSpectateList();
+    }
+
+    function sendSpectateCommand(event, payload, acknowledge) {
+        const connection = socket;
+        const sid = connection.id;
+        // Wait for a subscription to reach the server before sending its cleanup.
+        spectateCommands = spectateCommands.then(async () => {
+            if (!connection.connected || connection.id !== sid) return;
+            const sender = connection.timeout(acknowledgements);
+            const reply = payload === undefined ? sender.emitWithAck(event) : sender.emitWithAck(event, payload);
+            return reply.catch(() => undefined);
+        });
+        if (acknowledge) void spectateCommands.then(acknowledge);
+    }
+
+    function showSpectateConnectionStatus() {
+        spectateListRequest = undefined;
+        spectateJoinRequest = undefined;
+        const reconnecting = Boolean(socket?.active);
+        const status = reconnecting ? "Återansluter …" : "Spelanslutningen är offline.";
+        if (screen === "spectate") {
+            message("spectate-list-status", status);
+            show("spectate-list-retry", !reconnecting && Boolean(socket));
+        }
+        if (screen === "spectate-live" && !spectateFinished) {
+            setSpectateLiveStatus(status, "offline", !reconnecting && Boolean(socket));
+        }
+    }
+
+    function subscribeSpectateList() {
+        if (spectateListRequest) return;
+        if (!socket?.connected) {
+            showSpectateConnectionStatus();
+            return;
+        }
+        const command = {};
+        spectateListRequest = command;
+        message("spectate-list-status", "Hämtar pågående matcher …");
+        show("spectate-list-retry", false);
+        sendSpectateCommand("spectate_list", undefined, (ack) => {
+            if (spectateListRequest !== command) return;
+            spectateListRequest = undefined;
+            if (ack?.ok) receiveSpectateList(ack);
+            else {
+                message("spectate-list-status", ack?.error || "Matchlistan kunde inte hämtas.", "error");
+                show("spectate-list-retry", true);
+            }
+        });
+    }
+
+    function receiveSpectateList(data) {
+        if (screen !== "spectate" || !Array.isArray(data?.matches)) return;
+        spectateListRequest = undefined;
+        const list = byId("spectate-list");
+        const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.matchId : undefined;
+        let focusTarget;
+        const rows = document.createDocumentFragment();
+        for (const live of data.matches) {
+            const row = document.createElement("li");
+            row.className = "spectate-match";
+            const details = document.createElement("div");
+            details.className = "spectate-match-details";
+            const players = document.createElement("strong");
+            players.className = "spectate-match-players";
+            players.textContent = live.players.map((player) => player.name).join(" mot ");
+            const mode = spectateModeLabels[live.mode] ?? "Duell";
+            const meta = document.createElement("span");
+            meta.className = "spectate-match-meta";
+            meta.textContent = [mode, live.symbol, live.status === "countdown" ? "Startar snart" : "Live"]
+                .filter(Boolean).join(" · ");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "button button-secondary";
+            button.dataset.action = "spectate-watch";
+            button.dataset.matchId = live.id;
+            button.dataset.mode = mode;
+            button.textContent = "Titta live";
+            button.setAttribute("aria-label", `Titta live på ${players.textContent}`);
+            if (focusedId === live.id) focusTarget = button;
+            details.append(players, meta);
+            row.append(details, button);
+            rows.append(row);
+        }
+        list.replaceChildren(rows);
+        if (focusedId) (focusTarget ?? byId("spectate-title")).focus({ preventScroll: true });
+        message("spectate-list-status", data.matches.length ? "" : "Inga matcher pågår just nu.");
+        show("spectate-list-retry", false);
+    }
+
+    function leaveSpectateList() {
+        spectateListRequest = undefined;
+        if (socket?.connected) sendSpectateCommand("spectate_list_leave");
+        byId("spectate-list").replaceChildren();
+    }
+
+    function openSpectateMatch(button) {
+        spectatedMatchId = button.dataset.matchId;
+        put("spectate-mode", button.dataset.mode);
+        show("spectate-contest", false);
+        activate("spectate-live");
+        subscribeSpectateMatch();
+    }
+
+    function setSpectateLiveStatus(value, state, retry = false) {
+        put("spectate-status", value);
+        stateAttribute("spectate-status", "state", state);
+        stateAttribute("spectate-status", "tone", state === "error" ? "error" : "info");
+        show("spectate-live-retry", retry);
+    }
+
+    function subscribeSpectateMatch() {
+        if (!spectatedMatchId || spectateJoinRequest) return;
+        if (!socket?.connected) {
+            showSpectateConnectionStatus();
+            return;
+        }
+        const command = { matchId: spectatedMatchId };
+        spectateJoinRequest = command;
+        setSpectateLiveStatus("Ansluter till matchen …", "loading");
+        sendSpectateCommand("spectate_join", command, (ack) => {
+            if (spectateJoinRequest !== command) return;
+            spectateJoinRequest = undefined;
+            if (ack?.ok) receiveSpectateState(ack.state);
+            else {
+                spectateFinished = ack?.code === "match_unavailable";
+                if (spectateFinished) put("spectate-live-phase", "Inte live");
+                setSpectateLiveStatus(ack?.error || "Liveuppdateringarna kunde inte startas.",
+                    spectateFinished ? "finished" : "error", !spectateFinished);
+            }
+        });
+    }
+
+    function leaveSpectateMatch() {
+        if (socket?.connected) sendSpectateCommand("spectate_leave");
+        spectatedMatchId = undefined;
+        spectateJoinRequest = undefined;
+        spectateFinished = false;
+        spectateChart.reset();
+        drawSpectatePredictionChart?.();
+    }
+
+    function retrySpectating(titleId, subscribe) {
+        byId(titleId).focus({ preventScroll: true });
+        if (socket?.connected) subscribe();
+        else if (socket) {
+            socket.connect();
+            showSpectateConnectionStatus();
+        }
+    }
+
+    function receiveSpectateState(data) {
+        if (screen !== "spectate-live" || data?.id !== spectatedMatchId) return;
+        spectateJoinRequest = undefined;
+        spectateFinished = data.status === "finished";
+        const prediction = data.mode === "prediction";
+        const counting = data.status === "countdown";
+        const [first, second] = data.players;
+        const winner = data.players.find((player) => player.id === data.winnerId);
+        const phase = prediction ? (data.round?.phase === "reveal" ? "Facit" : "Prognos") : phaseLabels[data.storm];
+        const timing = counting ? data.countdown : prediction && !spectateFinished ? data.remaining : data.elapsed;
+        const storm = data.storm === "final" ? "KO" : data.storm === "market" ? "Slutstorm" : "Storm";
+        const detail = prediction ? `Runda ${data.round.number} av ${data.roundLimit}` : `${storm} om ${clock(data.remaining)}`;
+        const finalStatus = winner ? `${winner.name} vann matchen.` : "Matchen slutade oavgjort.";
+        setSpectateLiveStatus(spectateFinished ? finalStatus : counting ? "Matchen startar snart" : "Live",
+            spectateFinished ? "finished" : counting ? "countdown" : "live");
+        put("spectate-live-phase", spectateFinished ? "Avslutad" : counting ? "Startar" : phase);
+        put("spectate-live-timing", clock(timing));
+        put("spectate-live-detail", detail);
+        show("spectate-live-detail", !counting && !spectateFinished);
+        put("spectate-instrument", data.symbol);
+        put("spectate-instrument-detail", [data.name, data.market, data.interval].filter(Boolean).join(" · "));
+        put("spectate-price", formatNumber(data.price, amountFormat));
+        show("spectate-synthetic", Boolean(data.synthetic));
+
+        for (const [side, player] of [["first", first], ["second", second]]) {
+            const prefix = `spectate-${side}`;
+            health(prefix, player);
+            show(`${prefix}-capital-row`, !prediction);
+            put(`${prefix}-capital`, formatNumber(player.capital, amountFormat));
+            const active = prediction ? data.round.phase === "predict" && player.locked : player.hasPosition;
+            show(`${prefix}-activity`, active && !spectateFinished);
+            put(`${prefix}-activity`, prediction ? "Prognos låst" : "Öppen position");
+        }
+        show("spectate-contest", true);
+        show("spectate-prediction-chart-panel", prediction);
+        show("spectate-trading-chart", !prediction);
+        show("spectate-chart-footer", !prediction);
+        stateAttribute("spectate-event", "event", data.event?.type ?? "");
+        if (prediction) renderSpectatePrediction(data, first, second);
+        else {
+            spectateChart.update(data.bars);
+            const event = data.event;
+            const actor = data.players.find((player) => player.id === event?.actorId)?.name;
+            const target = data.players.find((player) => player.id === event?.targetId)?.name;
+            const damage = event?.damage > 0 ? ` · −${formatNumber(event.damage)} HP` : "";
+            const eventLabels = {
+                attack: `${actor} · Attack${damage}`,
+                grow: `${actor} · Grow`,
+                loss: `${actor} · Förlustaffär${damage}`,
+                ko: target ? `${target} · KO` : "Storm · KO",
+            };
+            show("spectate-prediction-reveal", false);
+            message("spectate-event", eventLabels[event?.type]);
+        }
+    }
+
+    function renderSpectatePrediction(data, first, second) {
+        const outcome = data.round.outcome;
+        show("spectate-prediction-reveal", Boolean(outcome));
+        const chartOutcome = outcome ? {
+            actualMoveBps: outcome.actualMoveBps,
+            selfMoveBps: outcome.players.find((player) => player.id === first.id)?.moveBps,
+            opponentMoveBps: outcome.players.find((player) => player.id === second.id)?.moveBps,
+        } : null;
+        drawSpectatePredictionChart?.({ bars: data.bars, outcome: chartOutcome, editable: false });
+        if (!outcome) {
+            message("spectate-event", "");
+            return;
+        }
+        put("spectate-first-prediction-name", first.name);
+        put("spectate-second-prediction-name", second.name);
+        put("spectate-first-prediction", formatPrediction(chartOutcome.selfMoveBps));
+        put("spectate-second-prediction", formatPrediction(chartOutcome.opponentMoveBps));
+        put("spectate-actual-prediction", formatPrediction(chartOutcome.actualMoveBps));
+        stateAttribute("spectate-first-prediction-card", "winner", String(first.id === outcome.winnerId));
+        stateAttribute("spectate-second-prediction-card", "winner", String(second.id === outcome.winnerId));
+        const winner = data.players.find((player) => player.id === outcome.winnerId);
+        message("spectate-event", winner ? `${winner.name} vann rundan · ${formatNumber(outcome.damage)} HP i skada`
+            : "Oavgjord runda");
     }
 
     function newQueue(mode = "ranked") {
@@ -856,13 +1120,7 @@
         message("match-feedback", "");
         resetPrediction();
         setPercent(100);
-        chart?.remove();
-        chart = undefined;
-        priceSeries = undefined;
-        entryLine = undefined;
-        chartBars = [];
-        chartFailed = false;
-        show("chart-controls", false);
+        matchChart.reset();
         show("sell-choice", false);
     }
 
@@ -910,125 +1168,148 @@
         effectTimer = window.setTimeout(clearEffect, 1400);
     }
 
-    function createChart() {
-        const library = window.LightweightCharts;
-        const container = byId("match-chart");
-        if (!library || !container) throw new Error("Chart unavailable");
-        const theme = getComputedStyle(container);
-        const color = (key, fallback) => theme.getPropertyValue(key).trim() || fallback;
-        const price = color("--chart-price", "#b9f467");
-        const line = color("--chart-line", "#29334b");
-        const label = color("--chart-label", "#91a0bb");
-        chart = library.createChart(container, {
-            autoSize: true,
-            layout: {
-                attributionLogo: false,
-                background: { type: "solid", color: "transparent" },
-                textColor: label,
-                fontSize: 11,
-            },
-            grid: { vertLines: { color: line }, horzLines: { color: line } },
-            rightPriceScale: { borderColor: line, scaleMargins: { top: 0.12, bottom: 0.12 } },
-            timeScale: {
-                borderColor: line,
-                timeVisible: true,
-                tickMarkFormatter: (time) => String(time),
-                rightOffsetPixels: chartRightPadding,
-                rightBarStaysOnScroll: true,
-            },
-            localization: {
-                priceFormatter: (price) => formatNumber(price, amountFormat),
-                timeFormatter: (time) => `Kurspunkt ${time}`,
-            },
-            handleScale: { mouseWheel: false, pinch: true },
-            handleScroll: { mouseWheel: false, horzTouchDrag: false, vertTouchDrag: false },
-            trackingMode: { exitMode: library.TrackingModeExitMode.OnTouchEnd },
-        });
-        if (chartType === "candlestick") {
-            const down = color("--chart-price-down", "#ff858a");
-            priceSeries = chart.addSeries(library.CandlestickSeries, {
-                upColor: price,
-                downColor: down,
-                borderVisible: false,
-                wickUpColor: price,
-                wickDownColor: down,
-                priceLineColor: label,
-            });
-            container.setAttribute("aria-label", "Kursgraf med ljusstaplar");
-        } else {
-            priceSeries = chart.addSeries(library.LineSeries, {
-                color: price,
-                lineWidth: 2,
-                priceLineColor: label,
-            });
-            container.setAttribute("aria-label", "Linjegraf över aktiekursen");
+    class PriceChart {
+        constructor(containerId, statusId, controlsId) {
+            this.containerId = containerId;
+            this.statusId = statusId;
+            this.controlsId = controlsId;
+            this.bars = [];
+            this.failed = false;
         }
-    }
 
-    function zoomChart(factor) {
-        if (!chartBars.length || chartFailed) return;
-        const timeScale = chart.timeScale();
-        const width = timeScale.width();
-        if (!width) return;
-        const { barSpacing, minBarSpacing } = timeScale.options();
-        const spacing = Math.max(minBarSpacing, Math.min(width / 2, barSpacing * factor));
-        timeScale.applyOptions({ barSpacing: spacing, rightOffsetPixels: chartRightPadding });
-    }
-
-    function updateChart(bars, position) {
-        if (chartFailed) return;
-        if (!bars?.length) {
-            message("match-chart-status", "Väntar på kursgraf …");
-            return;
+        reset() {
+            this.chart?.remove();
+            this.chart = undefined;
+            this.series = undefined;
+            this.entryLine = undefined;
+            this.bars = [];
+            this.failed = false;
+            show(this.controlsId, false);
         }
-        try {
-            if (!chart) createChart();
-            const toPoint = priceSeries.seriesType() === "Candlestick"
-                ? ({ time, open, high, low, close }) => ({
-                    time: Number(time), open: Number(open), high: Number(high), low: Number(low), close: Number(close),
-                })
-                : ({ time, close }) => ({ time: Number(time), value: Number(close) });
-            const sameBar = (left, right) => left.time === right.time && left.open === right.open
-                && left.high === right.high && left.low === right.low && left.close === right.close;
-            const last = chartBars.length - 1;
-            const append = last >= 0 && chartBars.length <= bars.length
-                && chartBars[last].time === bars[last].time
-                && chartBars.slice(0, last).every((bar, index) => sameBar(bar, bars[index]));
-            if (append) {
-                if (!sameBar(chartBars[last], bars[last])) priceSeries.update(toPoint(bars[last]));
-                for (const bar of bars.slice(last + 1)) priceSeries.update(toPoint(bar));
-            } else {
-                priceSeries.setData(bars.map(toPoint));
-                if (!chartBars.length) {
-                    chart.timeScale().fitContent();
-                    show("chart-controls", true);
-                }
-            }
-            chartBars = bars;
 
-            const entry = numeric(position?.entryPrice);
-            if (entry != null && entryLine) {
-                entryLine.applyOptions({ price: entry, title: positionDirection(position) });
-            } else if (entry != null) {
-                entryLine = priceSeries.createPriceLine({
-                    price: entry,
-                    color: "#c4acff",
-                    lineWidth: 1,
-                    lineStyle: window.LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true,
-                    title: positionDirection(position),
+        create() {
+            const library = window.LightweightCharts;
+            const container = byId(this.containerId);
+            if (!library || !container) throw new Error("Chart unavailable");
+            const theme = getComputedStyle(container);
+            const color = (key, fallback) => theme.getPropertyValue(key).trim() || fallback;
+            const price = color("--chart-price", "#b9f467");
+            const line = color("--chart-line", "#29334b");
+            const label = color("--chart-label", "#91a0bb");
+            this.chart = library.createChart(container, {
+                autoSize: true,
+                layout: {
+                    attributionLogo: false,
+                    background: { type: "solid", color: "transparent" },
+                    textColor: label,
+                    fontSize: 11,
+                },
+                grid: { vertLines: { color: line }, horzLines: { color: line } },
+                rightPriceScale: { borderColor: line, scaleMargins: { top: 0.12, bottom: 0.12 } },
+                timeScale: {
+                    borderColor: line,
+                    timeVisible: true,
+                    tickMarkFormatter: (time) => String(time),
+                    rightOffsetPixels: chartRightPadding,
+                    rightBarStaysOnScroll: true,
+                },
+                localization: {
+                    priceFormatter: (price) => formatNumber(price, amountFormat),
+                    timeFormatter: (time) => `Kurspunkt ${time}`,
+                },
+                handleScale: { mouseWheel: false, pinch: true },
+                handleScroll: { mouseWheel: false, horzTouchDrag: false, vertTouchDrag: false },
+                trackingMode: { exitMode: library.TrackingModeExitMode.OnTouchEnd },
+            });
+            if (chartType === "candlestick") {
+                const down = color("--chart-price-down", "#ff858a");
+                this.series = this.chart.addSeries(library.CandlestickSeries, {
+                    upColor: price,
+                    downColor: down,
+                    borderVisible: false,
+                    wickUpColor: price,
+                    wickDownColor: down,
+                    priceLineColor: label,
                 });
-            } else if (entryLine) {
-                priceSeries.removePriceLine(entryLine);
-                entryLine = undefined;
+                container.setAttribute("aria-label", "Kursgraf med ljusstaplar");
+            } else {
+                this.series = this.chart.addSeries(library.LineSeries, {
+                    color: price,
+                    lineWidth: 2,
+                    priceLineColor: label,
+                });
+                container.setAttribute("aria-label", "Linjegraf över aktiekursen");
             }
-            message("match-chart-status", "");
-        } catch {
-            chartFailed = true;
-            show("chart-controls", false);
-            message("match-chart-status", "Kursgrafen kunde inte visas.", "error");
+        }
+
+        zoom(factor) {
+            if (!this.bars.length || this.failed) return;
+            const timeScale = this.chart.timeScale();
+            const width = timeScale.width();
+            if (!width) return;
+            const { barSpacing, minBarSpacing } = timeScale.options();
+            const spacing = Math.max(minBarSpacing, Math.min(width / 2, barSpacing * factor));
+            timeScale.applyOptions({ barSpacing: spacing, rightOffsetPixels: chartRightPadding });
+        }
+
+        update(bars, position) {
+            if (this.failed) return;
+            if (!bars?.length) {
+                message(this.statusId, "Väntar på kursgraf …");
+                return;
+            }
+            try {
+                if (!this.chart) this.create();
+                const toPoint = this.series.seriesType() === "Candlestick"
+                    ? ({ time, open, high, low, close }) => ({
+                        time: Number(time), open: Number(open), high: Number(high), low: Number(low), close: Number(close),
+                    })
+                    : ({ time, close }) => ({ time: Number(time), value: Number(close) });
+                const sameBar = (left, right) => left.time === right.time && left.open === right.open
+                    && left.high === right.high && left.low === right.low && left.close === right.close;
+                const last = this.bars.length - 1;
+                const append = last >= 0 && this.bars.length <= bars.length
+                    && this.bars[last].time === bars[last].time
+                    && this.bars.slice(0, last).every((bar, index) => sameBar(bar, bars[index]));
+                if (append) {
+                    if (!sameBar(this.bars[last], bars[last])) this.series.update(toPoint(bars[last]));
+                    for (const bar of bars.slice(last + 1)) this.series.update(toPoint(bar));
+                } else {
+                    this.series.setData(bars.map(toPoint));
+                    if (!this.bars.length) {
+                        this.chart.timeScale().fitContent();
+                        show(this.controlsId, true);
+                    }
+                }
+                this.bars = bars;
+
+                const entry = numeric(position?.entryPrice);
+                if (entry != null && this.entryLine) {
+                    this.entryLine.applyOptions({ price: entry, title: positionDirection(position) });
+                } else if (entry != null) {
+                    this.entryLine = this.series.createPriceLine({
+                        price: entry,
+                        color: "#c4acff",
+                        lineWidth: 1,
+                        lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: positionDirection(position),
+                    });
+                } else if (this.entryLine) {
+                    this.series.removePriceLine(this.entryLine);
+                    this.entryLine = undefined;
+                }
+                message(this.statusId, "");
+            } catch {
+                this.failed = true;
+                show(this.controlsId, false);
+                message(this.statusId, "Kursgrafen kunde inte visas.", "error");
+            }
         }
     }
+
+    const matchChart = new PriceChart("match-chart", "match-chart-status", "chart-controls");
+    const spectateChart = new PriceChart("spectate-chart", "spectate-chart-status", "spectate-chart-controls");
 
     function parsePrediction(value) {
         const parts = /^([+-]?)(\d*)(?:[,.](\d{0,2}))?$/.exec(value.trim().replace("−", "-"));
@@ -1298,7 +1579,7 @@
         put("match-entry", formatNumber(position?.entryPrice, amountFormat));
         put("match-pnl", signed(position?.pnl, amountFormat));
         stateAttribute("match-pnl", "sign", sign(numeric(position?.pnl)));
-        updateChart(data.bars, position);
+        matchChart.update(data.bars, position);
         renderTradeControls();
         animateEvent(data.event);
     }
@@ -1580,7 +1861,7 @@
         const instrument = [data.symbol, data.name, data.market, data.interval].filter(Boolean);
         if (data.synthetic) instrument.push("Syntetisk");
         put("result-symbol", instrument.join(" · "));
-        put("result-period", period(data.periodStart, data.periodEnd));
+        put("result-period", period(data.periodStart, data.periodEnd, data.interval));
         renderResultDetails(data, mode);
         renderPlayAgain();
         activate("result");
@@ -1620,6 +1901,16 @@
             case "friend-cancel": privateCancel(); break;
             case "friend-copy": void copyInvite(); break;
             case "friend-join": sendActivity("private_join", { code: inviteCode }, (error) => toast(error, "error")); break;
+            case "spectate":
+                if (screen === "menu" && !activityCommand) openSpectateList();
+                break;
+            case "spectate-menu": activate("menu"); break;
+            case "spectate-watch": openSpectateMatch(button); break;
+            case "spectate-back": openSpectateList(); break;
+            case "spectate-list-retry": retrySpectating("spectate-title", subscribeSpectateList); break;
+            case "spectate-live-retry": retrySpectating("spectate-mode", subscribeSpectateMatch); break;
+            case "spectate-zoom-out": spectateChart.zoom(1 / chartZoomFactor); break;
+            case "spectate-zoom-in": spectateChart.zoom(chartZoomFactor); break;
             case "play-again": {
                 const mode = result?.mode ?? match?.mode;
                 if (mode === "bot") startBotMatch();
@@ -1632,14 +1923,15 @@
             }
             case "leave-queue": leaveQueue(); break;
             case "main-menu": leaveResult(); break;
+            case "leagues":
             case "ranking":
             case "profile":
             case "help":
             case "settings": openDialog(button.dataset.action); break;
             case "close-dialog": button.closest("dialog")?.close(); break;
             case "logout": void logout(); break;
-            case "chart-zoom-out": zoomChart(1 / chartZoomFactor); break;
-            case "chart-zoom-in": zoomChart(chartZoomFactor); break;
+            case "chart-zoom-out": matchChart.zoom(1 / chartZoomFactor); break;
+            case "chart-zoom-in": matchChart.zoom(chartZoomFactor); break;
             case "buy":
             case "short":
             case "sell": trade(button.dataset.action); break;
@@ -1651,6 +1943,8 @@
 
     async function initialize() {
         document.addEventListener("click", onClick);
+        document.addEventListener("visibilitychange", refreshOnlineCount);
+        window.setInterval(refreshOnlineCount, 10_000);
         byId("auth-form")?.addEventListener("submit", submitAuth);
         byId("ranking-mode")?.addEventListener("change", refreshRanking);
         byId("profile-mode")?.addEventListener("change", () => void refreshProfile(true));
@@ -1663,6 +1957,7 @@
         drawPredictionChart = window.createPredictionChart?.(
             byId("prediction-chart"), byId("prediction-draw-target"), setPredictionDraft,
         );
+        drawSpectatePredictionChart = window.createPredictionChart?.(byId("spectate-prediction-chart"));
         const chartSetting = byId("setting-chart-type");
         if (chartSetting) {
             chartSetting.value = chartType;

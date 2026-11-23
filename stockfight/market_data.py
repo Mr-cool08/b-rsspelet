@@ -29,6 +29,8 @@ _REQUIRED_COLUMNS = {"symbol", "market", "timestamp", "open", "high", "low", "cl
 _SERIES_COLUMNS = ("symbol", "market", "interval", "source")
 _DEMO_PATH = Path(__file__).resolve().parent.parent / "data" / "demo_market.csv"
 _DEMO_SOURCE = "stockfight-synthetic-demo"
+_HISTORICAL_PATH = _DEMO_PATH.with_name("historical_market.csv")
+_HISTORICAL_SOURCE = "Kaggle - S&P 500 stock data"
 _TIMESTAMP_UNITS = {
     "s": "seconds",
     "m": "minutes",
@@ -186,15 +188,20 @@ def seed_demo() -> int:
     return import_csv(_DEMO_PATH, source=_DEMO_SOURCE, synthetic=True)
 
 
+def seed_historical() -> int:
+    """Import the bundled daily stock prices without a network request."""
+    return import_csv(_HISTORICAL_PATH, interval="1d", source=_HISTORICAL_SOURCE)
+
+
 class DatabaseMarketProvider:
-    _recent: WeakKeyDictionary[Engine, deque[int]] = WeakKeyDictionary()
+    _recent: WeakKeyDictionary[Engine, deque[tuple[tuple[str, str], datetime]]] = WeakKeyDictionary()
     _lock = Lock()
 
     def __init__(self, allow_synthetic: bool = True) -> None:
         self.allow_synthetic = allow_synthetic
 
     def choose(self, *, required_bars: int, preview_count: int) -> Scenario:
-        """Choose a window with the preview and no interruption beyond the interval policy."""
+        """Draw a playable stock and a contiguous window from its history."""
         return self._choose(required_bars, preview_count, strides=(1,))
 
     def choose_prediction(self, *, required_bars: int, preview_count: int) -> Scenario:
@@ -226,9 +233,13 @@ class DatabaseMarketProvider:
             raise ValueError("Välj minst en kurspunkt för förhandsvisning och en för handel.")
         with self._lock:
             recent = self._recent.setdefault(db.engine, deque(maxlen=16))
+            previous_stock = recent[-1][0] if recent else None
+            recent_starts = set(recent)
             data_types = (False, True) if self.allow_synthetic else (False,)
             for synthetic in data_types:
-                selection = self._choose_window(required_bars, synthetic, set(recent), strides, score_window)
+                selection = self._choose_window(
+                    required_bars, synthetic, recent_starts, previous_stock, strides, score_window,
+                )
                 if selection is None:
                     continue
                 chosen, stride = selection
@@ -236,7 +247,7 @@ class DatabaseMarketProvider:
                 interval = first.interval
                 if stride > 1:
                     interval = f"{int(interval[:-1]) * stride}{interval[-1]}"
-                recent.append(first.id)
+                recent.append(((first.symbol, first.market), first.timestamp))
                 return Scenario(
                     symbol=first.symbol,
                     market=first.market,
@@ -261,9 +272,10 @@ class DatabaseMarketProvider:
             f"Marknadsdatan saknar en sammanhängande serie med {required_bars} kurspunkter."
         )
 
-    @staticmethod
+    @classmethod
     def _choose_window(
-        required_bars: int, synthetic: bool, recent: set[int], strides: tuple[int, ...],
+        cls, required_bars: int, synthetic: bool, recent: set[tuple[tuple[str, str], datetime]],
+        previous_stock: tuple[str, str] | None, strides: tuple[int, ...],
         score_window: Callable[[tuple[MarketData, ...]], int] | None,
     ) -> tuple[tuple[MarketData, ...], int] | None:
         from .data import MarketData, db
@@ -277,38 +289,66 @@ class DatabaseMarketProvider:
         )
         rows = db.session.scalars(query)
         selected = None
-        eligible_count = 0
-        best_priority = (-1, 0, False)
+        eligible_stocks = 0
+        best_stock_priority = (-1,)
         window_sizes = tuple((stride, (required_bars - 1) * stride + 1) for stride in strides)
-        max_size = max(size for _, size in window_sizes)
         try:
-            for (_, _, interval, _), series in groupby(rows, key=attrgetter(*_SERIES_COLUMNS)):
-                step = _interval_delta(interval)
-                calendar_interval = interval.endswith(("d", "w"))
-                window: deque[MarketData] = deque(maxlen=max_size)
-                for row in series:
-                    if window and not _consecutive(window[-1].timestamp, row.timestamp, step, calendar_interval):
-                        window.clear()
-                    window.append(row)
-                    for stride, size in window_sizes:
-                        start = len(window) - size
-                        if start < 0:
-                            continue
-                        sampled = None
-                        quality = 0
-                        if score_window is not None:
-                            sampled = tuple(islice(window, start, None, stride))
-                            quality = score_window(sampled)
-                        priority = (quality, stride, window[start].id not in recent)
-                        if priority > best_priority:
-                            best_priority = priority
-                            eligible_count = 0
-                        elif priority < best_priority:
-                            continue
-                        # Among equally suitable starts, give each one the same chance.
-                        eligible_count += 1
-                        if randrange(eligible_count) == 0:
-                            selected = (sampled if sampled is not None else tuple(window), stride)
+            for stock, stock_rows in groupby(rows, key=attrgetter("symbol", "market")):
+                recent_dates = {timestamp for recent_stock, timestamp in recent if recent_stock == stock}
+                candidate = cls._choose_stock_window(stock_rows, window_sizes, recent_dates, synthetic, score_window)
+                if candidate is None:
+                    continue
+                stock_window, window_priority = candidate
+                stock_priority = (window_priority if synthetic else window_priority[:1]) + (stock != previous_stock,)
+                if stock_priority > best_stock_priority:
+                    best_stock_priority = stock_priority
+                    eligible_stocks = 0
+                elif stock_priority < best_stock_priority:
+                    continue
+                # Draw among eligible stocks independently of how many windows each offers.
+                eligible_stocks += 1
+                if randrange(eligible_stocks) == 0:
+                    selected = stock_window
         finally:
             rows.close()
         return selected
+
+    @staticmethod
+    def _choose_stock_window(
+        rows: Iterator[MarketData], window_sizes: tuple[tuple[int, int], ...], recent: set[datetime],
+        synthetic: bool, score_window: Callable[[tuple[MarketData, ...]], int] | None,
+    ) -> tuple[tuple[tuple[MarketData, ...], int], tuple[int, int, int]] | None:
+        selected = None
+        eligible_windows = 0
+        best_priority = (-1, 0, 0)
+        max_size = max(size for _, size in window_sizes)
+        for (interval, _), series in groupby(rows, key=attrgetter("interval", "source")):
+            step = _interval_delta(interval)
+            calendar_interval = interval.endswith(("d", "w"))
+            window: deque[MarketData] = deque(maxlen=max_size)
+            for row in series:
+                if window and not _consecutive(window[-1].timestamp, row.timestamp, step, calendar_interval):
+                    window.clear()
+                window.append(row)
+                for stride, size in window_sizes:
+                    start = len(window) - size
+                    if start < 0:
+                        continue
+                    sampled = None
+                    quality = 0
+                    if score_window is not None:
+                        sampled = tuple(islice(window, start, None, stride))
+                        quality = score_window(sampled)
+                    fresh = window[start].timestamp not in recent
+                    # Active real windows remain eligible even when another date scores higher.
+                    priority = (quality, stride, fresh) if synthetic else (min(1, quality), fresh, stride)
+                    if priority > best_priority:
+                        best_priority = priority
+                        eligible_windows = 0
+                    elif priority < best_priority:
+                        continue
+                    # Sample starts without keeping the whole history in memory.
+                    eligible_windows += 1
+                    if randrange(eligible_windows) == 0:
+                        selected = (sampled if sampled is not None else tuple(window), stride)
+        return (selected, best_priority) if selected is not None else None

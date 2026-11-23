@@ -41,7 +41,7 @@
             const height = canvas.clientHeight;
             if (!width || !height) {
                 plot = undefined;
-                drawTarget.hidden = true;
+                drawTarget?.setAttribute("hidden", "");
                 return;
             }
             const ratio = window.devicePixelRatio || 1;
@@ -58,7 +58,7 @@
             const last = bars?.at(-1);
             const base = Number(last?.close);
             if (!base) {
-                drawTarget.hidden = true;
+                drawTarget?.setAttribute("hidden", "");
                 return;
             }
             const history = bars.map(({ time, close }) => ({
@@ -84,7 +84,7 @@
             const firstTime = Math.min(-1, history[0].time);
             const x = (time) => left + (anchor - left) * (time - firstTime) / -firstTime;
             plot = { top, bottom, radius };
-            const editable = view.editable && end > anchor && bottom > top;
+            const editable = drawTarget && view.editable && end > anchor && bottom > top;
             if (editable) {
                 Object.assign(drawTarget.style, {
                     left: `${anchor}px`,
@@ -93,7 +93,7 @@
                     height: `${bottom - top}px`,
                 });
             }
-            drawTarget.hidden = !editable;
+            drawTarget?.toggleAttribute("hidden", !editable);
 
             context.fillStyle = colors.future;
             context.fillRect(anchor, top, end - anchor, bottom - top);
@@ -157,18 +157,18 @@
             onDraw(Math.max(-10_000, Math.min(Number.MAX_SAFE_INTEGER, bps)));
         }
 
-        drawTarget.addEventListener("pointerdown", (event) => {
+        drawTarget?.addEventListener("pointerdown", (event) => {
             if (!view?.editable || !plot || drag || event.button !== 0) return;
             drag = { pointer: event.pointerId, radius: plot.radius };
             drawTarget.setPointerCapture(event.pointerId);
             updatePointer(event, canvas.getBoundingClientRect());
         });
-        drawTarget.addEventListener("pointermove", (event) => {
+        drawTarget?.addEventListener("pointermove", (event) => {
             if (event.pointerId === drag?.pointer && plot) {
                 updatePointer(event, canvas.getBoundingClientRect());
             }
         });
-        drawTarget.addEventListener("lostpointercapture", (event) => {
+        drawTarget?.addEventListener("lostpointercapture", (event) => {
             if (event.pointerId !== drag?.pointer) return;
             drag = undefined;
             draw();

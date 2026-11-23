@@ -242,9 +242,7 @@ class PredictionMatch:
             return 0
         return max(0, ceil(self._phase_ends_at - max(now, self._starts_at)))
 
-    def public(self, user_id: int, now: float) -> dict:
-        player = self._player(user_id)
-        opponent_id, opponent = self._opponent(user_id)
+    def _shared_state(self, now: float) -> dict:
         now = max(now, self._now)
         scenario = self.scenario
         return {
@@ -262,9 +260,16 @@ class PredictionMatch:
             "synthetic": scenario.synthetic,
             "price": format(self.price, "f"),
             "bars": revealed_prediction_bars(scenario, self.revealed_count),
+            "event": self._event.copy() if self._event is not None else None,
+        }
+
+    def public(self, user_id: int, now: float) -> dict:
+        player = self._player(user_id)
+        opponent_id, opponent = self._opponent(user_id)
+        return {
+            **self._shared_state(now),
             "self": {"id": user_id, "name": player.name, "hp": player.hp},
             "opponent": {"id": opponent_id, "name": opponent.name, "hp": opponent.hp},
-            "event": self._event.copy() if self._event is not None else None,
             "round": {
                 "number": self._round_number,
                 "phase": "reveal" if self._revealing else "predict",
@@ -274,6 +279,33 @@ class PredictionMatch:
                 "outcome": self._outcomes[-1].public(user_id, opponent_id) if self._revealing else None,
             },
         }
+
+    def spectator_state(self, now: float) -> dict:
+        state = self._shared_state(now)
+        state["players"] = [
+            {"id": user_id, "name": player.name, "hp": player.hp, "locked": user_id in self._moves}
+            for user_id, player in self.players.items()
+        ]
+        outcome = None
+        if self._revealing:
+            revealed = self._outcomes[-1]
+            outcome = {
+                "actualMoveBps": revealed.actual_move,
+                "players": [
+                    {"id": user_id, "moveBps": revealed.moves.get(user_id), "errorBps": revealed.errors.get(user_id)}
+                    for user_id in self.players
+                ],
+                "winnerId": revealed.winner_id,
+                "damage": revealed.damage,
+            }
+        state["round"] = {
+            "number": self._round_number,
+            "phase": "reveal" if self._revealing else "predict",
+            "outcome": outcome,
+        }
+        if self.status == "finished":
+            state.update(winnerId=self.winner_id, endReason=self.end_reason)
+        return state
 
     def summary(self, user_id: int) -> dict:
         player = self._player(user_id)

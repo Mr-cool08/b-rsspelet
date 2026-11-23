@@ -333,6 +333,35 @@ def test_provider_prefers_contiguous_real_bars_and_avoids_a_recent_window(databa
     assert used == {FIRST_BAR + timedelta(minutes=i) for i in range(3)}
 
 
+@pytest.mark.parametrize("method", ["choose", "choose_prediction"])
+def test_provider_varies_stocks_and_start_dates(database, tmp_path, method):
+    preview = 12
+    required = preview + MAX_ROUNDS
+    histories = {
+        "LONG": [(index, Decimal(1000 + 50 * (index % 2))) for index in range(140)],
+        "SHORT": [(200 + index, Decimal(100) + Decimal(index) / 10) for index in range(62)],
+    }
+    rows = []
+    for symbol, history in histories.items():
+        for day, close in history:
+            row = _csv_row(day * 1440, symbol=symbol)
+            rows.append((*row[:3], close, close, close, close, *row[7:]))
+    import_csv(_write_csv(tmp_path / "stocks.csv", rows), interval="1d", source="stock fixture")
+
+    choose = getattr(DatabaseMarketProvider(allow_synthetic=False), method)
+    scenarios = [choose(required_bars=required, preview_count=preview) for _ in range(6)]
+
+    assert {scenario.symbol for scenario in scenarios} == set(histories)
+    assert all(before.symbol != after.symbol for before, after in pairwise(scenarios))
+    assert len({(scenario.symbol, scenario.bars[0].timestamp) for scenario in scenarios}) == len(scenarios)
+    for scenario in scenarios:
+        history = histories[scenario.symbol]
+        bars = [(FIRST_BAR + timedelta(days=day), close) for day, close in history]
+        start = next(index for index, (timestamp, _) in enumerate(bars) if timestamp == scenario.bars[0].timestamp)
+        stride = int(scenario.interval.removesuffix("d"))
+        assert [(bar.timestamp, bar.close) for bar in scenario.bars] == bars[start::stride][:required]
+
+
 @pytest.mark.parametrize(("interval", "days"), [("1d", (3, 4, 8, 9, 17)), ("1w", (0, 7, 13, 20, 34))])
 def test_provider_allows_calendar_closures_without_bridging_long_gaps(database, tmp_path, interval, days):
     path = _write_csv(tmp_path / "calendar.csv", [_csv_row(day * 1440) for day in days])

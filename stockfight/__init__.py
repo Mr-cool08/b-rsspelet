@@ -13,9 +13,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .data import User, db, get_rating, initialize_database, leaderboard, profile
 from .engine import RANKED
-from .market_data import DatabaseMarketProvider, import_csv, seed_demo
+from .market_data import DatabaseMarketProvider, import_csv, seed_demo, seed_historical
 from .multiplayer import MatchService, install_handlers, token_matches
 from .prediction import PREDICTION
+from .ranking import LEAGUES
 
 socketio = SocketIO(async_mode="threading", max_http_buffer_size=16_384)
 install_handlers(socketio)
@@ -54,6 +55,7 @@ def create_app(config=None):
     )
     if config is not None:
         app.config.update(config)
+    app.config.setdefault("AUTO_SEED_HISTORICAL", not app.testing and env_flag("AUTO_SEED_HISTORICAL", True))
     if not 0.25 <= app.config["MARKET_TICK_SECONDS"] <= 60:
         raise ValueError("MARKET_TICK_SECONDS måste vara mellan 0,25 och 60.")
     if not 2 <= app.config["MATCH_PREVIEW_BARS"] <= 100:
@@ -81,6 +83,8 @@ def create_app(config=None):
     register_cli(app, schema_url)
     with app.app_context():
         initialize_database(schema_url)
+        if app.config["AUTO_SEED_HISTORICAL"]:
+            seed_historical()
         if app.config["AUTO_SEED_DEMO"] and app.config["ALLOW_SYNTHETIC"]:
             seed_demo()
     return app
@@ -136,11 +140,15 @@ def register_http(app, service):
 
     @app.get("/")
     def index():
-        return render_template("index.html")
+        return render_template("index.html", leagues=LEAGUES, online_count=service.online_count())
 
     @app.get("/healthz")
     def health():
         return {"status": "ok"}
+
+    @app.get("/api/online")
+    def online():
+        return {"count": service.online_count()}
 
     @app.get("/api/me")
     def me():

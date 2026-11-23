@@ -168,6 +168,29 @@ def test_private_registration_and_login(game):
     assert login.get_json()["user"]["username"] == "SwedishBull"
 
 
+def test_online_count_tracks_connected_accounts(game):
+    app, _ = game
+    guest = app.test_client()
+    response = guest.get("/api/online")
+    assert response.get_json() == {"count": 0}
+    assert response.headers["Cache-Control"] == "no-store"
+
+    first = register(app, "FirstOnline")
+    other_tab = Player(app, first.http, first.id)
+    other_tab.connect()
+    assert guest.get("/api/online").get_json() == {"count": 1}
+    assert b"1 online</span>" in guest.get("/").data
+
+    second = register(app, "SecondOnline")
+    first.socket.disconnect()
+    assert guest.get("/api/online").get_json() == {"count": 2}
+
+    other_tab.socket.disconnect()
+    assert guest.get("/api/online").get_json() == {"count": 1}
+    assert post(second.http, "/api/logout", {}).status_code == 200
+    assert guest.get("/api/online").get_json() == {"count": 0}
+
+
 @pytest.mark.parametrize("elo_gap, matches_after_widening", [(150, True), (201, False)])
 def test_matchmaking_widens_only_to_200_points(game, elo_gap, matches_after_widening):
     app, _ = game
@@ -194,6 +217,28 @@ def test_matchmaking_widens_only_to_200_points(game, elo_gap, matches_after_wide
         assert not first.events("match_state")
         assert not second.events("match_state")
         assert second.emit("queue_leave")["ok"]
+
+
+def test_queue_update_survives_disconnect_during_broadcast(game, monkeypatch):
+    app, _ = game
+    first = register(app, "FirstQueue")
+    second = register(app, "SecondQueue")
+    assert first.emit("queue_join")["ok"]
+    assert second.emit("queue_join", {"mode": "prediction"})["ok"]
+    first.events("queue_state")
+    emit = socketio.emit
+
+    def emit_and_disconnect(event, payload, **kwargs):
+        emit(event, payload, **kwargs)
+        if event == "queue_state" and payload.get("mode") == "ranked" and second.socket.is_connected():
+            second.socket.disconnect()
+
+    monkeypatch.setattr(socketio, "emit", emit_and_disconnect)
+    advance(game, 1)
+
+    assert not second.socket.is_connected()
+    assert first.events("queue_state")[-1]["waited"] == 1
+    assert second.id not in app.extensions["match_service"].queue
 
 
 def test_two_clients_trade_concurrently_finish_and_persist_once(game):
@@ -336,6 +381,33 @@ def test_short_trade_on_falling_price_can_attack_via_socket(game):
         trade = db.session.scalars(select(TradeHistory)).one()
         assert trade.user_id == first.id
         assert trade.side == "short"
+
+
+@pytest.mark.parametrize("trigger", ["pump", "trade"])
+def test_match_broadcast_survives_tab_disconnect(game, monkeypatch, trigger):
+    app, clock = game
+    first, second = join_both(game)
+    other_tab = Player(app, first.http, first.id)
+    other_tab.connect()
+    other_tab.state()
+    second_state = second.state()
+    emit = socketio.emit
+
+    def emit_and_disconnect(event, payload, **kwargs):
+        emit(event, payload, **kwargs)
+        if event == "match_state" and payload["self"]["id"] == first.id and first.socket.is_connected():
+            first.socket.disconnect()
+
+    monkeypatch.setattr(socketio, "emit", emit_and_disconnect)
+    if trigger == "pump":
+        advance(game, 3)
+    else:
+        clock.now += 3
+        assert second.trade(second_state, "buy", percent=50)["ok"]
+
+    assert not first.socket.is_connected()
+    assert other_tab.state()["status"] == "active"
+    assert second.state()["status"] == "active"
 
 
 def test_reconnecting_player_cannot_set_authoritative_fields(game):

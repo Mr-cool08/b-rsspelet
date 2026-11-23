@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 COPY stockfight ./stockfight
 COPY data/demo_market.csv ./data/demo_market.csv
+COPY data/historical_market.csv ./data/historical_market.csv
 COPY run.py .
 
 USER stockfight

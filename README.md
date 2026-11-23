@@ -22,7 +22,7 @@ python3 -m venv .venv
 .venv/bin/python run.py
 ```
 
-Öppna [Stock Fight på localhost](http://127.0.0.1:8080) och registrera ett konto. Välj **Spela mot bot** för en träningsmatch. För Ranked, öppna spelet i två separata webbläsarprofiler eller på två enheter, logga in med varsitt konto och tryck **PLAY** på båda. Spelet skapar SQLite-filen i `instance/` och importerar medföljande, tydligt markerad syntetisk minutdata under första starten.
+Öppna [Stock Fight på localhost](http://127.0.0.1:8080) och registrera ett konto. Välj **Spela mot bot** för en träningsmatch. För Ranked, öppna spelet i två separata webbläsarprofiler eller på två enheter, logga in med varsitt konto och tryck **PLAY** på båda. Spelet skapar SQLite-filen i `instance/` och importerar medföljande historiska kurser automatiskt vid start. Handelsduell och rankad Ritduell lottar en aktie och en startpunkt i dess kurshistorik. Datumen visas när matchen är slut.
 
 - Före den första botduellen kan du prova Attack och Grow på en exempelaffär. Öppna **Så spelar du** för att starta guiden igen.
 - **Spela med en vän** skapar en länk till en orankad Handelsduell. Länken fungerar en gång inom 15 minuter. Värden behöver vara ansluten när gästen bekräftar. Efter matchen kan båda tacka ja till revansch inom 15 minuter. Spela från samma lokalnätsadress eller publika adress om ni använder olika enheter.
@@ -58,8 +58,9 @@ Gunicorn kör exakt en trådad serverprocess med WebSocket-stöd via Flask-Socke
 | `STOCK_FIGHT_BIND` | Bindningsadress för Compose. Standard `0.0.0.0`. |
 | `STOCK_FIGHT_DEV_HOST` | Bindningsadress för lokal utvecklingsserver. Standard `127.0.0.1`. |
 | `SESSION_COOKIE_SECURE` | Standard `0` för HTTP. Använd `1` när spelarna ansluter via HTTPS. |
+| `AUTO_SEED_HISTORICAL` | `1` importerar de medföljande historiska dagskurserna automatiskt. |
 | `AUTO_SEED_DEMO` | `1` importerar medföljande syntetiska data automatiskt. |
-| `ALLOW_SYNTHETIC` | `0` kräver en spelbar importerad verklig serie. |
+| `ALLOW_SYNTHETIC` | `0` kräver en spelbar verklig serie för matcher. |
 | `MARKET_TICK_SECONDS` | Sekunder per historisk stapel. Standard `3`. |
 | `MATCH_PREVIEW_BARS` | Antal staplar i förhandsvisningen. Standard `12`. |
 | `DATABASE_URL` | Direkt PostgreSQL-anslutning för tabellinitiering, eller SQLite-adress. Utan databasadress använder appen `sqlite:///stockfight.sqlite3` i `instance/`. |
@@ -82,13 +83,15 @@ Om du anger bara en av anslutningssträngarna används den både vid tabelliniti
 
    Ta bort `DATABASE_URL_POOLED` från webbtjänsten om den är satt sedan tidigare. Då används `DATABASE_URL` både vid tabellinitiering och när spelet körs.
 
-4. Driftsätt spelet. Vid start skapar spelet tabellerna och importerar som standard de medföljande demokurserna. Registrera ett testkonto, välj **Manual Deploy → Restart service** i Render och logga sedan in med samma konto för att kontrollera att det sparats. [Starta om en Render-tjänst](https://render.com/docs/deploys#restarting-a-service)
+4. Driftsätt spelet. Vid start skapar spelet tabellerna och importerar som standard de medföljande historiska kurserna och demokurserna. Registrera ett testkonto, välj **Manual Deploy → Restart service** i Render och logga sedan in med samma konto för att kontrollera att det sparats. [Starta om en Render-tjänst](https://render.com/docs/deploys#restarting-a-service)
 
 Render kan pausa spelet vid inaktivitet, så det första besöket efter en paus kan ta längre tid. Konton, Elo, färdigspelade rankade matcher och importerade kurser ligger kvar i PostgreSQL när webbtjänsten startar om. Om databasen använder Renders gratisplan förfaller den 30 dagar efter att den skapats. Vill du ta med befintliga konton och resultat behöver du föra över dem från SQLite separat. [Render Free](https://render.com/docs/free#30-day-limit)
 
 ## Importera verkliga kurser
 
-Kursfiler med verkliga svenska och amerikanska aktier importeras från en lokal fil till den konfigurerade databasen. Använd data som du har rätt att använda på din server och visa för dina spelare. Den medföljande CSV-filen innehåller påhittade instrument och kurser för utveckling och provspel. Matchningen väljer i första hand bland spelbara verkliga serier när sådana har importerats.
+`data/historical_market.csv` innehåller verkliga amerikanska dagskurser från 2015–2017. Filen är ett urval ur Cam Nugents dataset *S&P 500 stock data*, publicerat under CC0. `data/demo_market.csv` innehåller syntetisk minutdata för provspel när verklig data saknas för en match. [S&P 500 stock data på Kaggle](https://www.kaggle.com/datasets/camnugent/sandp500/data)
+
+Fler svenska och amerikanska aktier kan läggas till från en lokal kursfil. Använd data som du har rätt att använda på din server och visa för dina spelare.
 
 Spara filen som kommaavgränsad UTF-8 med följande kolumnrubriker. `name` är valfri.
 
@@ -100,7 +103,7 @@ Använd till exempel `SE` eller `US` för marknad och ISO 8601 för tidsstämpel
 
 En handelsduell behöver som standard **51 observationer** i en och samma serie. Det motsvarar förhandsvisningen plus tillräckligt med observationer för 115 sekunders uppspelning. Om du ändrar uppspelningshastigheten behöver varje handelsduell `MATCH_PREVIEW_BARS + ceil(115 / MARKET_TICK_SECONDS)` observationer. En rankad Ritduell behöver minst `MATCH_PREVIEW_BARS + 8` observationer. Intradagsfönster bryts vid luckor. Dagliga och veckovisa serier kan passera stängda handelsdagar, upp till det nominella intervallet plus sex kalenderdagar mellan två observationer.
 
-Ritduellen prioriterar fönster med kursrörelser åt båda håll och där den senaste trenden ofta hjälper spelaren att komma närmare facit. När underlaget räcker kan grafen visa var tredje stängningskurs. Grafen visar då det längre intervallet, till exempel `3m` för minutdata.
+Ritduellen föredrar perioder med tydliga kursrörelser och lottar bland lämpliga startpunkter. När underlaget räcker kan grafen visa var tredje stängningskurs. Grafen visar då det längre intervallet, till exempel `3d` för dagskurser.
 
 Importera med projektets virtuella miljö aktiv.
 
