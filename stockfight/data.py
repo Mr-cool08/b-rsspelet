@@ -1,13 +1,16 @@
-"""SQLite models, rating reads, and completed-match persistence."""
+"""Database models, rating reads, and completed-match persistence."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import and_, func, inspect
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy import and_, create_engine, func, inspect
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session, aliased
+from sqlalchemy.pool import NullPool
 from sqlalchemy.types import Text, TypeDecorator
 
 from .market_data import (
@@ -49,8 +52,12 @@ __all__ = [
 db = SQLAlchemy()
 
 
+def _insert_for_dialect(dialect_name: str):
+    return {"postgresql": postgresql_insert, "sqlite": sqlite_insert}[dialect_name]
+
+
 class ExactDecimal(TypeDecorator[Decimal]):
-    """Use SQLite TEXT affinity to round-trip decimal values exactly."""
+    """Store decimals as text to round-trip their values exactly."""
 
     impl = Text
     cache_ok = True
@@ -182,10 +189,16 @@ class MarketData(db.Model):
     )
 
 
-def initialize_database() -> None:
-    with db.engine.begin() as connection:
-        # SQLite must acquire the write lock before inspecting the schema.
-        connection.exec_driver_sql("BEGIN IMMEDIATE")
+def initialize_database(schema_url: URL | None = None) -> None:
+    engine = db.engine
+    if schema_url is not None and schema_url != engine.url:
+        engine = create_engine(schema_url, poolclass=NullPool)
+    with engine.begin() as connection:
+        # Serialize schema inspection and creation across overlapping starts.
+        if connection.dialect.name == "postgresql":
+            connection.exec_driver_sql("SELECT pg_advisory_xact_lock(hashtext('stockfight_schema'))")
+        else:
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
         db.metadata.create_all(connection)
         columns = inspect(connection).get_columns(TradeHistory.__tablename__)
         if not any(column["name"] == "side" for column in columns):
@@ -238,7 +251,7 @@ def profile(user_id: int, mode: str = "ranked") -> dict:
         .where(MatchResult.user_id == user_id, Match.mode == mode)
         .subquery()
     )
-    # Read Elo and history from the same SQLite snapshot.
+    # Read Elo and history in one statement for a consistent snapshot.
     rows = db.session.execute(
         db.select(PlayerRating, history)
         .select_from(User)
@@ -290,7 +303,9 @@ def save_match(
     if not 1 <= engine_match.revealed_count <= len(scenario.bars):
         raise ValueError("A completed match must have a valid revealed market period")
 
-    claim = insert(Match).values(
+    engine = db.engine
+    dialect_name = engine.dialect.name
+    claim = _insert_for_dialect(dialect_name)(Match).values(
         id=engine_match.id,
         mode=mode,
         player1_id=first_id,
@@ -309,16 +324,31 @@ def save_match(
         winner_id=winner_id,
     ).on_conflict_do_nothing(index_elements=[Match.id])
 
-    with Session(db.engine) as session, session.begin():
-        # Claim this ID before any read. SQLite serializes writers, which also
-        # protects rating updates when different matches share a participant.
-        if session.execute(claim).rowcount == 0:
+    with Session(engine) as session, session.begin():
+        if dialect_name == "postgresql":
+            # Lock users in ID order to serialize shared participants, including
+            # when a player has no rating row yet. Allow foreign-key checks.
+            participant_ids = {first_id, second_id}
+            registered_ids = session.scalars(
+                db.select(User.id)
+                .where(User.id.in_(participant_ids))
+                .order_by(User.id)
+                .with_for_update(key_share=True)
+            )
+            if set(registered_ids) != participant_ids:
+                raise ValueError("Match participants must be registered users")
+
+            claimed = session.scalar(claim.returning(Match.id)) is not None
+        else:
+            # In SQLite the insert also locks other writers.
+            claimed = session.execute(claim).rowcount != 0
+        if not claimed:
             saved = session.scalars(db.select(MatchResult).where(MatchResult.match_id == engine_match.id))
             return {row.user_id: {"eloBefore": row.elo_before, "eloAfter": row.elo_after} for row in saved}
 
         ratings = []
         for user_id in (first_id, second_id):
-            if session.get(User, user_id) is None:
+            if dialect_name == "sqlite" and session.get(User, user_id) is None:
                 raise ValueError("Match participants must be registered users")
             rating = session.get(PlayerRating, (user_id, mode))
             if rating is None:

@@ -1,6 +1,6 @@
 # Stock Fight
 
-Stock Fight är ett mobilanpassat spel med två rankade lägen. I Handelsduell handlar båda samma aktie med 1 000 virtuella krediter och börjar med 100 HP. En vinstaffär kan användas till **Attack** för att skada motståndaren eller **Grow** för att öka kapitalet och ladda nästa attack. I Ritduell tävlar spelarna om att komma närmast nästa kursrörelse. Handelsduell går även att spela privat med en vän eller mot en bot. Ritduell har en övning för en spelare. Elo och avslutade rankade matcher sparas i SQLite.
+Stock Fight är ett mobilanpassat spel med två rankade lägen. I Handelsduell handlar båda samma aktie med 1 000 virtuella krediter och börjar med 100 HP. En vinstaffär kan användas till **Attack** för att skada motståndaren eller **Grow** för att öka kapitalet och ladda nästa attack. I Ritduell tävlar spelarna om att komma närmast nästa kursrörelse. Handelsduell går även att spela privat med en vän eller mot en bot. Ritduell har en övning för en spelare. Elo och avslutade rankade matcher sparas i SQLite lokalt eller i PostgreSQL på Render.
 
 ## Spela lokalt
 
@@ -24,50 +24,29 @@ python3 -m venv .venv
 
 Öppna [Stock Fight på localhost](http://127.0.0.1:8080) och registrera ett konto. Välj **Spela mot bot** för en träningsmatch. För Ranked, öppna spelet i två separata webbläsarprofiler eller på två enheter, logga in med varsitt konto och tryck **PLAY** på båda. Spelet skapar SQLite-filen i `instance/` och importerar medföljande, tydligt markerad syntetisk minutdata under första starten.
 
+- Före den första botduellen kan du prova Attack och Grow på en exempelaffär. Öppna **Så spelar du** för att starta guiden igen.
 - **Spela med en vän** skapar en länk till en orankad Handelsduell. Länken fungerar en gång inom 15 minuter. Värden behöver vara ansluten när gästen bekräftar. Efter matchen kan båda tacka ja till revansch inom 15 minuter. Spela från samma lokalnätsadress eller publika adress om ni använder olika enheter.
 - **Spela ritduell** öppnar en separat rankad kö med egen Elo. Dra till höger i grafen eller ange en procentuell kursrörelse i fältet och lås prognosen.
 - **Öva ritduell** går igenom tre rundor på en kurva med syntetiska priser. Lås prognosen för att se facit och din avvikelse. Gå vidare när du är redo.
 
 För att spela från två mobiler på samma nätverk, sätt `STOCK_FIGHT_DEV_HOST=0.0.0.0` i `.env` före start. Öppna datorns lokala IP-adress med port 8080 från båda mobilerna.
 
-## Spela via ngrok utan Docker
-
-Installera [ngrok för Windows](https://ngrok.com/download/windows) om klienten saknas. Kopiera din [authtoken från ngroks kontrollpanel](https://dashboard.ngrok.com/get-started/your-authtoken) till raden `NGROK_AUTHTOKEN=` i projektets `.env`.
-
-Starta spelet från projektmappen i PowerShell med sessionskakor för HTTPS.
-
-```powershell
-$env:SESSION_COOKIE_SECURE = '1'
-$env:STOCK_FIGHT_DEV_HOST = '127.0.0.1'
-.\.venv\Scripts\python.exe run.py
-```
-
-Starta tunneln från projektmappen i ett andra PowerShell-fönster. Skriptet läser token och port från `.env`.
-
-```powershell
-.\.venv\Scripts\python.exe run_ngrok.py
-```
-
-Dela HTTPS-adressen som ngrok visar under **Forwarding**. Båda spelarna öppnar samma länk, loggar in med varsitt konto och trycker på **PLAY**. Om `INVITE_CODE` är satt behöver nya spelare koden för att registrera sig. Låt båda terminalfönstren vara igång medan ni spelar.
-
-## Kör spelet och ngrok med Docker Compose
+## Kör spelet med Docker Compose
 
 1. Kopiera `.env.example` till `.env` om filen saknas.
 2. Skapa vid behov ett värde med `python -c "import secrets; print(secrets.token_hex(32))"` och lägg det i `SECRET_KEY`. Sätt `INVITE_CODE` om registrering ska kräva en kod.
-3. Fyll i `NGROK_AUTHTOKEN` från [ngroks kontrollpanel](https://dashboard.ngrok.com/get-started/your-authtoken) och sätt `SESSION_COOKIE_SECURE=1` för HTTPS.
-4. Stoppa en eventuell manuell spelserver och ngrok-tunnel och starta båda tjänsterna från projektmappen.
+3. Stoppa en eventuell manuell spelserver som använder samma port och starta tjänsten från projektmappen.
 
 ```bash
 docker compose up --build -d
 docker compose ps
-docker compose logs --tail=20 ngrok
 ```
 
-Dela HTTPS-adressen som ngrok visar i loggen för `started tunnel`. Compose startar tunneln när spelets hälsokontroll lyckas. Båda containrarna startar igen när Docker startar, om de lämnades igång.
+Öppna [Stock Fight på localhost](http://127.0.0.1:8080). På andra enheter i samma nätverk använder du datorns lokala IP-adress och porten som anges i `STOCK_FIGHT_PORT` (standard 8080).
 
-Compose-projektet heter `stock-fight-app`. Konton, Elo, marknadsdata och historik ligger i den namngivna volymen för projektet. `docker compose down` stoppar tjänsterna och behåller volymen.
+Compose-projektet heter `stock-fight-app`. Med standardinställningen ligger konton, Elo, marknadsdata och historik i projektets namngivna SQLite-volym. `docker compose down` stoppar tjänsten och behåller volymen. Vill du ansluta Compose på din dator till Render Postgres, sätt `DATABASE_URL` i `.env` till databasens externa anslutningssträng. [Externa anslutningar till Render Postgres](https://render.com/docs/postgresql-creating-connecting#external-connections)
 
-Gunicorn kör exakt en trådad serverprocess med WebSocket-stöd via Flask-SocketIO och simple-websocket. Aktiva matcher och kön ligger i den processen och försvinner vid omstart. Färdigspelade Ranked-matcher och Elo ligger i SQLite.
+Gunicorn kör exakt en trådad serverprocess med WebSocket-stöd via Flask-SocketIO och simple-websocket. Aktiva matcher och kön ligger i den processen och försvinner vid omstart.
 
 ### Konfiguration
 
@@ -78,17 +57,38 @@ Gunicorn kör exakt en trådad serverprocess med WebSocket-stöd via Flask-Socke
 | `STOCK_FIGHT_PORT` | Extern port. Standard 8080. |
 | `STOCK_FIGHT_BIND` | Bindningsadress för Compose. Standard `0.0.0.0`. |
 | `STOCK_FIGHT_DEV_HOST` | Bindningsadress för lokal utvecklingsserver. Standard `127.0.0.1`. |
-| `SESSION_COOKIE_SECURE` | Använd `1` när spelarna ansluter via HTTPS. |
-| `NGROK_AUTHTOKEN` | Token som ngrok använder för att öppna tunneln. |
+| `SESSION_COOKIE_SECURE` | Standard `0` för HTTP. Använd `1` när spelarna ansluter via HTTPS. |
 | `AUTO_SEED_DEMO` | `1` importerar medföljande syntetiska data automatiskt. |
 | `ALLOW_SYNTHETIC` | `0` kräver en spelbar importerad verklig serie. |
 | `MARKET_TICK_SECONDS` | Sekunder per historisk stapel. Standard `3`. |
 | `MATCH_PREVIEW_BARS` | Antal staplar i förhandsvisningen. Standard `12`. |
-| `DATABASE_URL` | Lokal SQLite-anslutning. Standard `sqlite:///stockfight.sqlite3` i `instance/`. Compose anger sin egen väg. |
+| `DATABASE_URL` | Direkt PostgreSQL-anslutning för tabellinitiering, eller SQLite-adress. Utan databasadress använder appen `sqlite:///stockfight.sqlite3` i `instance/`. |
+| `DATABASE_URL_POOLED` | Valfri poolad PostgreSQL-anslutning för spelets löpande databasfrågor. |
+
+Om du anger bara en av anslutningssträngarna används den både vid tabellinitiering och medan spelet körs.
+
+## Publicera på Render med Render Postgres
+
+1. Öppna din PostgreSQL-databas i Render. Välj **Connect → Internal** och kopiera hela **Internal Database URL**. [Anslut till Render Postgres](https://render.com/docs/postgresql-creating-connecting#internal-connections)
+2. Öppna spelets **Web Service** eller skapa den i samma region och arbetsyta som databasen. För en ny tjänst väljer du projektets Git-repo, **Docker** och **Free**. Låt Render bygga projektets `Dockerfile` och använda dess startkommando. Ange `/healthz` som hälsokontrollens sökväg. [Renders privata nätverk](https://render.com/docs/private-network) · [Docker på Render](https://render.com/docs/docker) · [Render Health Checks](https://render.com/docs/health-checks)
+3. Lägg till följande miljövariabler i Render.
+
+   | Variabel | Värde |
+   | --- | --- |
+   | `DATABASE_URL` | Databasens **Internal Database URL**. |
+   | `SECRET_KEY` | Ett slumpvärde som du behåller mellan driftsättningar. Skapa ett med `python -c "import secrets; print(secrets.token_hex(32))"`. |
+   | `SESSION_COOKIE_SECURE` | `1` |
+   | `PORT` | `8000`, samma port som Gunicorn använder i `Dockerfile`. |
+
+   Ta bort `DATABASE_URL_POOLED` från webbtjänsten om den är satt sedan tidigare. Då används `DATABASE_URL` både vid tabellinitiering och när spelet körs.
+
+4. Driftsätt spelet. Vid start skapar spelet tabellerna och importerar som standard de medföljande demokurserna. Registrera ett testkonto, välj **Manual Deploy → Restart service** i Render och logga sedan in med samma konto för att kontrollera att det sparats. [Starta om en Render-tjänst](https://render.com/docs/deploys#restarting-a-service)
+
+Render kan pausa spelet vid inaktivitet, så det första besöket efter en paus kan ta längre tid. Konton, Elo, färdigspelade rankade matcher och importerade kurser ligger kvar i PostgreSQL när webbtjänsten startar om. Om databasen använder Renders gratisplan förfaller den 30 dagar efter att den skapats. Vill du ta med befintliga konton och resultat behöver du föra över dem från SQLite separat. [Render Free](https://render.com/docs/free#30-day-limit)
 
 ## Importera verkliga kurser
 
-Kursfiler med verkliga svenska och amerikanska aktier importeras lokalt. Använd data som du har rätt att använda på din server och visa för dina spelare. Den medföljande CSV-filen innehåller påhittade instrument och kurser för utveckling och provspel. Matchningen väljer i första hand bland spelbara verkliga serier när sådana har importerats.
+Kursfiler med verkliga svenska och amerikanska aktier importeras från en lokal fil till den konfigurerade databasen. Använd data som du har rätt att använda på din server och visa för dina spelare. Den medföljande CSV-filen innehåller påhittade instrument och kurser för utveckling och provspel. Matchningen väljer i första hand bland spelbara verkliga serier när sådana har importerats.
 
 Spara filen som kommaavgränsad UTF-8 med följande kolumnrubriker. `name` är valfri.
 
@@ -98,7 +98,7 @@ symbol,market,timestamp,open,high,low,close,volume,name
 
 Använd till exempel `SE` eller `US` för marknad och ISO 8601 för tidsstämpeln. Tider utan tidszon tolkas som UTC. Priser använder punkt som decimaltecken. Ange intervallet per import, exempelvis `1m`, `5m`, `1h`, `1d` eller `1w`. En stapel spelas upp per kurstick oavsett historiskt intervall. Flaggan `--synthetic` ska användas för påhittade kurser.
 
-Ett spelbart fönster behöver som standard **51 observationer** i en och samma serie. Det motsvarar förhandsvisningen plus tillräckligt med observationer för 115 sekunders uppspelning. Om du ändrar uppspelningshastigheten behöver varje fönster `MATCH_PREVIEW_BARS + ceil(115 / MARKET_TICK_SECONDS)` observationer. Intradagsfönster bryts vid luckor. Dagliga och veckovisa serier kan passera stängda handelsdagar, upp till det nominella intervallet plus sex kalenderdagar mellan två observationer.
+En handelsduell behöver som standard **51 observationer** i en och samma serie. Det motsvarar förhandsvisningen plus tillräckligt med observationer för 115 sekunders uppspelning. Om du ändrar uppspelningshastigheten behöver varje handelsduell `MATCH_PREVIEW_BARS + ceil(115 / MARKET_TICK_SECONDS)` observationer. En rankad Ritduell behöver `MATCH_PREVIEW_BARS + 8` observationer. Intradagsfönster bryts vid luckor. Dagliga och veckovisa serier kan passera stängda handelsdagar, upp till det nominella intervallet plus sex kalenderdagar mellan två observationer.
 
 Importera med projektets virtuella miljö aktiv.
 
@@ -137,7 +137,7 @@ Om en rad är ogiltig avbryts hela importen och kommandot anger felet. En andra 
 | Botens handelsstrategi | `stockfight/bot.py` |
 | Rankad Ritduell och soloövning | `stockfight/prediction.py`, `stockfight/practice.py` |
 | Socket.IO, kö och matchrum | `stockfight/multiplayer.py` |
-| SQLite, marknadsdata och Elo | `stockfight/data.py`, `stockfight/market_data.py`, `stockfight/ranking.py` |
+| Databas, marknadsdata och Elo | `stockfight/data.py`, `stockfight/market_data.py`, `stockfight/ranking.py` |
 | HTML, CSS, JavaScript och kursgraf | `stockfight/templates/`, `stockfight/static/` |
 
 ```bash

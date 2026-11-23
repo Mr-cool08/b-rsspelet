@@ -297,11 +297,17 @@ class MatchService:
             connection = self._connections.get(sid)
             if not connection:
                 return failure("Logga in igen.")
-            if payload not in (None, {}):
-                return failure("Ogiltig inbjudningsförfrågan.")
             user_id = connection.user_id
-            self._private_invitations.pop(user_id, None)
-            self._send_private(user_id, self.clock())
+            now = self.clock()
+            if payload in (None, {}):
+                self._private_invitations.pop(user_id, None)
+                self._send_private(user_id, now)
+            elif isinstance(payload, dict) and payload.keys() == {"matchId"} and isinstance(payload["matchId"], str):
+                match_id, _ = self._private_rematch_for(user_id, now)
+                if payload["matchId"] == match_id:
+                    self._leave_private(user_id, now)
+            else:
+                return failure("Ogiltig förfrågan.")
             return {"ok": True}
 
     def private_rematch(self, sid, payload):

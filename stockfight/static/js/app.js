@@ -71,6 +71,7 @@
     let drawPredictionChart;
     let predictionRound;
     let predictionCommand;
+    let predictionSubmitFocus = false;
 
     function put(id, value) {
         const element = byId(id);
@@ -162,6 +163,7 @@
         for (const id of screenIds) show(`${id}-screen`, id === name);
         screen = name;
         window.scrollTo(0, 0);
+        if (name === "invite") byId("invite-title").focus({ preventScroll: true });
     }
 
     async function request(url, body) {
@@ -246,6 +248,7 @@
             }
             connection();
             setAuthMode("login");
+            show("auth-invite-note", Boolean(inviteCode));
             activate("auth");
             return;
         }
@@ -441,6 +444,7 @@
             }
             tradeCommand = undefined;
             predictionCommand = undefined;
+            predictionSubmitFocus = false;
             matchSynchronized = false;
             connection("offline");
             renderTradeControls();
@@ -514,26 +518,53 @@
     function startBotMatch(forceGuide = false) {
         if (!session.user || queueWanted || activityCommand) return;
         guideRequested = forceGuide;
+        message("guide-start-error", "");
         sendActivity("bot_start", undefined, (error) => {
             guideRequested = false;
-            toast(error, "error");
+            if (byId("bot-guide-dialog").open) message("guide-start-error", error, "error");
+            else toast(error, "error");
         });
     }
 
     function startPractice() {
         if (queueWanted) return;
-        sendActivity("prediction_practice_start", undefined, (error) => toast(error, "error"));
+        byId("help-dialog").close();
+        sendActivity("prediction_practice_start", undefined, (error) => toast(error, "error"), focusPracticeInput);
     }
 
     function practiceAction(event, payload) {
         if (match?.mode !== "prediction_practice" || !matchSynchronized) return;
-        sendActivity(event, { matchId: match.id, ...payload }, (error) => toast(error, "error"));
+        sendActivity(event, { matchId: match.id, ...payload }, (error) => toast(error, "error"), focusPracticeInput);
+    }
+
+    function focusPracticeInput() {
+        const input = byId("prediction-move");
+        if (screen === "match" && match?.mode === "prediction_practice" && !input.disabled) {
+            input.focus({ preventScroll: true });
+        }
+    }
+
+    function returnToMenu() {
+        resetMatch();
+        activate(inviteCode ? "invite" : "menu");
+        renderPrivate();
+    }
+
+    function leaveResult() {
+        const matchId = result?.id;
+        const leave = () => {
+            if (screen === "result" && result?.id === matchId) returnToMenu();
+        };
+        if (result?.mode === "private" && rematchOffer?.matchId === matchId && socket?.connected) {
+            sendActivity("private_cancel", { matchId }, (error) => toast(error, "error"), leave);
+        } else {
+            leave();
+        }
     }
 
     function receivePracticeEnded(data) {
         if (match?.mode !== "prediction_practice" || result || (data?.id != null && data.id !== match.id)) return;
-        resetMatch();
-        activate("menu");
+        returnToMenu();
     }
 
     function forgetInviteCode() {
@@ -732,6 +763,7 @@
     function openBotGuide() {
         byId("help-dialog").close();
         chooseGuideExample();
+        message("guide-start-error", "");
         openDialog("bot-guide");
     }
 
@@ -1025,6 +1057,7 @@
     function resetPrediction() {
         predictionRound = undefined;
         predictionCommand = undefined;
+        predictionSubmitFocus = false;
         byId("prediction-move").value = "";
         message("prediction-feedback", "");
         drawPredictionChart?.();
@@ -1036,12 +1069,15 @@
             resetPrediction();
             predictionRound = round?.number;
         }
+        const focusNext = round?.phase === "reveal" && match.mode === "prediction_practice" && predictionSubmitFocus;
         if (round?.selfLocked) {
             predictionCommand = undefined;
+            predictionSubmitFocus = false;
             byId("prediction-move").value = predictionInputValue(round.selfMoveBps);
             message("prediction-feedback", "");
         }
         renderPrediction();
+        if (focusNext) byId("practice-next").focus();
     }
 
     function renderPrediction() {
@@ -1120,13 +1156,17 @@
 
         const command = { matchId: match.id, round: match.round.number, moveBps };
         predictionCommand = command;
+        predictionSubmitFocus = event.currentTarget.contains(document.activeElement);
         message("prediction-feedback", "");
         renderPrediction();
         socket.timeout(acknowledgements).emit("prediction_submit", command, (error, ack) => {
             if (predictionCommand !== command || (!error && ack?.ok)) return;
             predictionCommand = undefined;
+            const restoreFocus = predictionSubmitFocus;
+            predictionSubmitFocus = false;
             message("prediction-feedback", ack?.error || "Prognosen kunde inte bekräftas. Försök igen.", "error");
             renderPrediction();
+            if (restoreFocus) byId("prediction-move").focus();
         });
     }
 
@@ -1233,6 +1273,9 @@
         const choosing = ready && Boolean(sellChoice);
         const profitable = sellChoice?.kind === "profit";
         const canOpen = ready && !position && numeric(match?.self?.cash) > 0;
+        const focusedAction = tradeFocus ?? document.activeElement?.dataset.action;
+        if (choosing && profitable && focusedAction === "confirm-close") tradeFocus = "attack";
+        if (choosing && !profitable && ["attack", "grow"].includes(focusedAction)) tradeFocus = "confirm-close";
         disable("buy", !canOpen);
         disable("short", !canOpen);
         disable("sell", !ready || !position || Boolean(sellChoice));
@@ -1357,8 +1400,16 @@
         switch (data.endReason) {
             case "attack": return self ? "Din attack avgjorde matchen." : opponent ? "Motståndarens attack avgjorde matchen." : "Matchen avgjordes av en attack.";
             case "trade_loss": return self ? "Din förlustaffär avslutade matchen." : "Motståndarens förlustaffär avslutade matchen.";
-            case "market_storm": return "Matchen avgjordes i marknadsstormen.";
-            case "final_storm": return "Matchen avgjordes i slutstormen.";
+            case "market_storm":
+            case "final_storm": {
+                const storm = data.endReason === "market_storm" ? "marknadsstormen" : "slutstormen";
+                if (numeric(data.hp) === 0 && numeric(data.opponentHp) === 0) {
+                    const tiebreak = data.outcome === "draw" ? "Ni gjorde lika mycket attackskada."
+                        : "Flest HP i attackskada avgjorde.";
+                    return `Båda slogs ut i ${storm}. ${tiebreak}`;
+                }
+                return `Matchen avgjordes i ${storm}.`;
+            }
             case "knockout": return "Matchen avgjordes genom knockout.";
             case "round_limit": return "Matchen avgjordes av slut-HP efter sista rundan.";
             default: return "";
@@ -1386,13 +1437,14 @@
         show("result-trade-detail", trades.length > 0);
         fillTable("result-trade-list", trades);
 
+        const forecast = (value) => value == null ? "Ingen prognos" : formatPrediction(value);
         const error = (value) => value == null ? "—" : `${formatNumber(value / 100, amountFormat)} procentenheter`;
         const rounds = (data.rounds ?? []).map((round) => {
-            const values = [round.number, formatPrediction(round.actualMoveBps), formatPrediction(round.selfMoveBps), error(round.selfErrorBps)];
+            const values = [round.number, formatPrediction(round.actualMoveBps), forecast(round.selfMoveBps), error(round.selfErrorBps)];
             if (practice) return values;
             const damaged = String(round.winnerId) === String(session.user.id) ? "Motståndaren" : "Du";
             const impact = round.damage ? `${damaged} −${formatNumber(round.damage)} HP` : "0 HP";
-            return [...values, formatPrediction(round.opponentMoveBps), error(round.opponentErrorBps), impact];
+            return [...values, forecast(round.opponentMoveBps), error(round.opponentErrorBps), impact];
         });
         byId("result-round-detail").open = practice;
         show("result-round-detail", rounds.length > 0);
@@ -1452,6 +1504,7 @@
         renderResultDetails(data, practice);
         renderPlayAgain();
         activate("result");
+        if (practice) byId("result-outcome").focus({ preventScroll: true });
         if (!practice) playSound(data.outcome);
         if (mode === "ranked") void refreshProfile();
     }
@@ -1498,7 +1551,7 @@
                 break;
             }
             case "leave-queue": leaveQueue(); break;
-            case "main-menu": resetMatch(); activate("menu"); break;
+            case "main-menu": leaveResult(); break;
             case "ranking":
             case "profile":
             case "help":
@@ -1553,6 +1606,7 @@
         reducedMotion.addEventListener("change", applyEffects);
         applyEffects();
         setAuthMode("login");
+        show("auth-invite-note", Boolean(inviteCode));
         activate("auth");
         authBusy(true);
         try {

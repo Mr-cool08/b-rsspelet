@@ -1,4 +1,4 @@
-"""Import and select historical market data from the local database."""
+"""Import and select historical market data from the database."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Protocol
 from weakref import WeakKeyDictionary
 
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Engine
 
 if TYPE_CHECKING:
@@ -142,7 +141,7 @@ def import_csv(path: str | Path, *, interval: str = "1m", source: str, synthetic
     Reimporting a bar from the same series keeps the value already stored.
     Real CSV data must come from a source the operator is permitted to use.
     """
-    from .data import MarketData, db
+    from .data import MarketData, _insert_for_dialect, db
 
     interval = interval.strip().lower()
     _interval_delta(interval)
@@ -152,11 +151,17 @@ def import_csv(path: str | Path, *, interval: str = "1m", source: str, synthetic
     if not isinstance(synthetic, bool):
         raise ValueError("synthetic måste anges som bool.")
 
+    engine = db.engine
+    dialect = engine.dialect.name
+    insert = _insert_for_dialect(dialect)
     statement = insert(MarketData.__table__).on_conflict_do_nothing(
         index_elements=(*_SERIES_COLUMNS, "synthetic", "timestamp")
     )
+    if dialect == "postgresql":
+        # PostgreSQL bulk inserts need RETURNING to count the non-conflicting rows.
+        statement = statement.returning(MarketData.id)
     inserted = 0
-    with db.engine.begin() as connection, Path(path).open(encoding="utf-8-sig", newline="") as file:
+    with engine.begin() as connection, Path(path).open(encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file, strict=True)
         try:
             columns = [column.strip().lower() for column in reader.fieldnames or ()]
@@ -168,7 +173,8 @@ def import_csv(path: str | Path, *, interval: str = "1m", source: str, synthetic
             reader.fieldnames = columns
             rows = _market_rows(reader, interval=interval, source=source, synthetic=synthetic)
             while batch := list(islice(rows, 500)):
-                inserted += connection.execute(statement, batch).rowcount
+                result = connection.execute(statement, batch)
+                inserted += len(result.fetchall()) if dialect == "postgresql" else result.rowcount
         except csv.Error as exc:
             raise ValueError(f"Ogiltig CSV vid rad {reader.line_num}.") from exc
     return inserted

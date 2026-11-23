@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, session
 from flask_socketio import SocketIO
 from sqlalchemy import select
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -24,12 +25,21 @@ def env_flag(name, default=False):
     return os.getenv(name, "1" if default else "0").lower() in {"1", "true", "yes", "on"}
 
 
+def _database_url(value: str | URL) -> URL:
+    url = make_url(value)
+    if url.drivername in {"postgres", "postgresql"}:
+        return url.set(drivername="postgresql+psycopg")
+    return url
+
+
 def create_app(config=None):
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    direct_url = os.getenv("DATABASE_URL")
+    pooled_url = os.getenv("DATABASE_URL_POOLED")
     app = Flask(__name__)
     app.config.from_mapping(
         SECRET_KEY=os.getenv("SECRET_KEY") or secrets.token_hex(32),
-        SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///stockfight.sqlite3"),
+        SQLALCHEMY_DATABASE_URI=pooled_url or direct_url or "sqlite:///stockfight.sqlite3",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=env_flag("SESSION_COOKIE_SECURE"),
@@ -49,6 +59,17 @@ def create_app(config=None):
     if not 2 <= app.config["MATCH_PREVIEW_BARS"] <= 100:
         raise ValueError("MATCH_PREVIEW_BARS måste vara mellan 2 och 100.")
 
+    database_url = _database_url(app.config["SQLALCHEMY_DATABASE_URI"])
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    if database_url.get_backend_name() == "postgresql":
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "pool_pre_ping": True,
+            **app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {}),
+        }
+    schema_url = None
+    if direct_url and pooled_url and (config is None or "SQLALCHEMY_DATABASE_URI" not in config):
+        schema_url = _database_url(direct_url)
+
     db.init_app(app)
     socketio.init_app(app)
     provider = app.config.get("MATCH_MARKET_PROVIDER")
@@ -57,9 +78,9 @@ def create_app(config=None):
     service = MatchService(app, socketio, provider)
     app.extensions["match_service"] = service
     register_http(app, service)
-    register_cli(app)
+    register_cli(app, schema_url)
     with app.app_context():
-        initialize_database()
+        initialize_database(schema_url)
         if app.config["AUTO_SEED_DEMO"] and app.config["ALLOW_SYNTHETIC"]:
             seed_demo()
     return app
@@ -188,10 +209,10 @@ def register_http(app, service):
         return {"players": leaderboard(mode)}
 
 
-def register_cli(app):
+def register_cli(app, schema_url: URL | None = None):
     @app.cli.command("init-db")
     def init_db():
-        initialize_database()
+        initialize_database(schema_url)
         click.echo("Databasen är klar.")
 
     @app.cli.command("seed-demo")

@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
+import pytest
 from sqlalchemy import func, select
 
 from stockfight.data import Match, MatchResult, PlayerRating, TradeHistory, db
@@ -154,7 +155,8 @@ def test_private_match_is_unranked_and_rematch_requires_both_players(game):
     assert database_counts() == before
 
 
-def test_switching_to_ranked_clears_private_rematch_for_both_players(game):
+@pytest.mark.parametrize("cancel_event", ["queue_join", "private_cancel"])
+def test_leaving_private_rematch_clears_it_for_both_players(game, cancel_event):
     app, _ = game
     host = register(app, "SwitchHost")
     guest = register(app, "SwitchGuest")
@@ -162,7 +164,9 @@ def test_switching_to_ranked_clears_private_rematch_for_both_players(game):
     assert guest.emit("private_join", {"code": code})["ok"]
     match_id = host.state()["id"]
     advance(game, 130)
-    assert private_state(guest)["rematch"]["matchId"] == match_id
-    assert host.emit("queue_join")["ok"]
+    payload = {"matchId": match_id}
+    assert host.emit("private_rematch", payload)["ok"]
+    assert private_state(guest)["rematch"]["opponentAccepted"]
+    assert host.emit(cancel_event, payload if cancel_event == "private_cancel" else None)["ok"]
     assert private_state(guest)["rematch"] is None
-    assert not guest.emit("private_rematch", {"matchId": match_id})["ok"]
+    assert not guest.emit("private_rematch", payload)["ok"]

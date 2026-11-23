@@ -34,6 +34,7 @@
                 <div class="intro-copy">
                     <h1>Börsduell<br><em>i realtid.</em></h1>
                     <p>Handla med virtuella pengar mot en annan spelare eller en bot.</p>
+                    <p id="auth-invite-note" hidden>Logga in eller skapa ett konto för att öppna din vänduell.</p>
                 </div>
                 <div class="intro-chart" aria-hidden="true">
                     <span></span><span></span><span></span><span></span><span></span><span></span>
@@ -162,7 +163,7 @@
 
         <section id="invite-screen" class="screen queue-screen" aria-labelledby="invite-title" hidden>
             <div class="queue-card invite-card panel">
-                <h1 id="invite-title" class="screen-title">Vänduell</h1>
+                <h1 id="invite-title" class="screen-title" tabindex="-1">Vänduell</h1>
                 <p id="invite-status" class="invite-status" role="status"></p>
                 <label id="invite-share" class="field" hidden>
                     <span>Inbjudningslänk</span>
@@ -308,7 +309,7 @@
                 <div class="result-hero">
                     <div>
                         <p id="result-mode" class="eyebrow">Matchresultat</p>
-                        <h1 id="result-outcome" class="result-title">—</h1>
+                        <h1 id="result-outcome" class="result-title" tabindex="-1">—</h1>
                     </div>
                     <div id="result-elo" class="elo-summary">
                         <span class="eyebrow">Elo</span>
@@ -350,7 +351,7 @@
                     <summary>Dina affärer</summary>
                     <div class="table-wrap" tabindex="0" aria-label="Dina affärer">
                         <table>
-                            <thead><tr><th scope="col">Tid</th><th scope="col">Position</th><th scope="col">Avslut</th><th scope="col">Resultat</th><th scope="col">Skada</th></tr></thead>
+                            <thead><tr><th scope="col">Tid</th><th scope="col">Position</th><th scope="col">Avslut</th><th scope="col">Kursvinst/förlust</th><th scope="col">Skada</th></tr></thead>
                             <tbody id="result-trade-list"></tbody>
                         </table>
                     </div>
@@ -393,7 +394,7 @@
 
     <dialog id="bot-guide-dialog" class="game-dialog" aria-labelledby="bot-guide-title">
         <div class="dialog-header">
-            <h2 id="bot-guide-title" class="card-title">Din första handelsduell</h2>
+            <h2 id="bot-guide-title" class="card-title">Prova Attack och Grow</h2>
             <button class="close-button" type="button" data-action="close-dialog" aria-label="Stäng introduktionen">×</button>
         </div>
         <div class="help-content">
@@ -408,6 +409,7 @@
                 <button class="button button-primary" type="button" data-action="guide-begin">Starta guidad botduell</button>
                 <button class="button button-secondary" type="button" data-action="guide-bypass">Hoppa över guiden</button>
             </div>
+            <p id="guide-start-error" class="form-error" role="alert" hidden></p>
         </div>
     </dialog>
 

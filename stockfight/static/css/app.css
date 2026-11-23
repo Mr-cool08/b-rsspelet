@@ -42,7 +42,7 @@ body {
 button, input, select { font: inherit; }
 button { cursor: pointer; touch-action: manipulation; }
 button:disabled { cursor: default; }
-button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 3px;
 }
@@ -1068,6 +1068,8 @@ a { color: inherit; }
 .help-content { display: grid; justify-items: start; gap: 9px; }
 .help-content h3:not(:first-child) { margin-top: 10px; }
 .help-content p { color: var(--muted); line-height: 1.5; }
+.help-content [data-tone="error"] { color: var(--danger); }
+.help-content [aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
 .table-wrap { overflow: auto; border-radius: 6px; }
 
 table {

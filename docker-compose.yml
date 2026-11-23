@@ -7,12 +7,13 @@ services:
     environment:
       SECRET_KEY: "${SECRET_KEY:?Ange SECRET_KEY i .env}"
       INVITE_CODE: "${INVITE_CODE:-}"
-      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-1}"
+      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-0}"
       AUTO_SEED_DEMO: "${AUTO_SEED_DEMO:-1}"
       ALLOW_SYNTHETIC: "${ALLOW_SYNTHETIC:-1}"
       MARKET_TICK_SECONDS: "${MARKET_TICK_SECONDS:-3}"
       MATCH_PREVIEW_BARS: "${MATCH_PREVIEW_BARS:-12}"
-      DATABASE_URL: sqlite:////app/instance/stockfight.sqlite3
+      DATABASE_URL: "${DATABASE_URL:-}"
+      DATABASE_URL_POOLED: "${DATABASE_URL_POOLED:-}"
     volumes:
       - stock-fight-data:/app/instance
       - ./data/imports:/app/imports:ro
@@ -22,14 +23,5 @@ services:
       interval: 15s
       timeout: 3s
       retries: 3
-  ngrok:
-    image: ngrok/ngrok:latest
-    command: ["http", "http://game:8000", "--log=stdout"]
-    environment:
-      NGROK_AUTHTOKEN: "${NGROK_AUTHTOKEN:?Ange NGROK_AUTHTOKEN i .env}"
-    depends_on:
-      game:
-        condition: service_healthy
-    restart: unless-stopped
 volumes:
   stock-fight-data:
