@@ -7,3 +7,4 @@ instance/
 *.sqlite3*
 data/imports/*
 !data/imports/.gitkeep
+/.mypy_cache/*
