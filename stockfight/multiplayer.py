@@ -26,6 +26,7 @@ TRADE_FIELDS = {
     "short": {"percent"},
     "sell": set(),
     "confirm_sell": {"choice", "positionId"},
+    "buy_regeneration": set(),
 }
 RESULT_RETENTION = 900
 PRIVATE_INVITE_SECONDS = 900

@@ -10,6 +10,11 @@ from uuid import uuid4
 from .ranking import K_FACTOR
 
 
+REGENERATION_DURATION = 20
+REGENERATION_INTERVAL = 5
+REGENERATION_HEALING = 2
+
+
 @dataclass(frozen=True, slots=True)
 class Bar:
     timestamp: datetime
@@ -53,6 +58,7 @@ class GameMode:
     final_storm_damage: int = 4
     rating_k: int = K_FACTOR
     loss_multiplier: Decimal = Decimal("2")
+    regeneration_cost: Decimal | None = None
 
     @property
     def scenario_seconds(self) -> int:
@@ -88,8 +94,8 @@ class GameMode:
         return True, None, None
 
 
-RANKED = GameMode(key="ranked")
-BOT = replace(RANKED, key="bot")
+RANKED = GameMode(key="ranked", regeneration_cost=Decimal("10"))
+BOT = replace(RANKED, key="bot", regeneration_cost=None)
 PRIVATE = replace(RANKED, key="private")
 
 
@@ -118,6 +124,19 @@ class Position:
 
 
 @dataclass(slots=True)
+class Regeneration:
+    started_at: float
+    ticks: int = 0
+
+    @property
+    def next_tick_at(self) -> float:
+        return self.started_at + (self.ticks + 1) * REGENERATION_INTERVAL
+
+    def remaining(self, now: float) -> int:
+        return max(0, ceil(REGENERATION_DURATION - (now - self.started_at)))
+
+
+@dataclass(slots=True)
 class PlayerState:
     name: str
     cash: Decimal
@@ -130,6 +149,7 @@ class PlayerState:
     trades: int = 0
     winning_trades: int = 0
     losing_trades: int = 0
+    regeneration: Regeneration | None = None
 
     @property
     def capital(self) -> Decimal:
@@ -205,20 +225,29 @@ class Match:
         previous_second = int(self.duration)
         previous_bars = self.revealed_count
         previous_storm_tick = self._next_storm_second
+        regeneration_ticked = False
         while True:
-            bar_second = inf
+            bar_at = inf
             if self.revealed_count < len(self.scenario.bars):
                 bar_number = self.revealed_count - self.scenario.preview_count + 1
-                bar_second = float(bar_number * self._tick_seconds)
-            due = min(bar_second, self._next_storm_second)
-            if self._starts_at + due > now:
+                bar_at = self._starts_at + float(bar_number * self._tick_seconds)
+            storm_at = self._starts_at + self._next_storm_second
+            regeneration_at = min(
+                (player.regeneration.next_tick_at for player in self.players.values() if player.regeneration),
+                default=inf,
+            )
+            due = min(bar_at, storm_at, regeneration_at)
+            if due > now:
                 break
 
-            if bar_second == due:
+            if bar_at == due:
                 self.revealed_count += 1
-            if self._next_storm_second == due:
-                self.duration = float(due)
-                self._apply_storm(int(due))
+            if regeneration_at == due:
+                self._apply_regeneration(due)
+                regeneration_ticked = True
+            if storm_at == due:
+                self.duration = float(self._next_storm_second)
+                self._apply_storm(self._next_storm_second)
                 self._next_storm_second += 1
                 if self.status == "finished":
                     return True
@@ -229,6 +258,12 @@ class Match:
             or int(self.duration) != previous_second
             or self.revealed_count != previous_bars
             or self._next_storm_second != previous_storm_tick
+            or regeneration_ticked
+            or any(
+                regeneration.remaining(now) != regeneration.remaining(previous_now)
+                for player in self.players.values()
+                if (regeneration := player.regeneration) is not None
+            )
         )
 
     def act(self, user_id: int, action: str, data: dict, now: float) -> dict:
@@ -236,6 +271,9 @@ class Match:
         self.advance(now)
         if self.status != "active":
             raise RuleError("Matchen är inte aktiv.")
+        if action == "buy_regeneration":
+            self._buy_regeneration(player)
+            return {}
         if action not in self.mode.allowed_actions:
             raise RuleError("Åtgärden är inte tillgänglig i spelläget.")
 
@@ -278,6 +316,28 @@ class Match:
         invested = player.cash * (Decimal(percent) / 100)
         player.position = Position(uuid4().hex, price, invested, invested / price, self.duration, side=side)
         player.cash -= invested
+
+    def _buy_regeneration(self, player: PlayerState) -> None:
+        cost = self.mode.regeneration_cost
+        if cost is None:
+            raise RuleError("Åtgärden är inte tillgänglig i spelläget.")
+        if player.regeneration is not None:
+            raise RuleError("Regenerering är redan aktiv.")
+        if player.cash < cost:
+            raise RuleError("Du har inte tillräckligt med pengar.")
+
+        player.cash -= cost
+        player.regeneration = Regeneration(self._now)
+
+    def _apply_regeneration(self, now: float) -> None:
+        for player in self.players.values():
+            regeneration = player.regeneration
+            if regeneration is None or regeneration.next_tick_at != now:
+                continue
+            player.hp = min(self.mode.starting_hp, player.hp + REGENERATION_HEALING)
+            regeneration.ticks += 1
+            if regeneration.ticks * REGENERATION_INTERVAL >= REGENERATION_DURATION:
+                player.regeneration = None
 
     def _attack_damage(self, player: PlayerState, target: PlayerState, profit: Decimal) -> int:
         base_damage = min(self.mode.base_attack_cap, profit * self.mode.attack_multiplier)
@@ -462,7 +522,7 @@ class Match:
                 "pnl": format(profit, "f"),
                 "closePreview": self._close_preview(position, player, opponent, profit),
             }
-        return {
+        state = {
             **self._shared_state(now),
             "self": {
                 "id": user_id,
@@ -484,6 +544,18 @@ class Match:
                 "growBonus": opponent.grow_bonus,
             },
         }
+        if self.mode.regeneration_cost is not None:
+            state["regeneration"] = {
+                "cost": format(self.mode.regeneration_cost, "f"),
+                "duration": REGENERATION_DURATION,
+                "interval": REGENERATION_INTERVAL,
+                "healing": REGENERATION_HEALING,
+            }
+            state["self"]["regenerationRemaining"] = (
+                player.regeneration.remaining(self._now)
+                if self.status == "active" and player.regeneration is not None else 0
+            )
+        return state
 
     def spectator_state(self, now: float) -> dict:
         state = self._shared_state(now)

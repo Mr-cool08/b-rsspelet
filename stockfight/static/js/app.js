@@ -1,7 +1,7 @@
 (() => {
     "use strict";
 
-    const { t, getLocale } = window.StockFightI18n;
+    const { t, getLocale, formatCurrency } = window.StockFightI18n;
     const byId = (id) => document.getElementById(id);
     const buttons = (action) => document.querySelectorAll(`[data-action="${action}"]`);
     const positionDirection = (position) => position.side === "short" ? t("Ner") : t("Upp");
@@ -23,12 +23,12 @@
         "guide-begin", "guide-bypass", "friend-create", "main-menu", "spectate"];
     const tutorialSteps = 4;
     const tutorialDirectionFeedback = {
-        up: "100 ↗ 104 · +5 krediter",
-        down: "100 ↘ 96 · +5 krediter",
+        up: "100 ↗ 104 · +$5",
+        down: "100 ↘ 96 · +$5",
     };
     const tutorialProfitFeedback = {
-        attack: "Motståndare −20 HP · 500 krediter kvar",
-        grow: "505 krediter · 102 % attackkraft · +25 bonus-HP",
+        attack: "Motståndare −20 HP · $500 kvar",
+        grow: "$505 · 102 % attackkraft · +25 bonus-HP",
     };
     const localizedValues = new Map();
 
@@ -643,7 +643,9 @@
             queueCommand = undefined;
             setActivityCommand(undefined);
             if (tradeCommand) {
-                message("match-feedback", "Anslutningen bröts under handeln. Kontrollera din position när du är tillbaka.");
+                const feedback = tradeCommand.action === "buy_regeneration" ? "Köpet av regenerering kunde inte bekräftas."
+                    : "Anslutningen bröts under handeln. Kontrollera din position när du är tillbaka.";
+                message("match-feedback", feedback);
             }
             tradeCommand = undefined;
             predictionCommand = undefined;
@@ -873,7 +875,7 @@
             const prefix = `spectate-${side}`;
             health(prefix, player);
             show(`${prefix}-capital-row`, !prediction);
-            put(`${prefix}-capital`, formatNumber(player.capital, amountFormat));
+            put(`${prefix}-capital`, formatCurrency(player.capital));
             const active = prediction ? data.round.phase === "predict" && player.locked : player.hasPosition;
             show(`${prefix}-activity`, active && !spectateFinished);
             putLocalized(`${prefix}-activity`, prediction ? "Prognos låst" : "Öppen position");
@@ -1340,6 +1342,7 @@
         setPercent(100);
         matchChart.reset();
         show("sell-choice", false);
+        show("regeneration-shop", false);
     }
 
     function health(prefix, player) {
@@ -1828,6 +1831,7 @@
         show("prediction-chart", prediction);
         renderGuide();
         if (prediction) {
+            show("regeneration-shop", false);
             show("match-chart-status", false);
             if (syncRound) syncPredictionRound();
             else {
@@ -1838,19 +1842,19 @@
         }
         const position = data.self?.position;
         const attackPower = numeric(data.self?.attackPower);
-        put("self-capital", formatNumber(data.self?.capital, amountFormat));
-        put("opponent-capital", formatNumber(data.opponent?.capital, amountFormat));
+        put("self-capital", formatCurrency(data.self?.capital));
+        put("opponent-capital", formatCurrency(data.opponent?.capital));
         put("self-attack-power", percentage(attackPower));
         stateAttribute("self-attack-power", "sign", sign((attackPower ?? 100) - 100));
-        put("match-cash", formatNumber(data.self?.cash, amountFormat));
-        put("match-invested", formatNumber(position?.invested ?? 0, amountFormat));
+        put("match-cash", formatCurrency(data.self?.cash));
+        put("match-invested", formatCurrency(position?.invested ?? 0));
         put("match-grow", formatNumber(data.self?.growBonus));
         stateAttribute("grow-stat", "charged", String(data.self?.growBonus > 0));
         const directionArrow = position?.side === "short" ? "↘" : "↗";
         put("match-direction", position ? `${directionArrow} ${positionDirection(position)}` : null);
         stateAttribute("match-direction", "side", position?.side ?? "");
         put("match-entry", formatNumber(position?.entryPrice, amountFormat));
-        put("match-pnl", signed(position?.pnl, amountFormat));
+        put("match-pnl", formatCurrency(position?.pnl, { signed: true }));
         stateAttribute("match-pnl", "sign", sign(numeric(position?.pnl)));
         matchChart.update(data.bars, position);
         renderTradeControls();
@@ -1875,13 +1879,29 @@
     function renderStake() {
         const cash = numeric(match?.self?.cash);
         for (const stake of [25, 50, 75, 100]) {
-            put(`stake-${stake}`, cash == null ? "—" : formatNumber(cash * stake / 100, amountFormat));
+            put(`stake-${stake}`, cash == null ? "—" : formatCurrency(cash * stake / 100));
         }
     }
 
     function tradeReady() {
         return Boolean(socket?.connected && matchSynchronized && match?.status === "active" && !tradeCommand
             && !result && nextSeq != null && (sellChoice || Number(match.nextSeq) >= nextSeq));
+    }
+
+    function renderRegeneration(ready) {
+        const offer = match?.regeneration;
+        show("regeneration-shop", Boolean(offer));
+        if (!offer) return;
+        const remaining = numeric(match.self?.regenerationRemaining) ?? 0;
+        const active = remaining > 0;
+        stateAttribute("regeneration-shop", "active", String(active));
+        put("regeneration-description", t("Återställer {healing} HP var {interval}:e sekund i {duration} sekunder.", {
+            healing: formatNumber(offer.healing), interval: formatNumber(offer.interval), duration: formatNumber(offer.duration),
+        }));
+        put("regeneration-buy", active
+            ? t("Aktiv · {remaining} s", { remaining: formatNumber(remaining) })
+            : t("Köp regenerering · {price}", { price: formatCurrency(offer.cost, { decimals: 0 }) }));
+        disable("buy-regeneration", !ready || active || numeric(match.self?.cash) < numeric(offer.cost));
     }
 
     function visibleSellChoice() {
@@ -1899,6 +1919,7 @@
 
     function renderTradeControls() {
         const ready = tradeReady();
+        renderRegeneration(ready);
         const position = match?.self?.position;
         const preview = visibleSellChoice();
         const choosing = ready && Boolean(preview);
@@ -1927,15 +1948,15 @@
             let hint = "";
             if (profitable) {
                 put("attack-preview", t("{damage} HP skada", { damage: formatNumber(preview.attackDamage) }));
-                put("grow-preview", t("{credits} krediter · {bonus} bonus-HP", {
-                    credits: signed(preview.growCredits, amountFormat), bonus: formatNumber(preview.growBonus),
+                put("grow-preview", t("{amount} · {bonus} bonus-HP", {
+                    amount: formatCurrency(preview.growCredits, { signed: true }), bonus: formatNumber(preview.growBonus),
                 }));
             } else if (preview.kind === "loss") {
-                hint = t("{credits} krediter · {damage} HP", {
-                    credits: signed(-Number(preview.lossCredits), amountFormat), damage: signed(-preview.lossDamage),
+                hint = t("{amount} · {damage} HP", {
+                    amount: formatCurrency(-Number(preview.lossCredits)), damage: signed(-preview.lossDamage),
                 });
             } else {
-                hint = t("±0 krediter");
+                hint = `±${formatCurrency(0, { decimals: 0 })}`;
             }
             put("sell-choice-hint", hint);
         }
@@ -1961,7 +1982,10 @@
             return;
         }
         if (action === "confirm_sell" && !visibleSellChoice()) return;
-        const buttonAction = action === "confirm_sell" && sellChoice?.kind !== "profit" ? "confirm-close" : choice ?? action;
+        const buysRegeneration = action === "buy_regeneration";
+        let buttonAction = choice ?? action;
+        if (action === "confirm_sell" && sellChoice?.kind !== "profit") buttonAction = "confirm-close";
+        if (buysRegeneration) buttonAction = "buy-regeneration";
         const opensPosition = action === "buy" || action === "short";
         const reopenAction = match.self?.position?.side === "short" ? "short" : "buy";
         const restoreFocus = document.activeElement?.dataset.action === buttonAction;
@@ -1981,10 +2005,14 @@
             tradeCommand = undefined;
             if (error || !ack?.ok) {
                 if (restoreFocus) tradeFocus = buttonAction;
-                message("match-feedback", ack?.error || "Handeln kunde inte bekräftas. Kontrollera din position.", "error");
+                const fallback = buysRegeneration ? "Köpet av regenerering kunde inte bekräftas."
+                    : "Handeln kunde inte bekräftas. Kontrollera din position.";
+                message("match-feedback", ack?.error || fallback, "error");
             } else {
                 nextSeq = Math.max(nextSeq, command.seq + 1);
-                if (ack.requiresChoice && ack.positionId) {
+                if (buysRegeneration) {
+                    message("match-feedback", "Regenerering aktiverad.", "success");
+                } else if (ack.requiresChoice && ack.positionId) {
                     if (restoreFocus) tradeFocus = sellChoice?.kind === "profit" ? "attack" : "confirm-close";
                 } else if (!opensPosition) {
                     sellChoice = undefined;
@@ -2086,7 +2114,7 @@
         const tradeLabels = { attack: "Attack", grow: "Grow", loss: "Förlust", flat: "Ingen vinst eller förlust" };
         const trades = (data.tradeDetails ?? []).map((trade) => [
             clock(trade.time), positionDirection(trade), tradeLabels[trade.choice] ? t(tradeLabels[trade.choice]) : null,
-            t("{credits} krediter", { credits: signed(trade.profit, amountFormat) }), `${formatNumber(trade.damage)} HP`,
+            formatCurrency(trade.profit, { signed: true }), `${formatNumber(trade.damage)} HP`,
         ]);
         if (!preserveDetails) byId("result-trade-detail").open = false;
         show("result-trade-detail", trades.length > 0);
@@ -2156,15 +2184,15 @@
             put("result-prediction-duration", clock(data.duration));
         } else {
             put("result-hp", formatNumber(data.hp));
-            put("result-capital", formatNumber(data.capital, amountFormat));
+            put("result-capital", formatCurrency(data.capital));
             show("result-opponent-capital-stat", numeric(data.opponentCapital) != null);
-            put("result-opponent-capital", formatNumber(data.opponentCapital, amountFormat));
+            put("result-opponent-capital", formatCurrency(data.opponentCapital));
             put("result-attack", formatNumber(data.attackDamage));
             put("result-grow", formatNumber(data.growCount));
             put("result-trades", formatNumber(data.trades));
             put("result-wins", formatNumber(data.winningTrades));
             put("result-losses", formatNumber(data.losingTrades));
-            put("result-peak", formatNumber(data.peakCapital, amountFormat));
+            put("result-peak", formatCurrency(data.peakCapital));
             put("result-duration", clock(data.duration));
         }
         show("result-instrument", !practice);
@@ -2287,6 +2315,7 @@
             case "buy":
             case "short":
             case "sell": trade(button.dataset.action); break;
+            case "buy-regeneration": trade("buy_regeneration"); break;
             case "attack": trade("confirm_sell", "attack"); break;
             case "grow": trade("confirm_sell", "grow"); break;
             case "confirm-close": trade("confirm_sell", "close"); break;

@@ -153,7 +153,8 @@ def test_private_registration_and_login(game):
     assert any(row["username"] == "SwedishBull" and row["elo"] == 100 for row in leaders)
     page = http.get("/").get_data(as_text=True)
     assert '<th scope="row">Iron</th>' in page and "Under 50" in page
-    assert '<th scope="row">Grandmaster</th>' in page and "800–899" in page
+    assert '<th scope="row">Grandmaster</th>' in page and "800–949" in page
+    assert '<th scope="row">Stock Legend</th>' in page and "950+" in page
     wrong_token = socketio.test_client(app, flask_test_client=http, auth={"csrfToken": "wrong"})
     assert not wrong_token.is_connected()
 
@@ -410,6 +411,37 @@ def test_short_trade_on_falling_price_can_attack_via_socket(game):
         trade = db.session.scalars(select(TradeHistory)).one()
         assert trade.user_id == first.id
         assert trade.side == "short"
+
+
+def test_ranked_regeneration_purchase_is_authoritative_and_survives_reconnect(game):
+    first, second = join_both(game)
+    advance(game, 3)
+    assert first.trade(first.state(), "buy", percent=50)["ok"]
+    advance(game, 1)
+    assert settle(first, first.state(), "attack")["ok"]
+
+    damaged = second.state()
+    assert damaged["self"]["hp"] == 80
+    assert not second.trade(damaged, "buy_regeneration", cost="0", healing=100)["ok"]
+    assert second.trade(damaged, "buy_regeneration")["ok"]
+    purchased = second.state()
+    assert purchased["self"]["hp"] == 80
+    assert Decimal(purchased["self"]["cash"]) == 490
+    assert purchased["self"]["regenerationRemaining"] == 20
+    assert not second.trade(damaged, "buy_regeneration")["ok"]
+
+    second.socket.disconnect()
+    advance(game, 11)
+    second.connect()
+    rejoined = second.state()
+    assert rejoined["self"]["hp"] == first.state()["opponent"]["hp"] == 84
+    assert Decimal(rejoined["self"]["cash"]) == 490
+    assert rejoined["self"]["regenerationRemaining"] == 9
+
+    advance(game, 9)
+    expired = second.state()
+    assert expired["self"]["hp"] == first.state()["opponent"]["hp"] == 88
+    assert expired["self"]["regenerationRemaining"] == 0
 
 
 @pytest.mark.parametrize("trigger", ["pump", "trade"])

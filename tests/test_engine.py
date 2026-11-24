@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from stockfight.engine import Bar, Match, RANKED, RuleError, Scenario
+from stockfight.engine import BOT, PRIVATE, Bar, Match, RANKED, RuleError, Scenario
 
 
 START = 1000.0
@@ -131,6 +131,72 @@ class MatchTests(unittest.TestCase):
         with self.assertRaises(RuleError):
             act(match, "buy", 0, {"percent": 25})
         self.assertIsNone(match.public(1, START)["self"]["position"])
+
+    def test_regeneration_heals_every_five_seconds_through_twenty_seconds(self):
+        match = make_match("100")
+        match.players[1].hp = 80
+        match.players[2].hp = 70
+        act(match, "buy_regeneration", 0.25)
+        state = match.public(1, START + 0.25)
+        self.assertEqual(state["regeneration"], {"cost": "10", "duration": 20, "interval": 5, "healing": 2})
+        self.assertEqual(Decimal(state["self"]["cash"]), 490)
+        self.assertEqual(state["self"]["regenerationRemaining"], 20)
+
+        for seconds, expected_hp in ((5, 82), (10, 84), (15, 86), (20, 88)):
+            with self.subTest(seconds=seconds):
+                before = START + 0.24 + seconds
+                due = START + 0.25 + seconds
+                match.advance(before)
+                self.assertEqual(match.public(1, before)["self"]["hp"], expected_hp - 2)
+                self.assertTrue(match.advance(due))
+                player = match.public(1, due)["self"]
+                self.assertEqual(player["hp"], expected_hp)
+                self.assertEqual(player["regenerationRemaining"], 20 - seconds)
+
+        match.advance(START + 30)
+        self.assertEqual(match.public(1, START + 30)["self"]["hp"], 88)
+        self.assertEqual(match.public(2, START + 30)["self"]["hp"], 70)
+
+    def test_regeneration_caps_health_and_only_charges_successful_purchases(self):
+        match = Match("private", PLAYERS, make_scenario(("100",)), START, mode=PRIVATE)
+        with self.assertRaises(RuleError):
+            act(match, "buy_regeneration", 2)
+        self.assertEqual(Decimal(match.public(1, START + 2)["self"]["cash"]), 500)
+
+        act(match, "buy", 3, {"percent": 100})
+        with self.assertRaises(RuleError):
+            act(match, "buy_regeneration", 3)
+        self.assertEqual(match.public(1, START + 3)["self"]["regenerationRemaining"], 0)
+        request_sale(match, 3)
+
+        match.players[1].hp = 99
+        act(match, "buy_regeneration", 3)
+        with self.assertRaises(RuleError):
+            act(match, "buy_regeneration", 4)
+        self.assertEqual(Decimal(match.public(1, START + 4)["self"]["cash"]), 490)
+
+        match.advance(START + 23)
+        self.assertEqual(match.public(1, START + 23)["self"]["hp"], 100)
+        act(match, "buy_regeneration", 23)
+        self.assertEqual(Decimal(match.public(1, START + 23)["self"]["cash"]), 480)
+
+    def test_regeneration_stops_at_knockout_and_is_unavailable_against_bots(self):
+        match = make_match("100")
+        match.players[1].hp = 1
+        act(match, "buy_regeneration", 70.25)
+
+        match.advance(START + 90)
+        self.assertEqual(match.status, "finished")
+        self.assertEqual(match.duration, 75)
+        self.assertEqual(match.public(1, START + 90)["self"]["hp"], 0)
+        self.assertEqual(match.public(1, START + 90)["self"]["regenerationRemaining"], 0)
+        with self.assertRaises(RuleError):
+            act(match, "buy_regeneration", 90)
+
+        practice = Match("bot", PLAYERS, make_scenario(("100",)), START, countdown=0, mode=BOT)
+        self.assertNotIn("regeneration", practice.public(1, START))
+        with self.assertRaises(RuleError):
+            act(practice, "buy_regeneration", 0)
 
     def test_rejects_empty_sale_and_second_position(self):
         match = make_match("100", "101")

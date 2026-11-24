@@ -30,7 +30,6 @@
         stocks: ["Aktier", "Stocks"],
         details: ["Om uppdraget", "About the mandate"],
         capital: ["Startkapital", "Starting capital"],
-        credits: ["{amount} krediter", "{amount} credits"],
         tools: ["Verktyg", "Tools"],
         slots: ["{used} av {max} valda", "{used} of {max} selected"],
         analysis: ["Samvariation", "Correlation"],
@@ -174,6 +173,7 @@
     let errorCode;
 
     const locale = () => window.StockFightI18n?.getLocale() ?? "sv-SE";
+    const { formatCurrency } = window.StockFightI18n;
     const isEnglish = () => locale().startsWith("en");
     function translate(key, params = {}) {
         const translation = copy[key]?.[Number(isEnglish())] ?? key;
@@ -313,7 +313,7 @@
             <div class="career-briefing-header">
                 <h2 tabindex="-1" id="career-briefing-title">${title(mission)}</h2>
                 <dl class="career-funding"><div><dt>${tx("capital")}</dt>
-                    <dd>${tx("credits", { amount: number(mission.capital, 0) })}</dd></div>
+                    <dd>${formatCurrency(mission.capital, { decimals: 0 })}</dd></div>
                     ${award ? `<div><dt>${tx("best")}</dt><dd>${escapeHTML(percent(award.score, true))}</dd></div>` : ""}</dl>
             </div>
             <div class="career-briefing-block career-briefing-goals">
@@ -565,8 +565,8 @@
                     ${phaseActive ? `<div class="career-clock"><span aria-hidden="true">◷</span>
                         <span id="career-clock" role="timer" aria-label="${tx("timeLeft")}"></span></div>` : ""}
                 </div>
-                ${metrics(setup ? [["capital", number(mission.capital, 0)]] : [
-                    ["value", number(attempt.value)], ["cash", number(attempt.cash), "", percent(attempt.cashPercent)],
+                ${metrics(setup ? [["capital", formatCurrency(mission.capital, { decimals: 0 })]] : [
+                    ["value", formatCurrency(attempt.value)], ["cash", formatCurrency(attempt.cash), "", percent(attempt.cashPercent)],
                     ["return", percent(attempt.returnPercent, true), signedClass(attempt.returnPercent)],
                     ["benchmark", percent(attempt.indexReturn, true), signedClass(attempt.indexReturn)],
                 ])}
@@ -606,7 +606,7 @@
                         ${metrics([
                             ["return", percent(attempt.returnPercent, true), signedClass(attempt.returnPercent)],
                             ["benchmark", percent(attempt.indexReturn, true), signedClass(attempt.indexReturn)],
-                            ["worst", percent(attempt.drawdown)], ["fees", number(attempt.fees)],
+                            ["worst", percent(attempt.drawdown)], ["fees", formatCurrency(attempt.fees)],
                         ])}
                         ${attempt.worstStep > 0 ? `<p class="career-catalog-note career-drawdown-detail">${tx("worstAt", { step: attempt.worstStep })}</p>` : ""}
                         ${chartOptions()}

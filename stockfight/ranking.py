@@ -14,7 +14,7 @@ LEAGUES = (
     (500, "Diamond"),
     (650, "Master"),
     (800, "Grandmaster"),
-    (900, "Stock Legend"),
+    (950, "Stock Legend"),
 )
 
 

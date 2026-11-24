@@ -122,9 +122,8 @@
     const text = (key, values = {}) => copy[key][english() ? 1 : 0]
         .replace(/\{(\w+)\}/g, (placeholder, name) => Object.hasOwn(values, name) ? values[name] : placeholder);
     const tx = (key, values) => escape(text(key, values));
-    const number = (value, signed = false) =>
-        new Intl.NumberFormat(locale(), { maximumFractionDigits: 2, signDisplay: signed ? "exceptZero" : "auto" }).format(value);
-    const money = (value, signed = false) => number(value, signed) + (english() ? " cr" : " kred.");
+    const number = (value) => new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(value);
+    const money = (value, signed = false) => window.StockFightI18n.formatCurrency(value, { decimals: 0, signed });
     const percent = (value) => new Intl.NumberFormat(locale(), { style: "percent" }).format(value / 100);
     const tone = (value) => value < 0 ? "company-negative" : value > 0 ? "company-positive" : "";
 
@@ -205,7 +204,7 @@
         const next = state.nextLevel;
         if (!next) return `<p class="company-progress company-positive">${tx("maximumLevel")}</p>`;
         const attained = Math.min(next.target, Math.max(state.peakProfit, 0));
-        const amount = { actual: number(attained), target: money(next.target) };
+        const amount = { actual: money(attained), target: money(next.target) };
         return `<div class="company-progress">
             <div class="company-progress-footer">
                 <span id="company-progress-title">${tx("progress")} · ${tx("progressShort", amount)}</span>

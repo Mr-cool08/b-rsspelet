@@ -43,6 +43,7 @@
         commandError: ["Affären kunde inte genomföras.", "The trade could not be completed."],
     };
     const locale = () => window.StockFightI18n?.getLocale() ?? "sv-SE";
+    const money = (value, signed = false) => window.StockFightI18n.formatCurrency(value, { decimals: 0, signed });
     const text = (key, values = {}) => copy[key][locale() === "en-GB" ? 1 : 0]
         .replace(/\{(\w+)\}/g, (placeholder, name) => values[name] ?? placeholder);
     const escape = (value) => String(value).replace(/[&<>"']/g, (character) => ({
@@ -89,7 +90,6 @@
     function render() {
         const focusId = results.contains(document.activeElement) ? document.activeElement.id : "";
         const format = new Intl.NumberFormat(locale());
-        const signed = new Intl.NumberFormat(locale(), { signDisplay: "exceptZero" });
         const loaded = isLoaded();
         const rows = loaded ? market.companies : [];
         const heldValue = market?.holdingsValue ?? market?.companies.reduce((total, firm) => total + firm.held * firm.price, 0);
@@ -112,8 +112,8 @@
         nextPage.textContent = text("next");
         nextPage.setAttribute("aria-disabled", String(!loaded || !market.hasMore));
         const balances = market ? `<dl class="company-exchange-summary"><div>
-            <dt>${text("holdingsValue")}</dt><dd>${format.format(heldValue)}</dd></div><div>
-            <dt>${text("reserve")}</dt><dd>${format.format(market.cashReserve)}</dd></div></dl>` : "";
+            <dt>${text("holdingsValue")}</dt><dd>${money(heldValue)}</dd></div><div>
+            <dt>${text("reserve")}</dt><dd>${money(market.cashReserve)}</dd></div></dl>` : "";
         const error = commandError ? `<p class="company-standings-message company-exchange-warning" role="status">
             ${text(Object.hasOwn(copy, commandError) ? commandError : "commandError")}</p>` : "";
         const table = rows.length ? `<table class="company-standings-table">
@@ -127,8 +127,8 @@
                     aria-label="${escape(text("tradeFirm", { action: text(action), firm: firm.name }))}"${disabled ? " disabled" : ""}>${text(action)}</button>`;
                 return `<tr${firm.isYou ? ' class="company-standing-own"' : ""}>
                     <th scope="row"><span>${escape(firm.name)}</span><small>${text("level")} ${format.format(firm.level)} ·
-                    ${text("profit")} ${signed.format(firm.profit)}</small></th>
-                    <td class="company-exchange-quote">${format.format(firm.price)}</td><td>${format.format(firm.held)}</td>
+                    ${text("profit")} ${money(firm.profit, true)}</small></th>
+                    <td class="company-exchange-quote">${money(firm.price)}</td><td>${format.format(firm.held)}</td>
                     <td>${firm.isYou ? `<small>${text("own")}</small>` : `<div class="company-exchange-controls">
                         ${button("buy", buyDisabled)}${button("sell", sellDisabled)}</div>`}</td>
                 </tr>`;

@@ -69,7 +69,7 @@ _REGULAR_CASES = (
     (
         _Case("Första portföljen", "Your first portfolio",
               "Jämför hur aktierna rört sig i förhandsvisningen och fördela sedan kapitalet. Pengar du lämnar ofördelade ligger kvar i kassan.",
-              "Compare the stocks in the preview before allocating your credits. Everything you leave unallocated stays in cash.",
+              "Compare the stocks in the preview before allocating your capital. Everything you leave unallocated stays in cash.",
               "climb", 18, (_goal("index", 0),), _goal("index", 2.5)),
         _Case("Låt kassan vänta", "Keep cash in reserve",
               "Kunden vill ha en del pengar på börsen hela perioden. Du väljer hur mycket du vill hålla i reserv när ledarskapet skiftar.",

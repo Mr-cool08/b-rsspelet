@@ -62,7 +62,7 @@
         "Logga ut": "Log out",
         "Börsduell": "Stock duels",
         "i realtid": "in real time",
-        "Handla med virtuella krediter på historiska börskurser. Tävla mot andra spelare eller öva mot en bot.": "Trade historical stock prices with virtual credits. Compete against other players or practise against a bot.",
+        "Handla med virtuella dollar på historiska börskurser. Tävla mot andra spelare eller öva mot en bot.": "Trade historical stock prices with virtual dollars. Compete against other players or practise against a bot.",
         "Logga in eller skapa ett konto för att öppna din vänduell.": "Log in or create an account to open your friend duel.",
         "Spelarkonto": "Player account",
         "Välj kontoåtgärd": "Choose an account action",
@@ -74,16 +74,12 @@
         "Din första 1 mot 1-duell": "Your first 1 vs 1 duel",
         "Steg {step} av {total}": "Step {step} of {total}",
         "Sänk motståndaren till 0 HP": "Bring your opponent to 0 HP",
-        "500 krediter": "500 credits",
         "Välj riktning": "Choose a direction",
-        "25 % · 125 krediter": "25% · 125 credits",
-        "100 ↗ 104 · +5 krediter": "100 ↗ 104 · +5 credits",
-        "100 ↘ 96 · +5 krediter": "100 ↘ 96 · +5 credits",
+        "25 % · $125": "25% · $125",
         "Använd vinsten": "Use your profit",
-        "+5 krediter": "+5 credits",
-        "En förlust kostar krediter och kan kosta HP.": "A losing trade costs credits and can cost HP.",
-        "Motståndare −20 HP · 500 krediter kvar": "Opponent −20 HP · 500 credits left",
-        "505 krediter · 102 % attackkraft · +25 bonus-HP": "505 credits · 102% attack power · +25 bonus HP",
+        "En förlust kostar pengar och kan kosta HP.": "A losing trade costs money and can cost HP.",
+        "Motståndare −20 HP · $500 kvar": "Opponent −20 HP · $500 left",
+        "$505 · 102 % attackkraft · +25 bonus-HP": "$505 · 102% attack power · +25 bonus HP",
         "När duellen avgörs": "How the duel is decided",
         "Efter 75 sekunder drar stormen HP från båda.": "After 75 seconds, the storm drains HP from both players.",
         "Vid dubbel KO avgör kapital, sedan attackskada.": "On a double KO, capital decides, then attack damage.",
@@ -173,10 +169,9 @@
         "Öppna": "Open",
         "Följ kursen": "Watch price",
         "Avsluta": "Exit",
-        "Välj insats i krediter": "Choose a stake in credits",
-        "Andel av tillgängliga krediter att satsa": "Share of available credits to stake",
+        "Välj insats i dollar": "Choose a stake in dollars",
+        "Andel av kassan att satsa": "Share of available cash to stake",
         "Vald insats": "Selected stake",
-        "krediter": "credits",
         "Välj riktning för din position": "Choose the direction of your position",
         "UPP": "UP",
         "NER": "DOWN",
@@ -193,6 +188,14 @@
         "Tillgängligt": "Available",
         "Investerat": "Invested",
         "Grow-bonus": "Grow bonus",
+        "Regenerering": "Regeneration",
+        "Återställer {healing} HP var {interval}:e sekund i {duration} sekunder.": "Restores {healing} HP every {interval} seconds for {duration} seconds.",
+        "Aktiv · {remaining} s": "Active · {remaining}s",
+        "Köp regenerering · {price}": "Buy regeneration · {price}",
+        "Regenerering aktiverad.": "Regeneration activated.",
+        "Regenerering är redan aktiv.": "Regeneration is already active.",
+        "Du har inte tillräckligt med pengar.": "You don't have enough cash.",
+        "Köpet av regenerering kunde inte bekräftas.": "Could not confirm the regeneration purchase.",
         "Ingångskurs": "Entry price",
         "Orealiserat resultat": "Unrealised P/L",
         "Ritduellens prognos": "Forecast Duel prediction",
@@ -236,8 +239,8 @@
         "Välj insats → UPP eller NER → Stäng affären.": "Choose a stake → UP or DOWN → Close trade.",
         "Attack gör skada. Grow sparar vinsten.": "Attack deals damage. Grow keeps the profit.",
         "Fler duellregler": "More duel rules",
-        "Grow laddar nästa attack. En förlust kostar krediter och kan kosta HP.": "Grow powers up the next attack. A losing trade costs credits and can cost HP.",
-        "Attackkraften ändras med 1 procentenhet per 2,5 krediter över eller under 500, inom 75–125 %. Kapitalet är kassan plus insatsen i en öppen affär.": "Attack power changes by 1 percentage point for every 2.5 credits above or below 500, within 75–125%. Capital is your cash plus the stake in an open trade.",
+        "Grow laddar nästa attack. En förlust kostar pengar och kan kosta HP.": "Grow powers up the next attack. A losing trade costs money and can cost HP.",
+        "Attackkraften ändras med 1 procentenhet per $2,50 över eller under $500, inom 75–125 %. Kapitalet är kassan plus insatsen i en öppen affär.": "Attack power changes by 1 percentage point for every $2.50 above or below $500, within 75–125%. Capital is your cash plus the stake in an open trade.",
         "Vid dubbel KO avgör kapital, sedan attackskada. Vid lika blir det oavgjort.": "On a double KO, capital decides, then attack damage. If both are equal, the duel is a draw.",
         "Starta guidad botduell": "Start guided Bot Duel",
         "Dra i prognosfältet i grafen eller skriv hur många procent kursen ändras till nästa punkt. Den som låst den närmaste prognosen gör skada. Flest HP kvar efter sista rundan vinner, om ingen slagits ut tidigare.": "Drag in the forecast area of the chart or enter how much you think the price will change as a percentage. The player with the closest locked forecast deals damage. If both players reach the final round, the one with the most HP left wins.",
@@ -372,9 +375,7 @@
         "Ange minst −100 % med högst två decimaler.": "Enter a value of at least −100% with up to two decimal places.",
         "Prognosen kunde inte bekräftas. Försök igen.": "Could not confirm the forecast. Try again.",
         "{damage} HP skada": "{damage} HP damage",
-        "{credits} krediter · {bonus} bonus-HP": "{credits} credits · {bonus} bonus HP",
-        "{credits} krediter · {damage} HP": "{credits} credits · {damage} HP",
-        "±0 krediter": "±0 credits",
+        "{amount} · {bonus} bonus-HP": "{amount} · {bonus} bonus HP",
         "Handeln kunde inte bekräftas. Kontrollera din position.": "Could not confirm the trade. Check your position.",
         "Revansch mot samma spelare": "Rematch with the same player",
         "Revansch är inte tillgänglig.": "A rematch is unavailable.",
@@ -401,7 +402,6 @@
         "{opponent} · slut-HP": "{opponent} · final HP",
         "Förlust": "Loss",
         "Ingen vinst eller förlust": "Break-even",
-        "{credits} krediter": "{credits} credits",
         "Ingen prognos": "No forecast",
         "{error} procentenheter": "{error} percentage points",
         "{damage} HP i skada": "{damage} HP damage",
@@ -508,6 +508,23 @@
         return locales[language];
     }
 
+    const currencyFormats = new Map();
+
+    function formatCurrency(value, { decimals = 2, signed = false } = {}) {
+        const amount = Number(value);
+        if (value == null || value === "" || !Number.isFinite(amount)) return "—";
+        const locale = getLocale();
+        const key = `${locale}:${decimals}`;
+        if (!currencyFormats.has(key)) {
+            currencyFormats.set(key, new Intl.NumberFormat(locale, {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: 2,
+            }));
+        }
+        const sign = amount < 0 ? "−" : signed && amount > 0 ? "+" : "";
+        return `${sign}$${currencyFormats.get(key).format(Math.abs(amount))}`;
+    }
+
     function t(source, values) {
         if (typeof source !== "string") return source;
         let translated = source;
@@ -580,6 +597,6 @@
         if (!manualLanguage) setLanguage(browserLanguage());
     });
 
-    window.StockFightI18n = { getLocale, t };
+    window.StockFightI18n = { getLocale, t, formatCurrency };
     renderLanguage();
 })();

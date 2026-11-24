@@ -38,8 +38,8 @@ class RankingTests(TestCase):
             (650, "Master"),
             (799, "Master"),
             (800, "Grandmaster"),
-            (899, "Grandmaster"),
-            (900, "Stock Legend"),
+            (949, "Grandmaster"),
+            (950, "Stock Legend"),
         ):
             with self.subTest(elo=elo):
                 self.assertEqual(league_progress(elo)["league"], league)
@@ -51,7 +51,11 @@ class RankingTests(TestCase):
             {"league": "Bronze", "nextLeague": "Silver", "nextElo": 150, "progress": 50},
         )
         self.assertEqual(
-            league_progress(900),
+            league_progress(875),
+            {"league": "Grandmaster", "nextLeague": "Stock Legend", "nextElo": 950, "progress": 50},
+        )
+        self.assertEqual(
+            league_progress(950),
             {"league": "Stock Legend", "nextLeague": None, "nextElo": None, "progress": 100},
         )
 

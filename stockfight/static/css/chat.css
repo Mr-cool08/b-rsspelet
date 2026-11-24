@@ -1,5 +1,4 @@
-.shared-chat-slot, #match-duel-chat-slot .duel-chat { margin-top: clamp(10px, 2vw, 18px); }
-.shared-chat-slot { max-width: 900px; margin-inline: auto; }
+.shared-chat-slot { max-width: 900px; margin-top: clamp(10px, 2vw, 18px); margin-inline: auto; }
 
 .game-chat, .duel-chat {
     display: grid;
@@ -92,3 +91,38 @@
 .chat-presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .chat-presets .button { min-width: 44px; padding-inline: 11px; font-size: .85rem; }
 .chat-presets .button:disabled, .chat-presets .button[aria-disabled="true"] { opacity: .55; }
+
+#match-duel-chat-slot .duel-chat {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 12px;
+    margin-bottom: clamp(7px, 1.5vw, 14px);
+    padding: 8px clamp(8px, 1.4vw, 16px);
+}
+
+#match-duel-chat-slot .chat-heading { color: var(--accent); font-size: 1rem; }
+#match-duel-chat-slot .chat-log { block-size: 3.5rem; }
+#match-duel-chat-slot .chat-empty {
+    display: flex;
+    align-items: center;
+    min-block-size: 3.5rem;
+    padding: 4px 8px;
+}
+
+#match-duel-chat-slot .chat-message { padding: 4px 8px; }
+#match-duel-chat-slot :is(.chat-presets, .chat-status) { grid-column: 1 / -1; }
+#match-duel-chat-slot .chat-presets .button { min-height: 44px; padding-block: 4px; line-height: 1.2; }
+
+@media (max-width: 480px) {
+    #match-duel-chat-slot .chat-presets {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    #match-duel-chat-slot .chat-presets .button { padding-inline: 4px; }
+}
+
+@media (min-width: 900px) {
+    #match-duel-chat-slot .duel-chat { grid-template-columns: auto minmax(0, 1fr) auto; }
+    #match-duel-chat-slot .chat-presets { grid-column: auto; }
+}

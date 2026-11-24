@@ -147,7 +147,7 @@
                     <h2 id="tutorial-step-2" class="card-title" tabindex="-1" data-i18n="Välj riktning">Välj riktning</h2>
                     <dl class="tutorial-stake">
                         <dt data-i18n="Insats">Insats</dt>
-                        <dd class="mono" data-i18n="25 % · 125 krediter">25 % · 125 krediter</dd>
+                        <dd class="mono" data-i18n="25 % · $125">25 % · $125</dd>
                     </dl>
                     <div class="tutorial-options" role="group" aria-label="Välj riktning för din position" data-i18n-aria-label="Välj riktning för din position">
                         <button class="button button-buy direction-button" type="button" data-action="tutorial-up" aria-pressed="false">
@@ -162,7 +162,7 @@
 
                 <section id="tutorial-page-3" class="tutorial-page" aria-labelledby="tutorial-step-3" hidden>
                     <h2 id="tutorial-step-3" class="card-title" tabindex="-1" data-i18n="Använd vinsten">Använd vinsten</h2>
-                    <strong class="tutorial-outcome mono" data-i18n="+5 krediter">+5 krediter</strong>
+                    <strong class="tutorial-outcome mono">+$5</strong>
                     <button class="button button-primary tutorial-close-position" type="button" data-action="tutorial-close-position" aria-controls="tutorial-profit-options">{{ icon('✓') }} <span data-i18n="Stäng affären">Stäng affären</span></button>
                     <div id="tutorial-profit-options" class="tutorial-options" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till" hidden>
                         <button class="button button-attack direction-button" type="button" data-action="tutorial-attack" aria-pressed="false">
@@ -455,6 +455,23 @@
                 <p id="bot-guide-step" role="status"></p>
                 <button class="button button-quiet" type="button" data-action="guide-skip" data-i18n="Hoppa över">Hoppa över</button>
             </div>
+            <div id="match-duel-chat-slot">
+                <section id="duel-chat" class="chat-panel panel duel-chat" aria-labelledby="duel-chat-title" hidden>
+                    <h2 id="duel-chat-title" class="chat-heading" data-i18n="Duellchatt">Duellchatt</h2>
+                    <div role="log" aria-labelledby="duel-chat-title">
+                        <div id="duel-chat-log" class="chat-log" tabindex="0" hidden></div>
+                        <p id="duel-chat-empty" class="chat-empty" data-i18n="Inga duellmeddelanden ännu.">Inga duellmeddelanden ännu.</p>
+                    </div>
+                    <div id="duel-chat-presets" class="chat-presets" role="group" aria-label="Snabbmeddelanden och emojis" data-i18n-aria-label="Snabbmeddelanden och emojis">
+                        {% set emoji_labels = {'wave': 'Vinkning', 'thumbs_up': 'Tumme upp', 'fire': 'Eld', 'laugh': 'Skratt'} %}
+                        {% for preset, (kind, text) in duel_presets.items() %}
+                        {% set label = emoji_labels.get(preset) if kind == 'emoji' else none %}
+                        <button class="button button-secondary" type="button" data-chat-preset="{{ preset }}" {% if label %}aria-label="{{ label }}" data-i18n-aria-label="{{ label }}"{% else %}data-i18n="{{ text }}"{% endif %} disabled>{{ text }}</button>
+                        {% endfor %}
+                    </div>
+                    <p id="duel-chat-status" class="chat-status" role="status" hidden></p>
+                </section>
+            </div>
             <div class="match-layout">
                 <section class="market-panel panel" aria-label="Marknad och kursgraf" data-i18n-aria-label="Marknad och kursgraf">
                     <div class="ticker">
@@ -489,7 +506,7 @@
                 <section id="trade-panel" class="trade-panel panel" aria-label="Position och handel" data-i18n-aria-label="Position och handel">
                     <div id="open-order" class="trade-order">
                         <h2 class="trade-label" data-i18n="Insats">Insats</h2>
-                        <div class="percent-buttons" role="group" aria-label="Andel av tillgängliga krediter att satsa" data-i18n-aria-label="Andel av tillgängliga krediter att satsa">
+                        <div class="percent-buttons" role="group" aria-label="Andel av kassan att satsa" data-i18n-aria-label="Andel av kassan att satsa">
                             <button type="button" data-percent="25" aria-pressed="false" disabled>25 %<small id="stake-25">—</small></button>
                             <button type="button" data-percent="50" aria-pressed="false" disabled>50 %<small id="stake-50">—</small></button>
                             <button type="button" data-percent="75" aria-pressed="false" disabled>75 %<small id="stake-75">—</small></button>
@@ -507,7 +524,7 @@
                     </div>
                     <div id="position-summary" class="position-summary" hidden>
                         <div class="position-result">
-                            <div><span data-i18n="Öppen position">Öppen position</span><strong id="match-pnl" class="mono">—</strong> <small data-i18n="krediter">krediter</small></div>
+                            <div><span data-i18n="Öppen position">Öppen position</span><strong id="match-pnl" class="mono">—</strong></div>
                             <span id="match-direction" class="position-direction mono">—</span>
                         </div>
                         <dl class="position-meta">
@@ -532,6 +549,11 @@
                         <button id="pending-close" class="button button-primary" type="button" data-action="confirm-close" aria-describedby="sell-choice-hint" hidden data-i18n="Stäng affären">Stäng affären</button>
                         <button class="button button-secondary keep-holding" type="button" data-action="keep-holding" data-i18n="Fortsätt hålla">Fortsätt hålla</button>
                     </div>
+                    <section id="regeneration-shop" class="regeneration-shop" aria-labelledby="regeneration-title" hidden>
+                        <h2 id="regeneration-title" class="trade-label" data-i18n="Regenerering">Regenerering</h2>
+                        <p id="regeneration-description"></p>
+                        <button id="regeneration-buy" class="button button-secondary" type="button" data-action="buy-regeneration" aria-describedby="regeneration-description" disabled></button>
+                    </section>
                     <p id="match-feedback" class="match-feedback" role="status" hidden></p>
                     <dl class="trade-stats">
                         <div><dt data-i18n="Tillgängligt">Tillgängligt</dt><dd id="match-cash" class="mono">—</dd></div>
@@ -563,23 +585,6 @@
                         <div id="prediction-opponent-breakdown"><dt id="prediction-opponent-name" data-i18n="Motståndaren">Motståndaren</dt><dd id="prediction-opponent" class="mono">—</dd><dd id="prediction-opponent-error" class="prediction-error">—</dd></div>
                     </dl>
                     <button id="practice-next" class="button button-primary" type="button" data-action="practice-next" hidden data-i18n="Nästa runda">Nästa runda</button>
-                </section>
-            </div>
-            <div id="match-duel-chat-slot">
-                <section id="duel-chat" class="chat-panel panel duel-chat" aria-labelledby="duel-chat-title" hidden>
-                    <h2 id="duel-chat-title" class="chat-heading" data-i18n="Duellchatt">Duellchatt</h2>
-                    <div role="log" aria-labelledby="duel-chat-title">
-                        <div id="duel-chat-log" class="chat-log" tabindex="0" hidden></div>
-                        <p id="duel-chat-empty" class="chat-empty" data-i18n="Inga duellmeddelanden ännu.">Inga duellmeddelanden ännu.</p>
-                    </div>
-                    <div id="duel-chat-presets" class="chat-presets" role="group" aria-label="Snabbmeddelanden och emojis" data-i18n-aria-label="Snabbmeddelanden och emojis">
-                        {% set emoji_labels = {'wave': 'Vinkning', 'thumbs_up': 'Tumme upp', 'fire': 'Eld', 'laugh': 'Skratt'} %}
-                        {% for preset, (kind, text) in duel_presets.items() %}
-                        {% set label = emoji_labels.get(preset) if kind == 'emoji' else none %}
-                        <button class="button button-secondary" type="button" data-chat-preset="{{ preset }}" {% if label %}aria-label="{{ label }}" data-i18n-aria-label="{{ label }}"{% else %}data-i18n="{{ text }}"{% endif %} disabled>{{ text }}</button>
-                        {% endfor %}
-                    </div>
-                    <p id="duel-chat-status" class="chat-status" role="status" hidden></p>
                 </section>
             </div>
         </section>
@@ -689,8 +694,8 @@
             </ul>
             <details class="help-rules">
                 <summary data-i18n="Fler duellregler">Fler duellregler</summary>
-                <p data-i18n="Grow laddar nästa attack. En förlust kostar krediter och kan kosta HP.">Grow laddar nästa attack. En förlust kostar krediter och kan kosta HP.</p>
-                <p data-i18n="Attackkraften ändras med 1 procentenhet per 2,5 krediter över eller under 500, inom 75–125 %. Kapitalet är kassan plus insatsen i en öppen affär.">Attackkraften ändras med 1 procentenhet per 2,5 krediter över eller under 500, inom 75–125 %. Kapitalet är kassan plus insatsen i en öppen affär.</p>
+                <p data-i18n="Grow laddar nästa attack. En förlust kostar pengar och kan kosta HP.">Grow laddar nästa attack. En förlust kostar pengar och kan kosta HP.</p>
+                <p data-i18n="Attackkraften ändras med 1 procentenhet per $2,50 över eller under $500, inom 75–125 %. Kapitalet är kassan plus insatsen i en öppen affär.">Attackkraften ändras med 1 procentenhet per $2,50 över eller under $500, inom 75–125 %. Kapitalet är kassan plus insatsen i en öppen affär.</p>
                 <p data-i18n="Efter 75 sekunder drar stormen HP från båda.">Efter 75 sekunder drar stormen HP från båda.</p>
                 <p data-i18n="Vid dubbel KO avgör kapital, sedan attackskada. Vid lika blir det oavgjort.">Vid dubbel KO avgör kapital, sedan attackskada. Vid lika blir det oavgjort.</p>
             </details>
@@ -716,7 +721,7 @@
         <div class="help-content">
             <dl class="tutorial-stake">
                 <dt data-i18n="Vinst i exemplet">Vinst i exemplet</dt>
-                <dd class="mono" data-i18n="+5 krediter">+5 krediter</dd>
+                <dd class="mono">+$5</dd>
             </dl>
             <div class="panel-actions" role="group" aria-label="Prova vad vinsten kan användas till" data-i18n-aria-label="Prova vad vinsten kan användas till">
                 <button class="button button-attack" type="button" data-action="guide-example-attack" aria-pressed="false">{{ icon('ϟ') }} Attack</button>

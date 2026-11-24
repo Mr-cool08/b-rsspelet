@@ -90,9 +90,7 @@
         .replace(/\{(\w+)\}/g, (placeholder, name) => values[name] ?? placeholder);
     const tx = (key, values) => escape(text(key, values));
     const format = (value, options) => new Intl.NumberFormat(locale(), options).format(value);
-    const money = (value, signed = false) => format(value, {
-        maximumFractionDigits: 2, signDisplay: signed ? "exceptZero" : "auto",
-    }) + (english() ? " cr" : " kred.");
+    const money = (value, signed = false) => window.StockFightI18n.formatCurrency(value, { decimals: 0, signed });
     const price = (value, currency = "USD") => value == null ? "–" : format(value, { style: "currency", currency, maximumFractionDigits: 2 });
     const percent = (value) => value == null ? "–" : format(value / 100, { style: "percent", maximumFractionDigits: 2, signDisplay: "exceptZero" });
     const formatTime = (value) => new Intl.DateTimeFormat(locale(), {

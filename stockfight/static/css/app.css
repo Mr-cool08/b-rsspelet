@@ -1269,6 +1269,18 @@ a { color: inherit; }
 
 .sell-choice p { color: #e4ebd5; }
 .sell-choice .keep-holding { min-height: 44px; padding-block: 6px; font-size: .83rem; }
+.regeneration-shop {
+    display: grid;
+    gap: 5px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #101924;
+}
+.regeneration-shop p { color: var(--muted); font-size: .78rem; }
+.regeneration-shop .button { min-height: 44px; font-size: .84rem; }
+.regeneration-shop[data-active="true"] { border-color: #718551; }
+.regeneration-shop[data-active="true"] .button:disabled { color: var(--buy); opacity: 1; }
 .match-feedback { color: var(--muted); font-size: .82rem; line-height: 1.35; overflow-wrap: anywhere; }
 [data-tone="error"] { color: var(--danger); }
 [data-tone="success"] { color: var(--buy); }
