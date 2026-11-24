@@ -15,6 +15,7 @@
     const outcomeLabels = { win: "VANN", lose: "FÖRLORADE", loss: "FÖRLORADE", draw: "OAVGJORT" };
     const spectateModeLabels = { ranked: "Handelsduell", prediction: "Ritduell", bot: "Botduell", private: "Vänduell" };
     const acknowledgements = 5000;
+    const duelChat = window.createDuelChat(acknowledgements);
     const queueBotWaitSeconds = 20;
     const chartRightPadding = 24;
     const chartZoomFactor = 1.5;
@@ -210,17 +211,34 @@
     }
 
     function activate(name) {
-        if (screen === name) return;
+        if (screen === name) {
+            syncPublicChat();
+            return;
+        }
         const previousScreen = screen;
         if (previousScreen === "spectate") leaveSpectateList();
         if (previousScreen === "spectate-live") leaveSpectateMatch();
         for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
         for (const id of screenIds) show(`${id}-screen`, id === name);
         screen = name;
+        syncPublicChat();
         show("online-count", name === "auth" || name === "menu");
         void refreshOnlineCount();
         window.scrollTo(0, 0);
         if (previousScreen) byId(screenFocus[name]).focus({ preventScroll: true });
+    }
+
+    function syncPublicChat() {
+        const chat = byId("shared-chat-slot");
+        const visible = Boolean(session.user) && (
+            screen === "spectate" || screen === "spectate-live"
+            || (screen === "match" && match?.mode === "prediction_practice")
+            || (screen === "result" && result?.mode === "prediction_practice")
+        );
+        if (chat.hidden === !visible) return;
+        chat.hidden = !visible;
+        if (visible) window.StockFightPublicChat?.connect(session.csrfToken);
+        else window.StockFightPublicChat?.disconnect();
     }
 
     async function request(url, body) {
@@ -611,6 +629,7 @@
             void refreshOnlineCount();
             renderTradeControls();
             renderPrediction();
+            syncDuelChat();
             renderPrivate();
             if (queueLeavePending && !match) sendQueueCommand(false);
             else if (queueWanted && screen === "queue" && !match) sendQueueCommand(true);
@@ -633,6 +652,7 @@
             connection("offline");
             renderTradeControls();
             renderPrediction();
+            syncDuelChat();
             renderPrivate();
             showSpectateConnectionStatus();
             if (reason === "io server disconnect") {
@@ -649,6 +669,7 @@
         socket.on("queue_state", receiveQueueState);
         socket.on("match_state", receiveMatchState);
         socket.on("match_result", receiveResult);
+        socket.on("duel_chat_message", duelChat.receive);
         socket.on("private_state", receivePrivateState);
         socket.on("prediction_practice_ended", receivePracticeEnded);
         socket.on("spectate_matches", receiveSpectateList);
@@ -1305,6 +1326,7 @@
         match = undefined;
         matchSynchronized = false;
         result = undefined;
+        duelChat.reset();
         nextSeq = undefined;
         tradeCommand = undefined;
         sellChoice = undefined;
@@ -1742,8 +1764,22 @@
         if (!sellChoice || sellChoice.positionId !== keptPositionId) keptPositionId = undefined;
         if (data.mode === "private") forgetInviteCode();
         activate("match");
+        syncDuelChat();
         renderMatch(data, true);
         animateEvent(data.event);
+    }
+
+    function syncDuelChat() {
+        const atResult = screen === "result";
+        const data = atResult ? result : screen === "match" ? result ?? match : undefined;
+        const isDuel = data && ["ranked", "prediction", "private", "bot"].includes(data.mode ?? "ranked");
+        duelChat.sync({
+            id: isDuel ? data.id : undefined,
+            player: session.user?.id,
+            connection: socket,
+            synchronized: matchSynchronized || Boolean(result),
+            atResult,
+        });
     }
 
     function renderMatch(data, syncRound = false) {
@@ -2082,6 +2118,7 @@
         const mode = data.mode ?? match?.mode ?? "ranked";
         renderResultView(data, mode);
         activate("result");
+        syncDuelChat();
         if (mode !== "prediction_practice") playSound(data.outcome);
         if (mode === "ranked") void refreshProfile();
     }

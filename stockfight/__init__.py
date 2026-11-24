@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .campaign_http import COMPANY_NAMESPACE, install_company_socket, register_campaign
+from .chat import DUEL_PRESETS, PublicChat
 from .company_live import start_live_market
 from .company_quotes import configured_provider
 from .data import User, db, get_rating, initialize_database, leaderboard, profile
@@ -86,6 +87,7 @@ def create_app(config=None):
         provider = DatabaseMarketProvider(allow_synthetic=app.config["ALLOW_SYNTHETIC"])
     service = MatchService(app, socketio, provider)
     app.extensions["match_service"] = service
+    app.extensions["public_chat"] = PublicChat(app, socketio, COMPANY_NAMESPACE)
     register_http(app, service)
     register_campaign(app, socketio)
     register_cli(app, schema_url)
@@ -110,8 +112,13 @@ def register_http(app, service):
             "csrfToken": session["csrf"],
         }
 
+    def disconnect_session():
+        token = session.get("csrf")
+        service.disconnect_session(token)
+        app.extensions["public_chat"].disconnect_session(token)
+
     def login_session(user):
-        service.disconnect_session(session.get("csrf"))
+        disconnect_session()
         session.clear()
         session["user_id"] = user.id
         return account_state(user)
@@ -150,7 +157,9 @@ def register_http(app, service):
 
     @app.get("/")
     def index():
-        return render_template("index.html", leagues=LEAGUES, online_count=service.online_count())
+        return render_template(
+            "index.html", leagues=LEAGUES, online_count=service.online_count(), duel_presets=DUEL_PRESETS,
+        )
 
     @app.get("/healthz")
     def health():
@@ -208,7 +217,7 @@ def register_http(app, service):
 
     @app.post("/api/logout")
     def logout():
-        service.disconnect_session(session.get("csrf"))
+        disconnect_session()
         session.clear()
         return account_state(None)
 

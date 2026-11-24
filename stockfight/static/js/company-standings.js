@@ -79,7 +79,6 @@
     let refreshQueued = false;
     let commandError;
     let socket;
-    let socketToken;
     let search = "";
     let loadedSearch;
     let page = 1;
@@ -210,16 +209,12 @@
         refresh();
     });
 
-    function connect(token) {
-        if (!window.io || !token || socketToken === token) return;
-        socket?.disconnect();
-        socketToken = token;
-        socket = window.io("/company", { auth: { csrfToken: token }, autoConnect: false });
+    window.addEventListener("company:socket", ({ detail }) => {
+        socket = detail;
         socket.on("company_market_changed", refresh);
         socket.on("connect", () => { render(); refresh(); });
         socket.on("disconnect", render);
-        socket.connect();
-    }
+    });
 
     section.addEventListener("click", (event) => {
         const button = event.target.closest("button[data-peer]");
@@ -235,7 +230,6 @@
     window.addEventListener("stockfight:languagechange", render);
     window.addEventListener("company:updated", (event) => {
         cash = event.detail.cash;
-        connect(event.detail.csrfToken);
         render();
         refresh();
     });

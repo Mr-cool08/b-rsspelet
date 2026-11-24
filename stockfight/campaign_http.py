@@ -2,11 +2,12 @@
 
 from time import time
 
-from flask import jsonify, redirect, render_template, request, session, url_for
+from flask import current_app, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import func
 
 from . import company, company_bots, company_market
 from .campaign import CampaignError, apply_command, default_state, public_state
+from .chat import chat_error
 from .company_live import load_firm, settle_firm
 from .data import CampaignSave, CompanySave, User, db, save_campaign
 from .multiplayer import token_matches
@@ -23,10 +24,35 @@ def _player_id():
 
 
 def install_company_socket(socketio):
+    def chat():
+        return current_app.extensions["public_chat"]
+
     @socketio.on("connect", namespace=COMPANY_NAMESPACE)
     def connect_company(auth=None):
-        return bool(_player_id() is not None and isinstance(auth, dict)
-                    and token_matches(session.get("csrf"), auth.get("csrfToken")))
+        token = session.get("csrf")
+        user_id = session.get("user_id")
+        if not isinstance(auth, dict) or not token_matches(token, auth.get("csrfToken")) or user_id is None:
+            return False
+        user = db.session.get(User, user_id)
+        if user is None:
+            return False
+        chat().connect(request.sid, user, token)
+
+    @socketio.on("disconnect", namespace=COMPANY_NAMESPACE)
+    def disconnect_company(reason=None):
+        chat().disconnect(request.sid)
+
+    @socketio.on("company_chat_history", namespace=COMPANY_NAMESPACE)
+    def company_chat_history(payload=None, *extra):
+        if extra:
+            return chat_error("chat_invalid")
+        return chat().subscribe(request.sid, payload)
+
+    @socketio.on("company_chat_send", namespace=COMPANY_NAMESPACE)
+    def company_chat_send(payload=None, *extra):
+        if extra:
+            return chat_error("chat_invalid")
+        return chat().send(request.sid, payload)
 
 
 def _share_price(standing):

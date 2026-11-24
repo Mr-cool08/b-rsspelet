@@ -13,6 +13,7 @@ from flask_socketio import SocketIO
 from sqlalchemy.exc import SQLAlchemyError
 
 from .bot import TradingBot
+from .chat import BOT_REPLIES, DUEL_PRESETS, ChatRateLimit, DuelChat, chat_error
 from .data import User, db, get_rating, save_match
 from .engine import BOT, PRIVATE, RANKED, GameMode, Match, RuleError
 from .market_data import MarketDataUnavailable, MarketProvider
@@ -39,7 +40,7 @@ def token_matches(expected, supplied):
     return (
         isinstance(expected, str)
         and isinstance(supplied, str)
-        and hmac.compare_digest(expected.encode(), supplied.encode())
+        and hmac.compare_digest(expected.encode(errors="surrogatepass"), supplied.encode(errors="surrogatepass"))
     )
 
 
@@ -58,6 +59,7 @@ class LiveMatch:
     started_at: datetime
     # Only human players in trading matches send numbered trade commands.
     next_seq: dict[int, int]
+    chat: DuelChat
     bot: TradingBot | None = None
     retry_after: float = 0.0
     rematch_of: str | None = None
@@ -82,6 +84,13 @@ class Connection:
     session_token: str
 
 
+@dataclass(frozen=True)
+class RecentResult:
+    expires_at: float
+    state: dict
+    chat: DuelChat | None = None
+
+
 @dataclass
 class MatchService:
     app: Flask
@@ -93,7 +102,8 @@ class MatchService:
     _match_by_user: dict[int, str] = field(default_factory=dict, init=False)
     _connections: dict[str, Connection] = field(default_factory=dict, init=False)
     _sids: dict[int, set[str]] = field(default_factory=dict, init=False)
-    _results: dict[int, tuple[float, dict]] = field(default_factory=dict, init=False)
+    _results: dict[int, RecentResult] = field(default_factory=dict, init=False)
+    _chat_limit: ChatRateLimit = field(default_factory=ChatRateLimit, init=False)
     _private_invitations: dict[int, PrivateInvitation] = field(default_factory=dict, init=False)
     _private_rematches: dict[str, PrivateRematch] = field(default_factory=dict, init=False)
     _lock: RLock = field(default_factory=RLock, init=False)
@@ -129,8 +139,8 @@ class MatchService:
                 self._send_practice(practice, now, sid=sid)
             else:
                 result = self._results.get(user_id)
-                if result and result[0] > now:
-                    self.socketio.emit("match_result", result[1], to=sid)
+                if result and result.expires_at > now:
+                    self.socketio.emit("match_result", result.state, to=sid)
                 self._emit_user("prediction_practice_ended", {"id": None}, user_id, sid=sid)
             self._notify_private_peer(user_id, now)
             self._send_private(user_id, now, sid=sid)
@@ -168,6 +178,62 @@ class MatchService:
     def online_count(self):
         with self._lock:
             return len(self._sids)
+
+    def _duel_chat_for(self, user_id, match_id, now):
+        live = self._live_for(user_id)
+        if live and live.game.id == match_id:
+            return live.chat
+        recent = self._results.get(user_id)
+        if recent and recent.expires_at > now and recent.state["id"] == match_id:
+            return recent.chat
+        return None
+
+    def duel_chat_history(self, sid, payload):
+        if not isinstance(payload, dict) or payload.keys() != {"matchId"}:
+            return chat_error("chat_invalid")
+        match_id = payload["matchId"]
+        if not isinstance(match_id, str) or len(match_id) != 32:
+            return chat_error("chat_invalid")
+        with self._lock:
+            connection = self._connections.get(sid)
+            if connection:
+                chat = self._duel_chat_for(connection.user_id, match_id, self.clock())
+                if chat is not None:
+                    return chat.history.snapshot()
+            return chat_error("chat_unavailable")
+
+    def duel_chat_send(self, sid, payload):
+        if not isinstance(payload, dict) or payload.keys() != {"matchId", "preset"}:
+            return chat_error("chat_invalid")
+        match_id = payload["matchId"]
+        preset = payload["preset"]
+        if (
+            not isinstance(match_id, str) or len(match_id) != 32
+            or not isinstance(preset, str) or preset not in DUEL_PRESETS
+        ):
+            return chat_error("chat_invalid")
+        with self._lock:
+            connection = self._connections.get(sid)
+            if connection is None:
+                return chat_error("chat_unavailable")
+            user_id = connection.user_id
+            now = self.clock()
+            chat = self._duel_chat_for(user_id, match_id, now)
+            if chat is None:
+                return chat_error("chat_unavailable")
+            if not self._chat_limit.allow(user_id, now):
+                return chat_error("chat_rate_limited")
+
+            message = chat.add(user_id, preset)
+            if chat.bot_id is not None:
+                self._emit_user("duel_chat_message", message, user_id)
+                reply = chat.add(chat.bot_id, BOT_REPLIES.get(preset, preset))
+                self._emit_user("duel_chat_message", reply, user_id)
+            else:
+                for player_id in chat.players:
+                    if self._duel_chat_for(player_id, match_id, now) is chat:
+                        self._emit_user("duel_chat_message", message, player_id)
+            return {"ok": True}
 
     def spectate_list(self, sid, payload=None):
         with self._lock:
@@ -536,8 +602,8 @@ class MatchService:
             practice = self._practices.get(user_id)
             if not practice:
                 cached = self._results.get(user_id)
-                if cached and cached[0] > now:
-                    result = cached[1]
+                if cached and cached.expires_at > now:
+                    result = cached.state
                     if (
                         result["mode"] == PRACTICE_MODE
                         and result["id"] == payload["matchId"]
@@ -557,7 +623,7 @@ class MatchService:
             if completed:
                 result = practice.result(now)
                 self._practices.pop(user_id)
-                self._results[user_id] = (now + RESULT_RETENTION, result)
+                self._results[user_id] = RecentResult(now + RESULT_RETENTION, result)
                 self._emit_user("match_result", result, user_id)
             else:
                 self._send_practice(practice, now)
@@ -604,7 +670,7 @@ class MatchService:
                     self._send_queue(user_id, now)
                 self._expire_private(now)
                 self._results = {
-                    user_id: result for user_id, result in self._results.items() if result[0] > now
+                    user_id: result for user_id, result in self._results.items() if result.expires_at > now
                 }
 
     def _start_background(self):
@@ -671,7 +737,9 @@ class MatchService:
             )
             next_seq = dict.fromkeys(players, 1)
         started_at = datetime.now(UTC) + timedelta(seconds=self.countdown)
-        live = LiveMatch(game, started_at, next_seq, bot=bot, rematch_of=rematch_of)
+        chat = DuelChat(game.id, {user_id: player.name for user_id, player in game.players.items()},
+                        BOT_USER_ID if bot is not None else None)
+        live = LiveMatch(game, started_at, next_seq, chat, bot=bot, rematch_of=rematch_of)
         self.matches[game.id] = live
         for user_id in players:
             self._drop_practice(user_id)
@@ -737,7 +805,7 @@ class MatchService:
                 "periodStart": scenario.bars[0].timestamp.isoformat(),
                 "periodEnd": scenario.bars[game.revealed_count - 1].timestamp.isoformat(),
             }
-            self._results[user_id] = (expires_at, result)
+            self._results[user_id] = RecentResult(expires_at, result, live.chat)
             self._emit_user("match_result", result, user_id)
             self._match_by_user.pop(user_id, None)
         if game.mode.key == PRIVATE.key:
@@ -752,9 +820,9 @@ class MatchService:
 
     def _private_rematch_for(self, user_id, now):
         previous = self._results.get(user_id)
-        if previous is None or previous[0] <= now:
+        if previous is None or previous.expires_at <= now:
             return None, None
-        match_id = previous[1]["id"]
+        match_id = previous.state["id"]
         rematch = self._private_rematches.get(match_id)
         if rematch is None or rematch.expires_at <= now:
             return None, None
@@ -915,6 +983,18 @@ def install_handlers(socketio):
     @socketio.on("private_rematch")
     def on_private_rematch(payload=None):
         return service().private_rematch(request.sid, payload)
+
+    @socketio.on("duel_chat_history")
+    def on_duel_chat_history(payload=None, *extra):
+        if extra:
+            return chat_error("chat_invalid")
+        return service().duel_chat_history(request.sid, payload)
+
+    @socketio.on("duel_chat_send")
+    def on_duel_chat_send(payload=None, *extra):
+        if extra:
+            return chat_error("chat_invalid")
+        return service().duel_chat_send(request.sid, payload)
 
     @socketio.on("trade")
     def on_trade(payload=None):

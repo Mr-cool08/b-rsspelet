@@ -1,0 +1,23 @@
+{% macro public_chat(id, company_view=false) -%}
+<section id="{{ id }}" class="game-chat{% if company_view %} company-panel{% endif %}" data-public-chat
+    aria-labelledby="{{ id }}-title"{% if company_view %} data-company-view hidden{% endif %}>
+    <header class="game-chat-heading">
+        <h2 id="{{ id }}-title" data-i18n="Publik chatt">Publik chatt</h2>
+        <p class="game-chat-description" data-i18n="Alla inloggade spelare kan läsa och skriva här.">Alla inloggade spelare kan läsa och skriva här.</p>
+    </header>
+    <div class="game-chat-log" role="log" aria-labelledby="{{ id }}-title" tabindex="0">
+        <p class="game-chat-empty" data-chat-empty data-i18n="Inga meddelanden ännu." hidden>Inga meddelanden ännu.</p>
+        <div data-chat-messages></div>
+    </div>
+    <form class="game-chat-form" novalidate>
+        <label for="{{ id }}-message" data-i18n="Meddelande">Meddelande</label>
+        <div class="game-chat-compose">
+            <input id="{{ id }}-message" type="text" maxlength="480" autocomplete="off" required
+                aria-describedby="{{ id }}-status">
+            <button class="button button-primary" type="submit" data-i18n="Skicka" disabled>Skicka</button>
+        </div>
+    </form>
+    <p id="{{ id }}-status" class="game-chat-status" role="status"></p>
+    <button class="button button-secondary" type="button" data-chat-retry data-i18n="Försök igen" hidden>Försök igen</button>
+</section>
+{%- endmacro %}

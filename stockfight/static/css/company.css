@@ -61,7 +61,7 @@
 
 .company-navigation {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     margin-bottom: 14px;
 }
@@ -86,6 +86,7 @@
 .company-navigation a[aria-current="location"] { color: var(--company-teal); border-color: #71b29f; background: #25403e; }
 .company-nav-icon { display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px; color: var(--company-teal); font: 400 1.22rem/1 var(--sans); }
 .company-nav-market::before { content: ""; width: 16px; height: 14px; background: currentColor; clip-path: polygon(0 82%, 34% 43%, 56% 59%, 80% 23%, 65% 23%, 65% 8%, 100% 8%, 100% 43%, 86% 43%, 86% 29%, 59% 80%, 35% 62%, 5% 96%); }
+.company-nav-chat::before { content: ""; width: 16px; height: 14px; border-radius: 2px; background: currentColor; clip-path: polygon(0 0, 100% 0, 100% 76%, 42% 76%, 20% 100%, 20% 76%, 0 76%); }
 
 .company-balance {
     display: grid;
@@ -303,6 +304,7 @@
 @media (max-width: 645px) {
     .company-hero, .company-operations { grid-template-columns: minmax(0, 1fr); gap: 10px; }
     .company-balance > div { padding: 8px 7px; }
+    .company-navigation a { flex-direction: column; gap: 3px; min-height: 51px; font-size: .75rem; }
     .company-topbar .brand { gap: 5px; }
     .company-home, .company-topbar select { font-size: .74rem; }
     .company-market-terminal { grid-template-columns: minmax(0, 1fr); }
@@ -315,6 +317,8 @@
 
 @media (max-width: 425px) {
     .company-market-balances { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .company-navigation a { flex-direction: column; gap: 3px; min-height: 51px; font-size: .75rem; }
+    .company-navigation { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .company-navigation a { grid-column: span 2; }
+    .company-navigation a:nth-last-child(-n + 2) { grid-column: span 3; }
     .company-data-table th, .company-data-table td { padding-inline: 3px; }
 }

@@ -1,4 +1,5 @@
 <!doctype html>
+{% from 'public_chat.html' import public_chat %}
 <html lang="sv">
 <head>
     <meta charset="utf-8">
@@ -7,8 +8,11 @@
     <title>Börskarriär · Stock Fight</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/campaign.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+    <script defer src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
     <script defer src="{{ url_for('static', filename='vendor/lightweight-charts.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/public-chat.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/campaign.js') }}"></script>
 </head>
 <body class="career-body">
@@ -32,6 +36,9 @@
         <div id="career-content" aria-busy="true">
             <header class="career-intro"><h1>Börskarriär</h1></header>
             <p data-career-text="loading" role="status">Laddar …</p>
+        </div>
+        <div class="shared-chat-slot">
+            {{ public_chat('portfolio-company-chat') }}
         </div>
         <noscript>Aktivera JavaScript för att spela.</noscript>
     </main>

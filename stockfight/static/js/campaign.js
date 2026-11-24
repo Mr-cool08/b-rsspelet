@@ -837,6 +837,7 @@
             if (!account.ok || !campaign.ok) throw new Error("connection");
             csrf = (await account.json()).csrfToken;
             updateState(await campaign.json());
+            window.StockFightPublicChat?.connect(csrf);
         } catch {
             content.innerHTML = `<section class="career-card career-entry-error">
                 <h1>${tx("career")}</h1><p>${tx("loadError")}</p>

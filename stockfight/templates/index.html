@@ -1,3 +1,4 @@
+{% from 'public_chat.html' import public_chat %}
 {% macro icon(symbol, kind='') -%}
     <span class="ui-icon{% if kind %} {{ kind }}{% endif %}" aria-hidden="true">{{ symbol }}</span>
 {%- endmacro %}
@@ -51,10 +52,13 @@
     <meta name="theme-color" content="#0c1119">
     <title>Stock Fight</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
     <script defer src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
     <script defer src="{{ url_for('static', filename='vendor/lightweight-charts.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/i18n.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/prediction-chart.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/duel-chat.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/public-chat.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
 </head>
 <body>
@@ -561,6 +565,23 @@
                     <button id="practice-next" class="button button-primary" type="button" data-action="practice-next" hidden data-i18n="Nästa runda">Nästa runda</button>
                 </section>
             </div>
+            <div id="match-duel-chat-slot">
+                <section id="duel-chat" class="chat-panel panel duel-chat" aria-labelledby="duel-chat-title" hidden>
+                    <h2 id="duel-chat-title" class="chat-heading" data-i18n="Duellchatt">Duellchatt</h2>
+                    <div role="log" aria-labelledby="duel-chat-title">
+                        <div id="duel-chat-log" class="chat-log" tabindex="0" hidden></div>
+                        <p id="duel-chat-empty" class="chat-empty" data-i18n="Inga duellmeddelanden ännu.">Inga duellmeddelanden ännu.</p>
+                    </div>
+                    <div id="duel-chat-presets" class="chat-presets" role="group" aria-label="Snabbmeddelanden och emojis" data-i18n-aria-label="Snabbmeddelanden och emojis">
+                        {% set emoji_labels = {'wave': 'Vinkning', 'thumbs_up': 'Tumme upp', 'fire': 'Eld', 'laugh': 'Skratt'} %}
+                        {% for preset, (kind, text) in duel_presets.items() %}
+                        {% set label = emoji_labels.get(preset) if kind == 'emoji' else none %}
+                        <button class="button button-secondary" type="button" data-chat-preset="{{ preset }}" {% if label %}aria-label="{{ label }}" data-i18n-aria-label="{{ label }}"{% else %}data-i18n="{{ text }}"{% endif %} disabled>{{ text }}</button>
+                        {% endfor %}
+                    </div>
+                    <p id="duel-chat-status" class="chat-status" role="status" hidden></p>
+                </section>
+            </div>
         </section>
 
         <section id="result-screen" class="screen result-screen" aria-label="Matchresultat" data-i18n-aria-label="Matchresultat" hidden>
@@ -606,6 +627,7 @@
                     <button id="result-rematch" class="button button-primary" type="button" data-action="play-again" data-i18n="Spela igen">Spela igen</button>
                     <p id="result-revenge-status" class="match-feedback" role="status" hidden></p>
                 </div>
+                <div id="result-duel-chat-slot"></div>
                 <details id="result-statistics" class="result-detail">
                     <summary data-i18n="Statistik">Statistik</summary>
                     <dl id="result-trade-stats" class="result-stats">
@@ -648,6 +670,9 @@
             </div>
         </section>
 
+        <div id="shared-chat-slot" class="shared-chat-slot" hidden>
+            {{ public_chat('shared-company-chat') }}
+        </div>
         <noscript><p class="form-error">Aktivera JavaScript för att spela Stock Fight.</p></noscript>
     </main>
 

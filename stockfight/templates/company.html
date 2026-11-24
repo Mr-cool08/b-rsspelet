@@ -1,4 +1,5 @@
 <!doctype html>
+{% from 'public_chat.html' import public_chat %}
 <html lang="sv">
 <head>
     <meta charset="utf-8">
@@ -8,9 +9,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/company.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/company-standings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
     <script defer src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
     <script defer src="{{ url_for('static', filename='vendor/lightweight-charts.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/public-chat.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/company-standings.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/company-market.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/company.js') }}"></script>
@@ -44,6 +47,7 @@
             <div id="company-admin" class="company-operations" data-company-view hidden></div>
             <div id="company-reports" data-company-view hidden></div>
             <section id="company-standings" data-company-view hidden></section>
+            {{ public_chat('company-chat', company_view=true) }}
         </div>
         <noscript>Börsföretag behöver JavaScript för att kunna spelas.</noscript>
     </main>

@@ -13,6 +13,7 @@
         liveMarket: ["Börs", "Market"],
         administration: ["Firma", "Firm"],
         otherFirms: ["Spelarbörs", "Player exchange"],
+        chat: ["Chatt", "Chat"],
         sections: ["Börsföretagets vyer", "Trading firm views"],
         loading: ["Laddar …", "Loading …"],
         level: ["Nivå {level}", "Level {level}"],
@@ -132,10 +133,20 @@
     let pending = false;
     let error;
     let refreshing = false;
+    let socket;
+    let socketToken;
     const botDrafts = new Map();
     let openBotEditors = new Set();
 
     function publishState() {
+        if (window.io && csrfToken && socketToken !== csrfToken) {
+            socket?.disconnect();
+            socketToken = csrfToken;
+            socket = window.io("/company", { auth: { csrfToken }, autoConnect: false });
+            window.StockFightPublicChat?.attach(socket);
+            window.dispatchEvent(new CustomEvent("company:socket", { detail: socket }));
+            socket.connect();
+        }
         window.dispatchEvent(new CustomEvent("company:updated", { detail: { ...state, csrfToken } }));
     }
 
@@ -177,6 +188,7 @@
             <a id="company-tab-admin" href="#company-admin"><span class="company-nav-icon" aria-hidden="true">⚙︎</span>${tx("administration")}</a>
             <a id="company-tab-reports" href="#company-reports"><span class="company-nav-icon" aria-hidden="true">▤</span>${tx("reportsTab")}</a>
             <a id="company-tab-standings" href="#company-standings"><span class="company-nav-icon" aria-hidden="true">♟︎</span>${tx("otherFirms")}</a>
+            <a id="company-tab-chat" href="#company-chat"><span class="company-nav-icon company-nav-chat" aria-hidden="true"></span>${tx("chat")}</a>
         </nav>`;
     }
 
